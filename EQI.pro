@@ -69,10 +69,37 @@ DEFINES -=QT_NO_DEBUG_OUTPUT # enable debug output
 
 SOURCES += \
         main.cpp \
-        mainwindow.cpp
+        mainwindow.cpp \
+    ui/toolTab/tab_coordinatetransformation.cpp \
+    qgis/app/qgsstatusbarcoordinateswidget.cpp \
+    eqi/eqiapplication.cpp \
+    qgis/app/qgisappstylesheet.cpp \
+    ui/toolTab/tab_uavdatamanagement.cpp \
+    qgis/app/qgsapplayertreeviewmenuprovider.cpp \
+    qgis/app/qgsvisibilitypresets.cpp \
+    qgis/app/qgsclipboard.cpp \
+    qgis/app/qgsmaplayerstyleguiutils.cpp
 
 HEADERS += \
-        mainwindow.h
+        mainwindow.h \
+    ui/toolTab/tab_coordinatetransformation.h \
+    qgis/app/qgsstatusbarcoordinateswidget.h \
+    eqi/eqiapplication.h \
+    qgis/app/qgisappstylesheet.h \
+    ui/toolTab/tab_uavdatamanagement.h \
+    qgis/app/qgsapplayertreeviewmenuprovider.h \
+    qgis/app/qgsvisibilitypresets.h \
+    qgis/app/qgsclipboard.h \
+    qgis/app/qgsmaplayerstyleguiutils.h
 
 FORMS += \
-        mainwindow.ui
+        mainwindow.ui \
+    ui/toolTab/tab_coordinatetransformation.ui \
+    ui/toolTab/tab_uavdatamanagement.ui \
+    ui/qgis/qgssymbolv2selectordialogbase.ui
+
+RESOURCES += \
+    Resources/images/images.qrc \
+    Resources/images/images.qrc
+
+DISTFILES +=
