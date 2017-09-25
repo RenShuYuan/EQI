@@ -1,0 +1,25 @@
+﻿创建Git	git init
+添加文件到暂存区	git add
+删除文件	git rm filename
+查看暂存区	git status
+查看修改内容	git diff
+提交文件到仓库	git commit -m "说明"
+查看历史记录	git log
+查看历史记录(简化)	git log --pretty=oneline
+版本回退	git reset --hard HEAD^
+查看操作记录	git reflog
+撤销工作区文件	git checkout -- filename
+撤销暂存区文件	git reset HEAD filename
+
+
+添加远程库	git remote add origin git@github.com:RenShuYuan/EQI.git
+本地内容推送到远程库(第一次)	git push -u origin master
+本地内容推送到远程库	git push origin master
+克隆远程库	git clone git@github.com:RenShuYuan/EQI.git
+创建分支	git branch dev
+切换分支	git checkout dev
+创建分支并切换	git checkout -b dev
+查看分支	git branch
+合并分支	git merge dev
+删除分支	git branch -d dev
+分支合并图	git log --graph

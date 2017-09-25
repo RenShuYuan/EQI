@@ -54,16 +54,16 @@ MainWindow *MainWindow::smInstance = nullptr;
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
-//    , mScaleLabel( nullptr )
-//    , mScaleEdit( nullptr )
-//    , mCoordsEdit( nullptr )
-//    , mRotationLabel( nullptr )
-//    , mRotationEdit( nullptr )
-//    , mProgressBar( nullptr )
-//    , mRenderSuppressionCBox( nullptr )
-//    , mOnTheFlyProjectionStatusButton( nullptr )
-//    , mLayerTreeCanvasBridge( nullptr )
-//    , mInternalClipboard( nullptr )
+    , mScaleLabel( nullptr )
+    , mScaleEdit( nullptr )
+    , mCoordsEdit( nullptr )
+    , mRotationLabel( nullptr )
+    , mRotationEdit( nullptr )
+    , mProgressBar( nullptr )
+    , mRenderSuppressionCBox( nullptr )
+    , mOnTheFlyProjectionStatusButton( nullptr )
+    , mLayerTreeCanvasBridge( nullptr )
+    , mInternalClipboard( nullptr )
     , mShowProjectionTab( false )
 {
     if ( smInstance )
@@ -136,59 +136,59 @@ MainWindow::~MainWindow()
 {
     delete ui;
 
-//    mMapCanvas->stopRendering();
+    mMapCanvas->stopRendering();
 
-//    delete mInternalClipboard;
+    delete mInternalClipboard;
 
-//    delete mMapTools.mZoomIn;
-//    delete mMapTools.mZoomOut;
-//    delete mMapTools.mPan;
+    delete mMapTools.mZoomIn;
+    delete mMapTools.mZoomOut;
+    delete mMapTools.mPan;
 
-//    delete mMapTools.mAddFeature;
-//    delete mMapTools.mAddPart;
-//    delete mMapTools.mAddRing;
-//    delete mMapTools.mFillRing;
-//    delete mMapTools.mAnnotation;
-//    delete mMapTools.mChangeLabelProperties;
-//    delete mMapTools.mDeletePart;
-//    delete mMapTools.mDeleteRing;
-//    delete mMapTools.mFeatureAction;
-//    delete mMapTools.mFormAnnotation;
-//    delete mMapTools.mHtmlAnnotation;
-//    delete mMapTools.mIdentify;
-//    delete mMapTools.mMeasureAngle;
-//    delete mMapTools.mMeasureArea;
-//    delete mMapTools.mMeasureDist;
-//    delete mMapTools.mMoveFeature;
-//    delete mMapTools.mMoveLabel;
-//    delete mMapTools.mNodeTool;
-//    delete mMapTools.mOffsetCurve;
-//    delete mMapTools.mPinLabels;
-//    delete mMapTools.mReshapeFeatures;
-//    delete mMapTools.mRotateFeature;
-//    delete mMapTools.mRotateLabel;
-//    delete mMapTools.mRotatePointSymbolsTool;
-//    delete mMapTools.mSelectFreehand;
-//    delete mMapTools.mSelectPolygon;
-//    delete mMapTools.mSelectRadius;
-//    delete mMapTools.mSelectFeatures;
-//    delete mMapTools.mShowHideLabels;
-//    delete mMapTools.mSimplifyFeature;
-//    delete mMapTools.mSplitFeatures;
-//    delete mMapTools.mSplitParts;
-//    delete mMapTools.mSvgAnnotation;
-//    delete mMapTools.mTextAnnotation;
-//    delete mMapTools.mCircularStringCurvePoint;
-//    delete mMapTools.mCircularStringRadius;
+    delete mMapTools.mAddFeature;
+    delete mMapTools.mAddPart;
+    delete mMapTools.mAddRing;
+    delete mMapTools.mFillRing;
+    delete mMapTools.mAnnotation;
+    delete mMapTools.mChangeLabelProperties;
+    delete mMapTools.mDeletePart;
+    delete mMapTools.mDeleteRing;
+    delete mMapTools.mFeatureAction;
+    delete mMapTools.mFormAnnotation;
+    delete mMapTools.mHtmlAnnotation;
+    delete mMapTools.mIdentify;
+    delete mMapTools.mMeasureAngle;
+    delete mMapTools.mMeasureArea;
+    delete mMapTools.mMeasureDist;
+    delete mMapTools.mMoveFeature;
+    delete mMapTools.mMoveLabel;
+    delete mMapTools.mNodeTool;
+    delete mMapTools.mOffsetCurve;
+    delete mMapTools.mPinLabels;
+    delete mMapTools.mReshapeFeatures;
+    delete mMapTools.mRotateFeature;
+    delete mMapTools.mRotateLabel;
+    delete mMapTools.mRotatePointSymbolsTool;
+    delete mMapTools.mSelectFreehand;
+    delete mMapTools.mSelectPolygon;
+    delete mMapTools.mSelectRadius;
+    delete mMapTools.mSelectFeatures;
+    delete mMapTools.mShowHideLabels;
+    delete mMapTools.mSimplifyFeature;
+    delete mMapTools.mSplitFeatures;
+    delete mMapTools.mSplitParts;
+    delete mMapTools.mSvgAnnotation;
+    delete mMapTools.mTextAnnotation;
+    delete mMapTools.mCircularStringCurvePoint;
+    delete mMapTools.mCircularStringRadius;
 
 //    delete mOverviewMapCursor;
 
-//    // cancel request for FileOpen events
-//    QgsApplication::setFileOpenEventReceiver( nullptr );
+    // cancel request for FileOpen events
+    QgsApplication::setFileOpenEventReceiver( nullptr );
 
-//    QgsApplication::exitQgis();
+    QgsApplication::exitQgis();
 
-//    delete QgsProject::instance();
+    delete QgsProject::instance();
 }
 
 QgsMapCanvas *MainWindow::mapCanvas()
@@ -219,23 +219,23 @@ int MainWindow::messageTimeout()
     return settings.value( "/eqi/messageTimeout", 5 ).toInt();
 }
 
-//void MainWindow::addDockWidget(Qt::DockWidgetArea area, QDockWidget *dockwidget)
-//{
-//    QMainWindow::addDockWidget( area, dockwidget );
-//    // Make the right and left docks consume all vertical space and top
-//    // and bottom docks nest between them
-//    setCorner( Qt::TopLeftCorner, Qt::LeftDockWidgetArea );
-//    setCorner( Qt::BottomLeftCorner, Qt::LeftDockWidgetArea );
-//    setCorner( Qt::TopRightCorner, Qt::RightDockWidgetArea );
-//    setCorner( Qt::BottomRightCorner, Qt::RightDockWidgetArea );
-//    // add to the Panel submenu
+void MainWindow::addDockWidget(Qt::DockWidgetArea area, QDockWidget *dockwidget)
+{
+    QMainWindow::addDockWidget( area, dockwidget );
+    // Make the right and left docks consume all vertical space and top
+    // and bottom docks nest between them
+    setCorner( Qt::TopLeftCorner, Qt::LeftDockWidgetArea );
+    setCorner( Qt::BottomLeftCorner, Qt::LeftDockWidgetArea );
+    setCorner( Qt::TopRightCorner, Qt::RightDockWidgetArea );
+    setCorner( Qt::BottomRightCorner, Qt::RightDockWidgetArea );
+    // add to the Panel submenu
 //    mPanelMenu->addAction( dockwidget->toggleViewAction() );
 
-//    dockwidget->show();
+    dockwidget->show();
 
-//    // refresh the map canvas
-//    mMapCanvas->refresh();
-//}
+    // refresh the map canvas
+    mMapCanvas->refresh();
+}
 
 void MainWindow::initActions()
 {
@@ -512,6 +512,82 @@ void MainWindow::initLayerTreeView()
     mLayerOrderDock->hide();
 
     connect( mMapCanvas, SIGNAL( mapCanvasRefreshed() ), this, SLOT( updateFilterLegend() ) );
+}
+
+void MainWindow::initMenus()
+{
+    // Panel and Toolbar Submenus
+    mPanelMenu = new QMenu( tr( "Panels" ), this );
+    mPanelMenu->setObjectName( "mPanelMenu" );
+    mToolbarMenu = new QMenu( tr( "Toolbars" ), this );
+    mToolbarMenu->setObjectName( "mToolbarMenu" );
+
+    //! 视图菜单
+    ui.mViewMenu->addAction(mActionPan);
+    ui.mViewMenu->addAction(mActionPanToSelected);
+    ui.mViewMenu->addAction(mActionZoomIn);
+    ui.mViewMenu->addAction(mActionZoomOut);
+    ui.mViewMenu->addSeparator();
+
+    QMenu *menuSelect = ui.mViewMenu->addMenu("选择");
+    menuSelect->addAction(mActionSelectFeatures);
+    menuSelect->addAction(mActionSelectPolygon);
+    menuSelect->addAction(mActionDeselectAll);
+    menuSelect->addAction(mActionSelectAll);
+    menuSelect->addAction(mActionInvertSelection);
+
+    ui.mViewMenu->addAction(mActionIdentify);
+
+    QMenu *menuMeasure = ui.mViewMenu->addMenu("测量");
+    menuMeasure->addAction(mActionMeasure);
+    menuMeasure->addAction(mActionMeasureArea);
+
+    ui.mViewMenu->addAction(mActionStatisticalSummary);
+    ui.mViewMenu->addSeparator();
+    ui.mViewMenu->addAction(mActionZoomFullExtent);
+    ui.mViewMenu->addAction(mActionZoomToLayer);
+    ui.mViewMenu->addAction(mActionZoomToSelected);
+    ui.mViewMenu->addAction(mActionZoomLast);
+    ui.mViewMenu->addAction(mActionZoomNext);
+    ui.mViewMenu->addAction(mActionZoomActualSize);
+    ui.mViewMenu->addSeparator();
+    ui.mViewMenu->addAction(mActionMapTips);
+    ui.mViewMenu->addAction(mActionDraw);
+
+    //! 图层菜单
+    QMenu *mNewLayerMenu = ui.mLayerMenu->addMenu("创建图层");
+    mNewLayerMenu->addAction(mActionNewVectorLayer);
+
+    QMenu *mAddLayerMenu = ui.mLayerMenu->addMenu("添加图层");
+    mAddLayerMenu->addAction(mActionAddOgrLayer);
+    mAddLayerMenu->addAction(mActionAddRasterLayer);
+    mAddLayerMenu->addAction(mActionAddDelimitedText);
+
+    ui.mLayerMenu->addSeparator();
+    ui.mLayerMenu->addAction(mActionCopyStyle);
+    ui.mLayerMenu->addAction(mActionPasteStyle);
+    ui.mLayerMenu->addSeparator();
+    ui.mLayerMenu->addAction(mActionOpenTable);
+    ui.mLayerMenu->addSeparator();
+    ui.mLayerMenu->addAction(mActionLayerSaveAs);
+    ui.mLayerMenu->addAction(mActionRemoveLayer);
+    ui.mLayerMenu->addAction(mActionSetLayerCRS);
+    ui.mLayerMenu->addAction(mActionSetProjectCRSFromLayer);
+    ui.mLayerMenu->addAction(mActionLayerProperties);
+    ui.mLayerMenu->addAction(mActionLayerSubsetString);
+    ui.mLayerMenu->addAction(mActionLabeling);
+    ui.mLayerMenu->addSeparator();
+    ui.mLayerMenu->addAction(mActionAddToOverview);
+    ui.mLayerMenu->addAction(mActionAddAllToOverview);
+    ui.mLayerMenu->addAction(mActionRemoveAllFromOverview);
+    ui.mLayerMenu->addSeparator();
+    ui.mLayerMenu->addAction(mActionShowAllLayers);
+    ui.mLayerMenu->addAction(mActionHideAllLayers);
+    ui.mLayerMenu->addAction(mActionShowSelectedLayers);
+    ui.mLayerMenu->addAction(mActionHideSelectedLayers);
+
+    mToolbarMenu = new QMenu( "工具栏", this );
+    mToolbarMenu->setObjectName( "mToolbarMenu" );
 }
 
 //void MainWindow::initOverview()

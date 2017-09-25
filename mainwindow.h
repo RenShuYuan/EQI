@@ -48,7 +48,7 @@ public:
     //! 控制信息显示条显示的时间: 默认为5秒
     int messageTimeout();
 
-//    void addDockWidget( Qt::DockWidgetArea area, QDockWidget *dockwidget );
+    void addDockWidget( Qt::DockWidgetArea area, QDockWidget *dockwidget );
 
     static MainWindow *instance() { return smInstance; }
     QAction *actionHideAllLayers() { return mActionHideAllLayers; }
@@ -59,13 +59,14 @@ public:
     QgsMapOverviewCanvas* mapOverviewCanvas() { return mOverviewCanvas; }
 
 public slots:
-//    QMenu *panelMenu() { return mPanelMenu; }
+    QMenu *panelMenu() { return mPanelMenu; }
 
 private:
     void initActions();
     void initTabTools();
     void initStatusBar();
     void initLayerTreeView();
+    void initMenus();
 //    void initOverview();
 
 private slots:
@@ -133,7 +134,7 @@ private:
     QDockWidget *mLogDock;
     QDockWidget *mOverviewDock;
 //    QCursor *mOverviewMapCursor;
-//    QMenu *mPanelMenu;
+    QMenu *mPanelMenu;
 
     // QGis
     QgsMapCanvas *mMapCanvas;
