@@ -9,6 +9,8 @@
 #include "qgis/app/qgsclipboard.h"
 #include "qgis/app/qgisappstylesheet.h"
 #include "qgis/app/qgsvisibilitypresets.h"
+#include "qgis/app/qgsprojectproperties.h"
+#include "qgis/app/qgsmeasuretool.h"
 
 // Qt
 #include <QAction>
@@ -20,6 +22,8 @@
 #include <QMessageBox>
 #include <QGridLayout>
 #include <QDockWidget>
+#include <QCursor>
+#include <QMenu>
 
 // QGis
 #include "qgsmapcanvas.h"
@@ -35,6 +39,14 @@
 #include "qgslayertreemapcanvasbridge.h"
 #include "qgslayertreemapcanvasbridge.h"
 #include "qgscustomlayerorderwidget.h"
+#include "qgsmessagelogviewer.h"
+#include "qgsmessagelog.h"
+#include "qgsvectorlayer.h"
+#include "qgslayertreegroup.h"
+#include "qgslayertreelayer.h"
+#include "qgslayertree.h"
+#include "qgscoordinateutils.h"
+#include "qgsmapoverviewcanvas.h"
 
 
 MainWindow *MainWindow::smInstance = nullptr;
@@ -42,6 +54,17 @@ MainWindow *MainWindow::smInstance = nullptr;
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
+//    , mScaleLabel( nullptr )
+//    , mScaleEdit( nullptr )
+//    , mCoordsEdit( nullptr )
+//    , mRotationLabel( nullptr )
+//    , mRotationEdit( nullptr )
+//    , mProgressBar( nullptr )
+//    , mRenderSuppressionCBox( nullptr )
+//    , mOnTheFlyProjectionStatusButton( nullptr )
+//    , mLayerTreeCanvasBridge( nullptr )
+//    , mInternalClipboard( nullptr )
+    , mShowProjectionTab( false )
 {
     if ( smInstance )
     {
@@ -52,15 +75,12 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ui->setupUi(this);
 
-    //创建动作
-     initActions();
-
     QWidget *centralWidget = this->centralWidget();
     QGridLayout *centralLayout = new QGridLayout( centralWidget );
     centralWidget->setLayout( centralLayout );
     centralLayout->setContentsMargins( 0, 0, 0, 0 );
 
-    // "theMapCanvas" used to find this canonical instance later
+    // 创建绘图区
     mMapCanvas = new QgsMapCanvas( centralWidget, "theMapCanvas" );
     mMapCanvas->setCanvasColor( QColor( 255, 255, 255 ) );
     connect( mMapCanvas, SIGNAL( messageEmitted( const QString&, const QString&, QgsMessageBar::MessageLevel ) ),
@@ -81,7 +101,6 @@ MainWindow::MainWindow(QWidget *parent) :
              this, SLOT( setAppStyleSheet( const QString& ) ) );
     mStyleSheetBuilder->buildStyleSheet( mStyleSheetBuilder->defaultOptions() );
 
-
     // 设置图层管理面板
     mLayerTreeView = new QgsLayerTreeView( this );
     mLayerTreeView->setObjectName( "theLayerTreeView" );
@@ -90,20 +109,92 @@ MainWindow::MainWindow(QWidget *parent) :
     mInternalClipboard = new QgsClipboard;
     connect( mInternalClipboard, SIGNAL( changed() ), this, SLOT( clipboardChanged() ) );
 
-    //初始化工具栏
+    initActions();
     initTabTools();
-
-    // 创建状态栏
     initStatusBar();
-
     initLayerTreeView();
-
+//    initOverview();
     mMapCanvas->freeze();
+
+    // 消息面板
+    mLogViewer = new QgsMessageLogViewer( statusBar(), this );
+    mLogDock = new QDockWidget( tr( "Log Messages Panel" ), this );
+    mLogDock->setObjectName( "MessageLog" );
+    mLogDock->setAllowedAreas( Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea );
+    addDockWidget( Qt::BottomDockWidgetArea, mLogDock );
+    mLogDock->setWidget( mLogViewer );
+    mLogDock->hide();
+    connect( mMessageButton, SIGNAL( toggled( bool ) ), mLogDock, SLOT( setVisible( bool ) ) );
+    connect( mLogDock, SIGNAL( visibilityChanged( bool ) ), mMessageButton, SLOT( setChecked( bool ) ) );
+    connect( QgsMessageLog::instance(), SIGNAL( messageReceived( bool ) ), this, SLOT( toggleLogMessageIcon( bool ) ) );
+    connect( mMessageButton, SIGNAL( toggled( bool ) ), this, SLOT( toggleLogMessageIcon( bool ) ) );
+    // end
+
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
+
+//    mMapCanvas->stopRendering();
+
+//    delete mInternalClipboard;
+
+//    delete mMapTools.mZoomIn;
+//    delete mMapTools.mZoomOut;
+//    delete mMapTools.mPan;
+
+//    delete mMapTools.mAddFeature;
+//    delete mMapTools.mAddPart;
+//    delete mMapTools.mAddRing;
+//    delete mMapTools.mFillRing;
+//    delete mMapTools.mAnnotation;
+//    delete mMapTools.mChangeLabelProperties;
+//    delete mMapTools.mDeletePart;
+//    delete mMapTools.mDeleteRing;
+//    delete mMapTools.mFeatureAction;
+//    delete mMapTools.mFormAnnotation;
+//    delete mMapTools.mHtmlAnnotation;
+//    delete mMapTools.mIdentify;
+//    delete mMapTools.mMeasureAngle;
+//    delete mMapTools.mMeasureArea;
+//    delete mMapTools.mMeasureDist;
+//    delete mMapTools.mMoveFeature;
+//    delete mMapTools.mMoveLabel;
+//    delete mMapTools.mNodeTool;
+//    delete mMapTools.mOffsetCurve;
+//    delete mMapTools.mPinLabels;
+//    delete mMapTools.mReshapeFeatures;
+//    delete mMapTools.mRotateFeature;
+//    delete mMapTools.mRotateLabel;
+//    delete mMapTools.mRotatePointSymbolsTool;
+//    delete mMapTools.mSelectFreehand;
+//    delete mMapTools.mSelectPolygon;
+//    delete mMapTools.mSelectRadius;
+//    delete mMapTools.mSelectFeatures;
+//    delete mMapTools.mShowHideLabels;
+//    delete mMapTools.mSimplifyFeature;
+//    delete mMapTools.mSplitFeatures;
+//    delete mMapTools.mSplitParts;
+//    delete mMapTools.mSvgAnnotation;
+//    delete mMapTools.mTextAnnotation;
+//    delete mMapTools.mCircularStringCurvePoint;
+//    delete mMapTools.mCircularStringRadius;
+
+//    delete mOverviewMapCursor;
+
+//    // cancel request for FileOpen events
+//    QgsApplication::setFileOpenEventReceiver( nullptr );
+
+//    QgsApplication::exitQgis();
+
+//    delete QgsProject::instance();
+}
+
+QgsMapCanvas *MainWindow::mapCanvas()
+{
+    Q_ASSERT( mMapCanvas );
+    return mMapCanvas;
 }
 
 QgsLayerTreeView *MainWindow::layerTreeView()
@@ -115,6 +206,36 @@ QgsClipboard *MainWindow::clipboard()
 {
     return mInternalClipboard;
 }
+
+QgsMessageBar *MainWindow::messageBar()
+{
+    Q_ASSERT( mInfoBar );
+    return mInfoBar;
+}
+
+int MainWindow::messageTimeout()
+{
+    QSettings settings;
+    return settings.value( "/eqi/messageTimeout", 5 ).toInt();
+}
+
+//void MainWindow::addDockWidget(Qt::DockWidgetArea area, QDockWidget *dockwidget)
+//{
+//    QMainWindow::addDockWidget( area, dockwidget );
+//    // Make the right and left docks consume all vertical space and top
+//    // and bottom docks nest between them
+//    setCorner( Qt::TopLeftCorner, Qt::LeftDockWidgetArea );
+//    setCorner( Qt::BottomLeftCorner, Qt::LeftDockWidgetArea );
+//    setCorner( Qt::TopRightCorner, Qt::RightDockWidgetArea );
+//    setCorner( Qt::BottomRightCorner, Qt::RightDockWidgetArea );
+//    // add to the Panel submenu
+//    mPanelMenu->addAction( dockwidget->toggleViewAction() );
+
+//    dockwidget->show();
+
+//    // refresh the map canvas
+//    mMapCanvas->refresh();
+//}
 
 void MainWindow::initActions()
 {
@@ -147,25 +268,27 @@ void MainWindow::initActions()
     connect( mActionHideSelectedLayers, SIGNAL( triggered() ), this, SLOT( hideSelectedLayers() ) );
 
     /*-----------------------------------------------------------------------------------------*/
-    mCTF_DtoD = new QAction("加载POS文件", this);
-    mCTF_DtoD->setIcon(QIcon(":/Resources/images/themes/default/mActionShowPluginManager.svg"));
-    mCTF_DtoD->setStatusTip(" 度与度分秒格式互转，仅支持文本格式。 ");
+    mActionCTF = new QAction("加载POS文件", this);
+    mActionCTF->setIcon(eqiApplication::getThemeIcon("mActionShowPluginManager.svg"));
+    mActionCTF->setStatusTip(" 度与度分秒格式互转，仅支持文本格式。 ");
 }
 
 void MainWindow::initTabTools()
 {
     // 初始化“坐标转换”tab
     tab_coordinateTransformation *m_tCTF = new tab_coordinateTransformation(this);
-    m_tCTF->addAction(mCTF_DtoD);
+    m_tCTF->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    m_tCTF->addAction(mActionCTF);
 
     // 初始化“无人机数据管理”tab
     tab_uavDataManagement *m_uDM = new tab_uavDataManagement(this);
-    m_uDM->addAction(mCTF_DtoD);
+    m_uDM->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    m_uDM->addAction(mActionCTF);
 
     // 添加tab到窗口
     toolTab = new QTabWidget;
     toolTab->addTab(m_uDM, "无人机数据管理");
-    toolTab->addTab(m_tCTF, "坐标转换");
+    toolTab->addTab(m_tCTF, "　　坐标转换　　");
     ui->mainToolBar->addWidget(toolTab);
 }
 
@@ -195,7 +318,6 @@ void MainWindow::initStatusBar()
     mScaleLabel = new QLabel( QString(), ui->statusBar );
     mScaleLabel->setObjectName( "mScaleLable" );
     mScaleLabel->setMinimumWidth( 10 );
-    //mScaleLabel->setMaximumHeight( 20 );
     mScaleLabel->setMargin( 3 );
     mScaleLabel->setAlignment( Qt::AlignCenter );
     mScaleLabel->setFrameStyle( QFrame::NoFrame );
@@ -220,7 +342,6 @@ void MainWindow::initStatusBar()
         mRotationLabel = new QLabel( QString(), ui->statusBar );
         mRotationLabel->setObjectName( "mRotationLabel" );
         mRotationLabel->setMinimumWidth( 10 );
-        //mRotationLabel->setMaximumHeight( 20 );
         mRotationLabel->setMargin( 3 );
         mRotationLabel->setAlignment( Qt::AlignCenter );
         mRotationLabel->setFrameStyle( QFrame::NoFrame );
@@ -272,8 +393,9 @@ void MainWindow::initStatusBar()
 
     // 消息按钮
     mMessageButton = new QToolButton( ui->statusBar );
+    mMessageButton = new QToolButton( this );
     mMessageButton->setAutoRaise( true );
-    mMessageButton->setIcon( eqiApplication::getThemeIcon( "mMessageLogRead.svg" ) );
+    mMessageButton->setIcon( eqiApplication::getThemeIcon("mMessageLog.svg") );
     mMessageButton->setToolTip( tr( "Messages" ) );
     mMessageButton->setWhatsThis( tr( "Messages" ) );
     mMessageButton->setToolButtonStyle( Qt::ToolButtonTextBesideIcon );
@@ -392,9 +514,273 @@ void MainWindow::initLayerTreeView()
     connect( mMapCanvas, SIGNAL( mapCanvasRefreshed() ), this, SLOT( updateFilterLegend() ) );
 }
 
+//void MainWindow::initOverview()
+//{
+//    // overview canvas
+//    mOverviewCanvas = new QgsMapOverviewCanvas( nullptr, mMapCanvas );
+
+//    //set canvas color to default
+//    QSettings settings;
+//    int red = settings.value( "/eqi/default_canvas_color_red", 255 ).toInt();
+//    int green = settings.value( "/eqi/default_canvas_color_green", 255 ).toInt();
+//    int blue = settings.value( "/eqi/default_canvas_color_blue", 255 ).toInt();
+//    mOverviewCanvas->setBackgroundColor( QColor( red, green, blue ) );
+
+//    mOverviewCanvas->setWhatsThis( "鹰眼地图画布。此画布可以用来显示一个地图定位器，"
+//                                   "显示在地图上画布的当前程度。当前范围被示为红色矩形。"
+//                                   "地图上的任何层都可以被添加到鹰眼画布。" );
+
+//    mOverviewMapCursor = new QCursor( Qt::OpenHandCursor );
+//    mOverviewCanvas->setCursor( *mOverviewMapCursor );
+//    mOverviewDock = new QDockWidget( "鹰眼图面板", this );
+//    mOverviewDock->setObjectName( "Overview" );
+////    QFont myFont( "微软雅黑", 9 );
+////    mOverviewDock->setFont(myFont);
+//    mOverviewDock->setAllowedAreas( Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea );
+//    mOverviewDock->setWidget( mOverviewCanvas );
+//    mOverviewDock->hide();
+//    addDockWidget( Qt::LeftDockWidgetArea, mOverviewDock );
+//    // add to the Panel submenu
+//    mPanelMenu->addAction( mOverviewDock->toggleViewAction() );
+
+//    mMapCanvas->enableOverviewMode( mOverviewCanvas );
+
+//    // moved here to set anti aliasing to both map canvas and overview
+//    QSettings mySettings;
+//    // Anti Aliasing enabled by default as of QGIS 1.7
+//    mMapCanvas->enableAntiAliasing( mySettings.value( "/eqi/enable_anti_aliasing", true ).toBool() );
+
+//    int action = mySettings.value( "/eqi/wheel_action", 2 ).toInt();
+//    double zoomFactor = mySettings.value( "/eqi/zoom_factor", 2 ).toDouble();
+//    mMapCanvas->setWheelAction( static_cast< QgsMapCanvas::WheelAction >( action ), zoomFactor );
+
+//    mMapCanvas->setCachingEnabled( mySettings.value( "/eqi/enable_render_caching", true ).toBool() );
+
+//    mMapCanvas->setParallelRenderingEnabled( mySettings.value( "/eqi/parallel_rendering", false ).toBool() );
+
+//    mMapCanvas->setMapUpdateInterval( mySettings.value( "/eqi/map_update_interval", 250 ).toInt() );
+//}
+
 void MainWindow::showRotation()
 {
     // 更新当前状态栏的旋转标签。
     double myrotation = mMapCanvas->rotation();
     mRotationEdit->setValue( myrotation );
+}
+
+void MainWindow::displayMessage(const QString &title, const QString &message, QgsMessageBar::MessageLevel level)
+{
+    messageBar()->pushMessage( title, message, level, messageTimeout() );
+}
+
+void MainWindow::setAppStyleSheet(const QString &stylesheet)
+{
+    setStyleSheet( stylesheet );
+}
+
+void MainWindow::toggleLogMessageIcon(bool hasLogMessage)
+{
+    if ( hasLogMessage && !mLogDock->isVisible() )
+    {
+        mMessageButton->setIcon( eqiApplication::getThemeIcon( "mMessageLog.svg" ) );
+    }
+    else
+    {
+        mMessageButton->setIcon( eqiApplication::getThemeIcon( "mMessageLogRead.svg" ) );
+    }
+}
+
+void MainWindow::removeLayer()
+{
+    if ( !mLayerTreeView )
+    {
+        return;
+    }
+
+    foreach ( QgsMapLayer * layer, mLayerTreeView->selectedLayers() )
+    {
+        QgsVectorLayer *vlayer = qobject_cast<QgsVectorLayer*>( layer );
+//        if ( vlayer && vlayer->isEditable() && !toggleEditing( vlayer, true ) )
+//            return;
+        if ( vlayer && vlayer->isEditable() )
+            return;
+    }
+
+    QList<QgsLayerTreeNode*> selectedNodes = mLayerTreeView->selectedNodes( true );
+
+    //validate selection
+    if ( selectedNodes.isEmpty() )
+    {
+        messageBar()->pushMessage( tr( "No legend entries selected" ),
+            tr( "Select the layers and groups you want to remove in the legend." ),
+            QgsMessageBar::INFO, messageTimeout() );
+        return;
+    }
+
+    bool promptConfirmation = QSettings().value( "eqi/askToDeleteLayers", true ).toBool();
+    //display a warning
+    if ( promptConfirmation && QMessageBox::warning( this, tr( "Remove layers and groups" ),
+                                                     tr( "Remove %n legend entries?",
+                                                         "number of legend items to remove",
+                                                     selectedNodes.count() ),
+                                                     QMessageBox::Ok | QMessageBox::Cancel ) == QMessageBox::Cancel )
+    {
+        return;
+    }
+
+    Q_FOREACH ( QgsLayerTreeNode* node, selectedNodes )
+    {
+        QgsLayerTreeGroup* parentGroup = qobject_cast<QgsLayerTreeGroup*>( node->parent() );
+        if ( parentGroup )
+            parentGroup->removeChildNode( node );
+    }
+
+    showStatusMessage( tr( "%n legend entries removed.", "number of removed legend entries", selectedNodes.count() ) );
+
+    mMapCanvas->refresh();
+}
+
+void MainWindow::showAllLayers()
+{
+    foreach ( QgsLayerTreeLayer* nodeLayer, mLayerTreeView->layerTreeModel()->rootGroup()->findLayers() )
+        nodeLayer->setVisible( Qt::Checked );
+}
+
+void MainWindow::hideAllLayers()
+{
+    foreach ( QgsLayerTreeLayer* nodeLayer, mLayerTreeView->layerTreeModel()->rootGroup()->findLayers() )
+        nodeLayer->setVisible( Qt::Unchecked );
+}
+
+void MainWindow::showSelectedLayers()
+{
+    foreach ( QgsLayerTreeNode* node, mLayerTreeView->selectedNodes() )
+    {
+        if ( QgsLayerTree::isGroup( node ) )
+            QgsLayerTree::toGroup( node )->setVisible( Qt::Checked );
+        else if ( QgsLayerTree::isLayer( node ) )
+            QgsLayerTree::toLayer( node )->setVisible( Qt::Checked );
+    }
+}
+
+void MainWindow::hideSelectedLayers()
+{
+    foreach ( QgsLayerTreeNode* node, mLayerTreeView->selectedNodes() )
+    {
+        if ( QgsLayerTree::isGroup( node ) )
+            QgsLayerTree::toGroup( node )->setVisible( Qt::Unchecked );
+        else if ( QgsLayerTree::isLayer( node ) )
+            QgsLayerTree::toLayer( node )->setVisible( Qt::Unchecked );
+    }
+}
+
+void MainWindow::canvasRefreshStarted()
+{
+    showProgress( -1, 0 ); // 使进度条显示繁忙指示器
+}
+
+void MainWindow::canvasRefreshFinished()
+{
+    showProgress( 0, 0 ); // 停止忙碌指示
+}
+
+void MainWindow::showProgress(int theProgress, int theTotalSteps)
+{
+    if ( theProgress == theTotalSteps )
+    {
+        mProgressBar->reset();
+        mProgressBar->hide();
+    }
+    else
+    {
+        //only call show if not already hidden to reduce flicker 只有调用show如果尚未隐藏，以减少闪烁
+        if ( !mProgressBar->isVisible() )
+        {
+            mProgressBar->show();
+        }
+        mProgressBar->setMaximum( theTotalSteps );
+        mProgressBar->setValue( theProgress );
+
+        if ( mProgressBar->maximum() == 0 )
+        {
+            // 繁忙指示灯（当最小等于最大值）Qt的风格（在KDE中）有一些问题，并没有启动的忙指示动画。
+            // 这是一个简单的修复，迫使以某种方式继续动画临时进度条的创建。
+            // 注意：在看下面的代码可以在胃中引入轻度疼痛。
+            if ( strcmp( QApplication::style()->metaObject()->className(), "Oxygen::Style" ) == 0 )
+            {
+                QProgressBar pb;
+                pb.setAttribute( Qt::WA_DontShowOnScreen ); // 没有视觉干扰
+                pb.setMaximum( 0 );
+                pb.show();
+                qApp->processEvents();
+            }
+        }
+    }
+}
+
+void MainWindow::userScale()
+{
+    mMapCanvas->zoomScale( 1.0 / mScaleEdit->scale() );
+}
+
+void MainWindow::userRotation()
+{
+    double degrees = mRotationEdit->value();
+    mMapCanvas->setRotation( degrees );
+    mMapCanvas->refresh();
+}
+
+void MainWindow::projectPropertiesProjections()
+{
+    // 驱动程序，以显示该项目对话框并切换到投影页
+    mShowProjectionTab = true;
+    projectProperties();
+}
+
+void MainWindow::projectProperties()
+{
+    /* 显示该项目的属性表*/
+    // 项目属性对话框可能正在构建，改为等待光标
+    QApplication::setOverrideCursor( Qt::WaitCursor );
+    QgsProjectProperties *pp = new QgsProjectProperties( mMapCanvas );
+    // 如果从状态栏调用，显示投影页
+    if ( mShowProjectionTab )
+    {
+        pp->showProjectionsTab();
+        mShowProjectionTab = false;
+    }
+    qApp->processEvents();
+
+    // 如果在项目属性对话框中改变显示精度等，对应修改状态栏
+    connect( pp, SIGNAL( displayPrecisionChanged() ), this,
+        SLOT( updateMouseCoordinatePrecision() ) );
+
+    connect( pp, SIGNAL( scalesChanged( const QStringList & ) ), mScaleEdit,
+        SLOT( updateScales( const QStringList & ) ) );
+    QApplication::restoreOverrideCursor();	//恢复光标
+
+    //通过任意刷新信号关闭到画布
+    connect( pp, SIGNAL( refresh() ), mMapCanvas, SLOT( refresh() ) );
+
+    // 显示模态对话框。
+    pp->exec();
+
+    qobject_cast<QgsMeasureTool*>( mMapTools.mMeasureDist )->updateSettings();
+    qobject_cast<QgsMeasureTool*>( mMapTools.mMeasureArea )->updateSettings();
+
+    // 删除属性表对象
+    delete pp;
+}
+
+void MainWindow::updateMouseCoordinatePrecision()
+{
+    mCoordsEdit->setMouseCoordinatesPrecision(
+                QgsCoordinateUtils::calculateCoordinatePrecision(
+                    mapCanvas()->mapUnitsPerPixel(),
+                    mapCanvas()->mapSettings().destinationCrs() ) );
+}
+
+void MainWindow::showStatusMessage(const QString &theMessage)
+{
+    statusBar()->showMessage( theMessage );
 }

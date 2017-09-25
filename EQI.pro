@@ -27,6 +27,7 @@ RC_ICONS = plane.ico
 # 加载头文件
 INCLUDEPATH +=  C:/qgis-2.14.4/dev/include \
                 C:/OSGeo4W/include \
+                C:/OSGeo4W/include/qt4 \
                 C:/OSGeo4W/include/libxml \
                 C:/OSGeo4W/include/qwt \
                 C:/OSGeo4W/include/spatialindex \
@@ -78,7 +79,10 @@ SOURCES += \
     qgis/app/qgsapplayertreeviewmenuprovider.cpp \
     qgis/app/qgsvisibilitypresets.cpp \
     qgis/app/qgsclipboard.cpp \
-    qgis/app/qgsmaplayerstyleguiutils.cpp
+    qgis/app/qgsmaplayerstyleguiutils.cpp \
+    qgis/app/qgsprojectproperties.cpp \
+    qgis/app/qgsmeasuretool.cpp \
+    qgis/app/qgsmeasuredialog.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -90,16 +94,19 @@ HEADERS += \
     qgis/app/qgsapplayertreeviewmenuprovider.h \
     qgis/app/qgsvisibilitypresets.h \
     qgis/app/qgsclipboard.h \
-    qgis/app/qgsmaplayerstyleguiutils.h
+    qgis/app/qgsmaplayerstyleguiutils.h \
+    qgis/app/qgsprojectproperties.h \
+    qgis/app/qgsmeasuretool.h \
+    qgis/app/qgsmeasuredialog.h
 
 FORMS += \
         mainwindow.ui \
     ui/toolTab/tab_coordinatetransformation.ui \
     ui/toolTab/tab_uavdatamanagement.ui \
-    ui/qgis/qgssymbolv2selectordialogbase.ui
+    ui/qgis/qgssymbolv2selectordialogbase.ui \
+    ui/qgis/qgsmeasurebase.ui \
+    ui/qgis/qgsprojectpropertiesbase.ui
 
 RESOURCES += \
-    Resources/images/images.qrc \
     Resources/images/images.qrc
-
 DISTFILES +=

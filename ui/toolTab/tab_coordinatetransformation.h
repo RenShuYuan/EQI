@@ -1,13 +1,14 @@
-#ifndef TAB_COORDINATETRANSFORMATION_H
+﻿#ifndef TAB_COORDINATETRANSFORMATION_H
 #define TAB_COORDINATETRANSFORMATION_H
 
 #include <QWidget>
+#include <QToolBar>
 
 namespace Ui {
 class tab_coordinateTransformation;
 }
 
-class tab_coordinateTransformation : public QWidget
+class tab_coordinateTransformation : public QToolBar
 {
     Q_OBJECT
 

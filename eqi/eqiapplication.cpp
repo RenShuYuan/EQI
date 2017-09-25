@@ -37,7 +37,6 @@ QString eqiApplication::getFolder( const QString &folder, const QString &name )
 {
 	QDir dir(folder);
 
-	//ÅÐ¶ÏÂ·¾¶ÊÇ·ñ´æÔÚ
 	if (!dir.exists())
 	{
 		return "";

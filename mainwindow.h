@@ -11,18 +11,22 @@ class QProgressBar;
 class QCheckBox;
 class QToolButton;
 class QDockWidget;
+class QCursor;
 
 // QGis
+#include "qgsmessagebar.h"
 class QgsMapCanvas;
 class QgsStatusBarCoordinatesWidget;
 class QgsScaleComboBox;
 class QgsDoubleSpinBox;
 class QgisAppStyleSheet;
 class QgsLayerTreeView;
-class QgsMessageBar;
 class QgsLayerTreeMapCanvasBridge;
 class QgsCustomLayerOrderWidget;
 class QgsClipboard;
+class QgsMessageLogViewer;
+class QgsMapTool;
+class QgsMapOverviewCanvas;
 
 namespace Ui {
 class MainWindow;
@@ -36,8 +40,15 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
+    QgsMapCanvas *mapCanvas();
     QgsLayerTreeView *layerTreeView();
     QgsClipboard *clipboard();
+    QgsMessageBar *messageBar();
+
+    //! 控制信息显示条显示的时间: 默认为5秒
+    int messageTimeout();
+
+//    void addDockWidget( Qt::DockWidgetArea area, QDockWidget *dockwidget );
 
     static MainWindow *instance() { return smInstance; }
     QAction *actionHideAllLayers() { return mActionHideAllLayers; }
@@ -45,22 +56,64 @@ public:
     QAction *actionHideSelectedLayers() { return mActionHideSelectedLayers; }
     QAction *actionShowSelectedLayers() { return mActionShowSelectedLayers; }
     QgsLayerTreeMapCanvasBridge *layerTreeCanvasBridge() { return mLayerTreeCanvasBridge; }
+    QgsMapOverviewCanvas* mapOverviewCanvas() { return mOverviewCanvas; }
+
+public slots:
+//    QMenu *panelMenu() { return mPanelMenu; }
 
 private:
     void initActions();
     void initTabTools();
     void initStatusBar();
-
     void initLayerTreeView();
+//    void initOverview();
 
 private slots:
     void showRotation();
+
+    //! 返回顶部消息
+    void displayMessage( const QString& title, const QString& message, QgsMessageBar::MessageLevel level );
+
+    //! 从settings设置应用程序样式表
+    void setAppStyleSheet( const QString& stylesheet );
+
+    //! 改变状态栏中消息按钮的图标
+    void toggleLogMessageIcon( bool hasLogMessage );
+
+    void removeLayer();
+    void showAllLayers();
+    void hideAllLayers();
+    void showSelectedLayers();
+    void hideSelectedLayers();
+
+    void canvasRefreshStarted();
+    void canvasRefreshFinished();
+    void showProgress( int theProgress, int theTotalSteps );
+
+    //! 处理用户输入的比例尺(slot)
+    void userScale();
+
+    //! 处理用户输入的旋转(slot)
+    void userRotation();
+
+    //! 打开项目属性对话框,并显示在投影状态(slot)
+    void projectPropertiesProjections();
+
+    //! 设置项目属性，包括地图单位(slot)
+    void projectProperties();
+
+    void updateMouseCoordinatePrecision();
+
+    void showStatusMessage( const QString& theMessage );
 
 private:
     Ui::MainWindow *ui;
     static MainWindow *smInstance;
 
-    QAction *mCTF_DtoD;
+    //! 标志，表示该项目属性对话框是怎么出现
+    bool mShowProjectionTab;
+
+    QAction *mActionCTF;
     QAction *mActionFilterLegend;
     QAction *mActionRemoveLayer;
     QAction *mActionShowAllLayers;
@@ -77,6 +130,10 @@ private:
     QToolButton *mOnTheFlyProjectionStatusButton;
     QDockWidget *mLayerTreeDock;
     QDockWidget *mLayerOrderDock;
+    QDockWidget *mLogDock;
+    QDockWidget *mOverviewDock;
+//    QCursor *mOverviewMapCursor;
+//    QMenu *mPanelMenu;
 
     // QGis
     QgsMapCanvas *mMapCanvas;
@@ -89,6 +146,103 @@ private:
     QgsLayerTreeMapCanvasBridge *mLayerTreeCanvasBridge;
     QgsCustomLayerOrderWidget *mMapLayerOrder;
     QgsClipboard *mInternalClipboard;
+    QgsMessageLogViewer *mLogViewer;
+    QgsMapOverviewCanvas *mOverviewCanvas;
+
+    class Tools
+    {
+    public:
+
+        Tools()
+            : mZoomIn( nullptr )
+            , mZoomOut( nullptr )
+            , mPan( nullptr )
+            , mIdentify( nullptr )
+            , mFeatureAction( nullptr )
+            , mMeasureDist( nullptr )
+            , mMeasureArea( nullptr )
+            , mMeasureAngle( nullptr )
+            , mAddFeature( nullptr )
+            , mCircularStringCurvePoint( nullptr )
+            , mCircularStringRadius( nullptr )
+            , mMoveFeature( nullptr )
+            , mOffsetCurve( nullptr )
+            , mReshapeFeatures( nullptr )
+            , mSplitFeatures( nullptr )
+            , mSplitParts( nullptr )
+            , mSelect( nullptr )
+            , mSelectFeatures( nullptr )
+            , mSelectPolygon( nullptr )
+            , mSelectFreehand( nullptr )
+            , mSelectRadius( nullptr )
+            , mVertexAdd( nullptr )
+            , mVertexMove( nullptr )
+            , mVertexDelete( nullptr )
+            , mAddRing( nullptr )
+            , mFillRing( nullptr )
+            , mAddPart( nullptr )
+            , mSimplifyFeature( nullptr )
+            , mDeleteRing( nullptr )
+            , mDeletePart( nullptr )
+            , mNodeTool( nullptr )
+            , mRotatePointSymbolsTool( nullptr )
+            , mAnnotation( nullptr )
+            , mFormAnnotation( nullptr )
+            , mHtmlAnnotation( nullptr )
+            , mSvgAnnotation( nullptr )
+            , mTextAnnotation( nullptr )
+            , mPinLabels( nullptr )
+            , mShowHideLabels( nullptr )
+            , mMoveLabel( nullptr )
+            , mRotateFeature( nullptr )
+            , mRotateLabel( nullptr )
+            , mChangeLabelProperties( nullptr )
+        {}
+
+        QgsMapTool *mZoomIn;
+        QgsMapTool *mZoomOut;
+        QgsMapTool *mPan;
+        QgsMapTool *mIdentify;
+        QgsMapTool *mFeatureAction;
+        QgsMapTool *mMeasureDist;
+        QgsMapTool *mMeasureArea;
+        QgsMapTool *mMeasureAngle;
+        QgsMapTool *mAddFeature;
+        QgsMapTool *mCircularStringCurvePoint;
+        QgsMapTool *mCircularStringRadius;
+        QgsMapTool *mMoveFeature;
+        QgsMapTool *mOffsetCurve;
+        QgsMapTool *mReshapeFeatures;
+        QgsMapTool *mSplitFeatures;
+        QgsMapTool *mSplitParts;
+        QgsMapTool *mSelect;
+        QgsMapTool *mSelectFeatures;
+        QgsMapTool *mSelectPolygon;
+        QgsMapTool *mSelectFreehand;
+        QgsMapTool *mSelectRadius;
+        QgsMapTool *mVertexAdd;
+        QgsMapTool *mVertexMove;
+        QgsMapTool *mVertexDelete;
+        QgsMapTool *mAddRing;
+        QgsMapTool *mFillRing;
+        QgsMapTool *mAddPart;
+        QgsMapTool *mSimplifyFeature;
+        QgsMapTool *mDeleteRing;
+        QgsMapTool *mDeletePart;
+        QgsMapTool *mNodeTool;
+        QgsMapTool *mRotatePointSymbolsTool;
+        QgsMapTool *mAnnotation;
+        QgsMapTool *mFormAnnotation;
+        QgsMapTool *mHtmlAnnotation;
+        QgsMapTool *mSvgAnnotation;
+        QgsMapTool *mTextAnnotation;
+        QgsMapTool *mPinLabels;
+        QgsMapTool *mShowHideLabels;
+        QgsMapTool *mMoveLabel;
+        QgsMapTool *mRotateFeature;
+        QgsMapTool *mRotateLabel;
+        QgsMapTool *mChangeLabelProperties;
+    } mMapTools;
 };
 
 #ifdef ANDROID

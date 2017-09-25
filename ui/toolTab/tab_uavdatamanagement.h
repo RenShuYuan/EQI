@@ -2,12 +2,13 @@
 #define UAVDATAMANAGEMENT_H
 
 #include <QWidget>
+#include <QToolBar>
 
 namespace Ui {
 class tab_uavDataManagement;
 }
 
-class tab_uavDataManagement : public QWidget
+class tab_uavDataManagement : public QToolBar
 {
     Q_OBJECT
 
