@@ -29,11 +29,11 @@ void eqiMapToolPointToTk::canvasReleaseEvent(QgsMapMouseEvent *e)
         else if (count==2)
         {
             nextPoint = toMapCoordinates( e->pos() );
-
+            qDebug() << "1.开始生成图框";///
             eqiFractalManagement fm;
             fm.setBlc(5000);
             QStringList thList = fm.rectToTh(lastPoint, nextPoint);
-
+            qDebug() << "1.结束生成图框";///
             // 是否需要创建矢量图层
             if (fisrtMap)
             {
@@ -60,12 +60,12 @@ void eqiMapToolPointToTk::canvasReleaseEvent(QgsMapMouseEvent *e)
                 dateProvider = newLayer->dataProvider();
                 fisrtMap = false;
             }
-
+            qDebug() << "2.开始生成图框要素";///
             // 生成图幅要素
             QgsFeatureList featureList;
             foreach (QString th, thList)
             {
-                QgsMessageLog::logMessage(th);
+//                QgsMessageLog::logMessage(th);
 
                 QgsPolygon polygon = fm.dNToLal(th);
                 QgsGeometry* mGeometry = QgsGeometry::fromPolygon(polygon);
@@ -76,7 +76,7 @@ void eqiMapToolPointToTk::canvasReleaseEvent(QgsMapMouseEvent *e)
                 MyFeature.setAttributes(QgsAttributes() << QVariant(th));
                 featureList.append(MyFeature);
             }
-
+            qDebug() << "2.结束生成图框要素";///
             // 开始编辑
             newLayer->startEditing();
 
@@ -93,6 +93,7 @@ void eqiMapToolPointToTk::canvasReleaseEvent(QgsMapMouseEvent *e)
             MainWindow::instance()->refreshMapCanvas();
 
             count = 0;
+            qDebug() << "3.循环结束";///
         }
     }
 

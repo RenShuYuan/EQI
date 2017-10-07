@@ -92,7 +92,8 @@ SOURCES += \
     qgis/app/qgsmaptoolselectutils.cpp \
     ui/toolTab/tab_datamanagement.cpp \
     qgis/ogr/qgsopenvectorlayerdialog.cpp \
-    qgis/app/qgsvectorlayersaveasdialog.cpp
+    qgis/app/qgsvectorlayersaveasdialog.cpp \
+    qgis/ogr/qgsogrhelperfunctions.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -117,7 +118,8 @@ HEADERS += \
     qgis/app/qgsmaptoolselectutils.h \
     ui/toolTab/tab_datamanagement.h \
     qgis/ogr/qgsopenvectorlayerdialog.h \
-    qgis/app/qgsvectorlayersaveasdialog.h
+    qgis/app/qgsvectorlayersaveasdialog.h \
+    qgis/ogr/qgsogrhelperfunctions.h
 
 FORMS += \
         mainwindow.ui \

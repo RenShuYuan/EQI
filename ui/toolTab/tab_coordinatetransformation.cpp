@@ -6,7 +6,6 @@ tab_coordinateTransformation::tab_coordinateTransformation(QWidget *parent) :
     ui(new Ui::tab_coordinateTransformation)
 {
     ui->setupUi(this);
-    setMinimumHeight(80);
 }
 
 tab_coordinateTransformation::~tab_coordinateTransformation()

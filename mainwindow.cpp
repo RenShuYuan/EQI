@@ -306,7 +306,6 @@ void MainWindow::refreshMapCanvas()
 {
     //停止任何当前的渲染
     mMapCanvas->stopRendering();
-
     mMapCanvas->refreshAllLayers();
 }
 
@@ -415,21 +414,21 @@ void MainWindow::initActions()
     mActionZoomActualSize->setIcon(eqiApplication::getThemeIcon("mActionZoomActual.svg"));
     connect( mActionZoomActualSize, SIGNAL( triggered() ), this, SLOT( zoomActualSize() ) );
 
-//    mActionZoomToSelected = new QAction("缩放到选择的区域(&S)", this);
-//    mActionZoomToSelected->setShortcut(tr("Ctrl+J"));
-//    mActionZoomToSelected->setStatusTip("缩放到选择的区域(S)");
-//    mActionZoomToSelected->setIcon(eqiApplication::getThemeIcon("mActionZoomToSelected.svg"));
-//    connect( mActionZoomToSelected, SIGNAL( triggered() ), this, SLOT( zoomToSelected() ) );
+    mActionZoomToSelected = new QAction("缩放到\n选择的区域(&S)", this);
+    mActionZoomToSelected->setShortcut(tr("Ctrl+J"));
+    mActionZoomToSelected->setStatusTip("缩放到选择的区域(S)");
+    mActionZoomToSelected->setIcon(eqiApplication::getThemeIcon("mActionZoomToSelected.svg"));
+    connect( mActionZoomToSelected, SIGNAL( triggered() ), this, SLOT( zoomToSelected() ) );
 
-//    mActionZoomToLayer = new QAction("缩放到图层(&L)", this);
-//    mActionZoomToLayer->setStatusTip("缩放到图层(L)");
-//    mActionZoomToLayer->setIcon(eqiApplication::getThemeIcon("mActionZoomToLayer.svg"));
-//    connect( mActionZoomToLayer, SIGNAL( triggered() ), this, SLOT( zoomToLayerExtent() ) );
+    mActionZoomToLayer = new QAction("缩放到图层(&L)", this);
+    mActionZoomToLayer->setStatusTip("缩放到图层(L)");
+    mActionZoomToLayer->setIcon(eqiApplication::getThemeIcon("mActionZoomToLayer.svg"));
+    connect( mActionZoomToLayer, SIGNAL( triggered() ), this, SLOT( zoomToLayerExtent() ) );
 
-//    mActionZoomLast = new QAction("上一视图", this);
-//    mActionZoomLast->setStatusTip("上一视图");
-//    mActionZoomLast->setIcon(eqiApplication::getThemeIcon("mActionZoomLast.svg"));
-//    connect( mActionZoomLast, SIGNAL( triggered() ), this, SLOT( zoomToPrevious() ) );
+    mActionZoomLast = new QAction("上一视图", this);
+    mActionZoomLast->setStatusTip("上一视图");
+    mActionZoomLast->setIcon(eqiApplication::getThemeIcon("mActionZoomLast.svg"));
+    connect( mActionZoomLast, SIGNAL( triggered() ), this, SLOT( zoomToPrevious() ) );
 
 //    mActionZoomNext = new QAction("下一视图", this);
 //    mActionZoomNext->setStatusTip("下一视图");
@@ -484,7 +483,7 @@ void MainWindow::initActions()
 
     /*----------------------------------------------分幅管理-------------------------------------------*/
     mActionPtoTK = new QAction("根据坐标\n创建图框", this);
-    mActionPtoTK->setIcon(eqiApplication::getThemeIcon("eqi/mActionPtoTK.svg"));
+    mActionPtoTK->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionPtoTK.svg"));
     mActionPtoTK->setStatusTip("从屏幕选取或手动输入单点坐标制作图框，利用两个角点坐标可按范围制作图框。");
     connect( mActionPtoTK, SIGNAL( triggered() ), this, SLOT( pointToTk()) );
 
@@ -497,12 +496,12 @@ void MainWindow::initActions()
     mActionAddOgrLayer = new QAction("添加矢量图层...", this);
     mActionAddOgrLayer->setShortcut(tr("Ctrl+Shift+V"));
     mActionAddOgrLayer->setStatusTip("添加矢量图层...");
-    mActionAddOgrLayer->setIcon(eqiApplication::getThemeIcon("mActionAddOgrLayer.svg"));
+    mActionAddOgrLayer->setIcon(eqiApplication::getThemeIcon("eqi/1/mActionAddOgrLayer.png"));
     connect( mActionAddOgrLayer, SIGNAL( triggered() ), this, SLOT( addVectorLayer() ) );
 
     mActionLayerSaveAs = new QAction("另存为(&S)...", this);
     mActionLayerSaveAs->setStatusTip("另存为");
-    mActionLayerSaveAs->setIcon(eqiApplication::getThemeIcon("mActionLayerSaveAs.svg"));
+    mActionLayerSaveAs->setIcon(eqiApplication::getThemeIcon("eqi/1/mActionLayerSaveAs.png"));
     connect( mActionLayerSaveAs, SIGNAL( triggered() ), this, SLOT( saveAsFile() ) );
 }
 
@@ -517,9 +516,9 @@ void MainWindow::initTabTools()
     m_MB->addAction(mActionZoomOut);
     m_MB->addAction(mActionZoomFullExtent);
     m_MB->addAction(mActionZoomActualSize);
-//    m_MB->addAction(mActionZoomToSelected);
-//    m_MB->addAction(mActionZoomToLayer);
-//    m_MB->addAction(mActionZoomLast);
+    m_MB->addAction(mActionZoomToSelected);
+    m_MB->addAction(mActionZoomToLayer);
+    m_MB->addAction(mActionZoomLast);
 //    m_MB->addAction(mActionZoomNext);
 //    m_MB->addAction(mActionDraw);
     m_MB->addAction(mActionIdentify);

@@ -163,9 +163,9 @@ private:
     QAction *mActionZoomOut;
     QAction *mActionZoomFullExtent;
     QAction *mActionZoomActualSize;
-//    QAction *mActionZoomToSelected;
-//    QAction *mActionZoomToLayer;
-//    QAction *mActionZoomLast;
+    QAction *mActionZoomToSelected;
+    QAction *mActionZoomToLayer;
+    QAction *mActionZoomLast;
 //    QAction *mActionZoomNext;
 //    QAction *mActionDraw;
     QAction *mActionIdentify;
