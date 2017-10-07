@@ -2,8 +2,14 @@
 #include "mainwindow.h"
 #include "eqi/eqiapplication.h"
 #include "ui_mainwindow.h"
+#include "eqi/eqifractalmanagement.h"
+#include "eqi/maptool/eqimaptoolpointtotk.h"
+#include "ui/toolTab/tab_mapbrowsing.h"
 #include "ui/toolTab/tab_coordinatetransformation.h"
 #include "ui/toolTab/tab_uavdatamanagement.h"
+#include "ui/toolTab/tab_fractalmanagement.h"
+#include "ui/toolTab/tab_datamanagement.h"
+#include "ui/dialog/dialog_prjtransformsetting.h"
 #include "qgis/app/qgsstatusbarcoordinateswidget.h"
 #include "qgis/app/qgsapplayertreeviewmenuprovider.h"
 #include "qgis/app/qgsclipboard.h"
@@ -11,6 +17,8 @@
 #include "qgis/app/qgsvisibilitypresets.h"
 #include "qgis/app/qgsprojectproperties.h"
 #include "qgis/app/qgsmeasuretool.h"
+#include "qgis/ogr/qgsopenvectorlayerdialog.h"
+#include "qgis/app/qgsvectorlayersaveasdialog.h"
 
 // Qt
 #include <QAction>
@@ -26,7 +34,7 @@
 #include <QMenu>
 
 // QGis
-#include "qgsmapcanvas.h"
+//#include "qgsmapcanvas.h"
 #include "qgsscalecombobox.h"
 #include "qgsdoublespinbox.h"
 #include "qgslayertreeview.h"
@@ -46,7 +54,14 @@
 #include "qgslayertreelayer.h"
 #include "qgslayertree.h"
 #include "qgscoordinateutils.h"
-#include "qgsmapoverviewcanvas.h"
+#include "qgsrasterlayer.h"
+#include "qgsvectordataprovider.h"
+#include "qgsmaplayerregistry.h"
+#include "qgssublayersdialog.h"
+#include "qgsdatumtransformdialog.h"
+#include "qgsmessageviewer.h"
+
+//#include "qgsmapoverviewcanvas.h"
 
 
 MainWindow *MainWindow::smInstance = nullptr;
@@ -237,8 +252,203 @@ void MainWindow::addDockWidget(Qt::DockWidgetArea area, QDockWidget *dockwidget)
     mMapCanvas->refresh();
 }
 
+void MainWindow::pan()
+{
+    mMapCanvas->setMapTool( mMapTools.mPan );
+}
+
+void MainWindow::panToSelected()
+{
+    mMapCanvas->panToSelected();
+}
+
+void MainWindow::zoomIn()
+{
+    mMapCanvas->setMapTool( mMapTools.mZoomIn );
+}
+
+void MainWindow::zoomOut()
+{
+    mMapCanvas->setMapTool( mMapTools.mZoomOut );
+}
+
+void MainWindow::zoomFull()
+{
+    mMapCanvas->zoomToFullExtent();
+}
+
+void MainWindow::zoomActualSize()
+{
+    legendLayerZoomNative();
+}
+
+void MainWindow::zoomToSelected()
+{
+    mMapCanvas->zoomToSelected();
+}
+
+void MainWindow::zoomToLayerExtent()
+{
+    mLayerTreeView->defaultActions()->zoomToLayer( mMapCanvas );
+}
+
+void MainWindow::zoomToPrevious()
+{
+    mMapCanvas->zoomToPreviousExtent();
+}
+
+void MainWindow::zoomToNext()
+{
+    mMapCanvas->zoomToNextExtent();
+}
+
+void MainWindow::refreshMapCanvas()
+{
+    //停止任何当前的渲染
+    mMapCanvas->stopRendering();
+
+    mMapCanvas->refreshAllLayers();
+}
+
+void MainWindow::loadOGRSublayers(const QString &layertype, const QString &uri, const QStringList &list)
+{
+    // The uri must contain the actual uri of the vectorLayer from which we are
+    // going to load the sublayers.
+    QString fileName = QFileInfo( uri ).baseName();
+    QList<QgsMapLayer *> myList;
+    for ( int i = 0; i < list.size(); i++ )
+    {
+        QString composedURI;
+        QStringList elements = list.at( i ).split( ':' );
+        while ( elements.size() > 2 )
+        {
+            elements[0] += ':' + elements[1];
+            elements.removeAt( 1 );
+        }
+
+        QString layerName = elements.value( 0 );
+        QString layerType = elements.value( 1 );
+        if ( layerType == "any" )
+        {
+            layerType = "";
+            elements.removeAt( 1 );
+        }
+
+        if ( layertype != "GRASS" )
+        {
+            composedURI = uri + "|layername=" + layerName;
+        }
+        else
+        {
+            composedURI = uri + "|layerindex=" + layerName;
+        }
+
+        if ( !layerType.isEmpty() )
+        {
+            composedURI += "|geometrytype=" + layerType;
+        }
+
+        // addVectorLayer( composedURI, list.at( i ), "ogr" );
+
+        QgsDebugMsg( "Creating new vector layer using " + composedURI );
+        QString name = list.at( i );
+        name.replace( ':', ' ' );
+        QgsVectorLayer *layer = new QgsVectorLayer( composedURI, fileName + " " + name, "ogr", false );
+        if ( layer && layer->isValid() )
+        {
+            myList << layer;
+        }
+        else
+        {
+            QString msg = tr( "%1 is not a valid or recognized data source" ).arg( composedURI );
+            messageBar()->pushMessage( tr( "Invalid Data Source" ), msg, QgsMessageBar::CRITICAL, messageTimeout() );
+            if ( layer )
+                delete layer;
+        }
+    }
+
+    if ( ! myList.isEmpty() )
+    {
+        // Register layer(s) with the layers registry
+        QgsMapLayerRegistry::instance()->addMapLayers( myList );
+        Q_FOREACH ( QgsMapLayer *l, myList )
+        {
+            bool ok;
+            l->loadDefaultStyle( ok );
+        }
+    }
+}
+
 void MainWindow::initActions()
 {
+    /*--------------------------------------------地图浏览---------------------------------------------*/
+    mActionPan = new QAction("平移地图", this);
+    mActionPan->setStatusTip("平移地图");
+    mActionPan->setIcon(eqiApplication::getThemeIcon("mActionPan.svg"));
+    connect( mActionPan, SIGNAL( triggered() ), this, SLOT( pan() ) );
+
+    mActionPanToSelected = new QAction("在视图中将\n选中部分居中", this);
+    mActionPanToSelected->setStatusTip("在视图中将选中部分居中");
+    mActionPanToSelected->setIcon(eqiApplication::getThemeIcon("mActionPanToSelected.svg"));
+    connect( mActionPanToSelected, SIGNAL( triggered() ), this, SLOT( panToSelected() ) );
+
+    mActionZoomIn = new QAction("放大", this);
+    mActionZoomIn->setShortcut(tr("Ctrl++"));
+    mActionZoomIn->setStatusTip("放大");
+    mActionZoomIn->setIcon(eqiApplication::getThemeIcon("mActionZoomIn.svg"));
+    connect( mActionZoomIn, SIGNAL( triggered() ), this, SLOT( zoomIn() ) );
+
+    mActionZoomOut = new QAction("缩小", this);
+    mActionZoomOut->setShortcut(tr("Ctrl+-"));
+    mActionZoomOut->setStatusTip("缩小");
+    mActionZoomOut->setIcon(eqiApplication::getThemeIcon("mActionZoomOut.svg"));
+    connect( mActionZoomOut, SIGNAL( triggered() ), this, SLOT( zoomOut() ) );
+
+    mActionZoomFullExtent = new QAction("全图显示(&F)", this);
+    mActionZoomFullExtent->setShortcut(tr("Ctrl+Shift+F"));
+    mActionZoomFullExtent->setStatusTip("全图显示(F)");
+    mActionZoomFullExtent->setIcon(eqiApplication::getThemeIcon("mActionZoomFullExtent.svg"));
+    connect( mActionZoomFullExtent, SIGNAL( triggered() ), this, SLOT( zoomFull() ) );
+
+    mActionZoomActualSize = new QAction("缩放到原始\n分辨率(100%)", this);
+    mActionZoomActualSize->setStatusTip("缩放到原始\n分辨率(100%)");
+    mActionZoomActualSize->setIcon(eqiApplication::getThemeIcon("mActionZoomActual.svg"));
+    connect( mActionZoomActualSize, SIGNAL( triggered() ), this, SLOT( zoomActualSize() ) );
+
+//    mActionZoomToSelected = new QAction("缩放到选择的区域(&S)", this);
+//    mActionZoomToSelected->setShortcut(tr("Ctrl+J"));
+//    mActionZoomToSelected->setStatusTip("缩放到选择的区域(S)");
+//    mActionZoomToSelected->setIcon(eqiApplication::getThemeIcon("mActionZoomToSelected.svg"));
+//    connect( mActionZoomToSelected, SIGNAL( triggered() ), this, SLOT( zoomToSelected() ) );
+
+//    mActionZoomToLayer = new QAction("缩放到图层(&L)", this);
+//    mActionZoomToLayer->setStatusTip("缩放到图层(L)");
+//    mActionZoomToLayer->setIcon(eqiApplication::getThemeIcon("mActionZoomToLayer.svg"));
+//    connect( mActionZoomToLayer, SIGNAL( triggered() ), this, SLOT( zoomToLayerExtent() ) );
+
+//    mActionZoomLast = new QAction("上一视图", this);
+//    mActionZoomLast->setStatusTip("上一视图");
+//    mActionZoomLast->setIcon(eqiApplication::getThemeIcon("mActionZoomLast.svg"));
+//    connect( mActionZoomLast, SIGNAL( triggered() ), this, SLOT( zoomToPrevious() ) );
+
+//    mActionZoomNext = new QAction("下一视图", this);
+//    mActionZoomNext->setStatusTip("下一视图");
+//    mActionZoomNext->setIcon(eqiApplication::getThemeIcon("mActionZoomNext.svg"));
+//    connect( mActionZoomNext, SIGNAL( triggered() ), this, SLOT( zoomToNext() ) );
+
+//    mActionDraw = new QAction("刷新", this);
+//    mActionDraw->setShortcut(tr("F5"));
+//    mActionDraw->setStatusTip("刷新");
+//    mActionDraw->setIcon(eqiApplication::getThemeIcon("mActionDraw.svg"));
+//    connect( mActionDraw, SIGNAL( triggered() ), this, SLOT( refreshMapCanvas() ) );
+
+    mActionIdentify = new QAction("识别要素", this);
+    mActionIdentify->setShortcut(tr("Ctrl+Shift+I"));
+    mActionIdentify->setStatusTip("识别要素");
+    mActionIdentify->setIcon(eqiApplication::getThemeIcon("mActionIdentify.svg"));
+    connect( mActionIdentify, SIGNAL( triggered() ), this, SLOT( identify() ) );
+
+    /*--------------------------------------------图层操作---------------------------------------------*/
     mActionRemoveLayer = new QAction("移除图层/组", this);
     mActionRemoveLayer->setShortcut(tr("Ctrl+D"));
     mActionRemoveLayer->setStatusTip("移除图层/组");
@@ -267,14 +477,53 @@ void MainWindow::initActions()
     mActionHideSelectedLayers->setIcon(eqiApplication::getThemeIcon("mActionHideSelectedLayers.png"));
     connect( mActionHideSelectedLayers, SIGNAL( triggered() ), this, SLOT( hideSelectedLayers() ) );
 
-    /*-----------------------------------------------------------------------------------------*/
+    /*----------------------------------------------坐标转换-------------------------------------------*/
     mActionCTF = new QAction("加载POS文件", this);
     mActionCTF->setIcon(eqiApplication::getThemeIcon("mActionShowPluginManager.svg"));
     mActionCTF->setStatusTip(" 度与度分秒格式互转，仅支持文本格式。 ");
+
+    /*----------------------------------------------分幅管理-------------------------------------------*/
+    mActionPtoTK = new QAction("根据坐标\n创建图框", this);
+    mActionPtoTK->setIcon(eqiApplication::getThemeIcon("eqi/mActionPtoTK.svg"));
+    mActionPtoTK->setStatusTip("从屏幕选取或手动输入单点坐标制作图框，利用两个角点坐标可按范围制作图框。");
+    connect( mActionPtoTK, SIGNAL( triggered() ), this, SLOT( pointToTk()) );
+
+    mActionPtoTKSetting = new QAction("参数设置", this);
+    mActionPtoTKSetting->setIcon(eqiApplication::getThemeIcon("propertyicons/settings.svg"));
+    mActionPtoTKSetting->setStatusTip("与分幅图框相关的参数设置。");
+    connect( mActionPtoTKSetting, SIGNAL( triggered() ), this, SLOT( prjtransformsetting() ) );
+
+    /*----------------------------------------------数据管理-------------------------------------------*/
+    mActionAddOgrLayer = new QAction("添加矢量图层...", this);
+    mActionAddOgrLayer->setShortcut(tr("Ctrl+Shift+V"));
+    mActionAddOgrLayer->setStatusTip("添加矢量图层...");
+    mActionAddOgrLayer->setIcon(eqiApplication::getThemeIcon("mActionAddOgrLayer.svg"));
+    connect( mActionAddOgrLayer, SIGNAL( triggered() ), this, SLOT( addVectorLayer() ) );
+
+    mActionLayerSaveAs = new QAction("另存为(&S)...", this);
+    mActionLayerSaveAs->setStatusTip("另存为");
+    mActionLayerSaveAs->setIcon(eqiApplication::getThemeIcon("mActionLayerSaveAs.svg"));
+    connect( mActionLayerSaveAs, SIGNAL( triggered() ), this, SLOT( saveAsFile() ) );
 }
 
 void MainWindow::initTabTools()
 {
+    // 初始化“地图浏览”tab
+    tab_mapBrowsing *m_MB = new tab_mapBrowsing(this);
+    m_MB->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    m_MB->addAction(mActionPan);
+    m_MB->addAction(mActionPanToSelected);
+    m_MB->addAction(mActionZoomIn);
+    m_MB->addAction(mActionZoomOut);
+    m_MB->addAction(mActionZoomFullExtent);
+    m_MB->addAction(mActionZoomActualSize);
+//    m_MB->addAction(mActionZoomToSelected);
+//    m_MB->addAction(mActionZoomToLayer);
+//    m_MB->addAction(mActionZoomLast);
+//    m_MB->addAction(mActionZoomNext);
+//    m_MB->addAction(mActionDraw);
+    m_MB->addAction(mActionIdentify);
+
     // 初始化“坐标转换”tab
     tab_coordinateTransformation *m_tCTF = new tab_coordinateTransformation(this);
     m_tCTF->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
@@ -285,10 +534,25 @@ void MainWindow::initTabTools()
     m_uDM->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
     m_uDM->addAction(mActionCTF);
 
+    // 初始化“分幅管理”tab
+    tab_fractalManagement *m_tFM = new tab_fractalManagement(this);
+    m_tFM->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    m_tFM->addAction(mActionPtoTK);
+    m_tFM->addAction(mActionPtoTKSetting);
+
+    // 初始化“数据管理”tab
+    tab_dataManagement *m_tDM = new tab_dataManagement(this);
+    m_tDM->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    m_tDM->addAction(mActionAddOgrLayer);
+    m_tDM->addAction(mActionLayerSaveAs);
+
     // 添加tab到窗口
     toolTab = new QTabWidget;
+    toolTab->addTab(m_MB, "地图浏览");
     toolTab->addTab(m_uDM, "无人机数据管理");
     toolTab->addTab(m_tCTF, "　　坐标转换　　");
+    toolTab->addTab(m_tFM, "　　分幅管理　　");
+    toolTab->addTab(m_tDM, "　　数据管理　　");
     ui->mainToolBar->addWidget(toolTab);
 }
 
@@ -514,129 +778,271 @@ void MainWindow::initLayerTreeView()
     connect( mMapCanvas, SIGNAL( mapCanvasRefreshed() ), this, SLOT( updateFilterLegend() ) );
 }
 
-void MainWindow::initMenus()
+void MainWindow::askUserForOGRSublayers(QgsVectorLayer *layer)
 {
-    // Panel and Toolbar Submenus
-    mPanelMenu = new QMenu( tr( "Panels" ), this );
-    mPanelMenu->setObjectName( "mPanelMenu" );
-    mToolbarMenu = new QMenu( tr( "Toolbars" ), this );
-    mToolbarMenu->setObjectName( "mToolbarMenu" );
+    if ( !layer )
+    {
+        layer = qobject_cast<QgsVectorLayer *>( activeLayer() );
+        if ( !layer || layer->dataProvider()->name() != "ogr" )
+            return;
+    }
 
-    //! 视图菜单
-    ui.mViewMenu->addAction(mActionPan);
-    ui.mViewMenu->addAction(mActionPanToSelected);
-    ui.mViewMenu->addAction(mActionZoomIn);
-    ui.mViewMenu->addAction(mActionZoomOut);
-    ui.mViewMenu->addSeparator();
+    QStringList sublayers = layer->dataProvider()->subLayers();
+    QString layertype = layer->dataProvider()->storageType();
 
-    QMenu *menuSelect = ui.mViewMenu->addMenu("选择");
-    menuSelect->addAction(mActionSelectFeatures);
-    menuSelect->addAction(mActionSelectPolygon);
-    menuSelect->addAction(mActionDeselectAll);
-    menuSelect->addAction(mActionSelectAll);
-    menuSelect->addAction(mActionInvertSelection);
+    // 我们初始化一个选择对话框并显示它
+    QgsSublayersDialog chooseSublayersDialog( QgsSublayersDialog::Ogr, "ogr", this );
+    chooseSublayersDialog.populateLayerTable( sublayers );
 
-    ui.mViewMenu->addAction(mActionIdentify);
-
-    QMenu *menuMeasure = ui.mViewMenu->addMenu("测量");
-    menuMeasure->addAction(mActionMeasure);
-    menuMeasure->addAction(mActionMeasureArea);
-
-    ui.mViewMenu->addAction(mActionStatisticalSummary);
-    ui.mViewMenu->addSeparator();
-    ui.mViewMenu->addAction(mActionZoomFullExtent);
-    ui.mViewMenu->addAction(mActionZoomToLayer);
-    ui.mViewMenu->addAction(mActionZoomToSelected);
-    ui.mViewMenu->addAction(mActionZoomLast);
-    ui.mViewMenu->addAction(mActionZoomNext);
-    ui.mViewMenu->addAction(mActionZoomActualSize);
-    ui.mViewMenu->addSeparator();
-    ui.mViewMenu->addAction(mActionMapTips);
-    ui.mViewMenu->addAction(mActionDraw);
-
-    //! 图层菜单
-    QMenu *mNewLayerMenu = ui.mLayerMenu->addMenu("创建图层");
-    mNewLayerMenu->addAction(mActionNewVectorLayer);
-
-    QMenu *mAddLayerMenu = ui.mLayerMenu->addMenu("添加图层");
-    mAddLayerMenu->addAction(mActionAddOgrLayer);
-    mAddLayerMenu->addAction(mActionAddRasterLayer);
-    mAddLayerMenu->addAction(mActionAddDelimitedText);
-
-    ui.mLayerMenu->addSeparator();
-    ui.mLayerMenu->addAction(mActionCopyStyle);
-    ui.mLayerMenu->addAction(mActionPasteStyle);
-    ui.mLayerMenu->addSeparator();
-    ui.mLayerMenu->addAction(mActionOpenTable);
-    ui.mLayerMenu->addSeparator();
-    ui.mLayerMenu->addAction(mActionLayerSaveAs);
-    ui.mLayerMenu->addAction(mActionRemoveLayer);
-    ui.mLayerMenu->addAction(mActionSetLayerCRS);
-    ui.mLayerMenu->addAction(mActionSetProjectCRSFromLayer);
-    ui.mLayerMenu->addAction(mActionLayerProperties);
-    ui.mLayerMenu->addAction(mActionLayerSubsetString);
-    ui.mLayerMenu->addAction(mActionLabeling);
-    ui.mLayerMenu->addSeparator();
-    ui.mLayerMenu->addAction(mActionAddToOverview);
-    ui.mLayerMenu->addAction(mActionAddAllToOverview);
-    ui.mLayerMenu->addAction(mActionRemoveAllFromOverview);
-    ui.mLayerMenu->addSeparator();
-    ui.mLayerMenu->addAction(mActionShowAllLayers);
-    ui.mLayerMenu->addAction(mActionHideAllLayers);
-    ui.mLayerMenu->addAction(mActionShowSelectedLayers);
-    ui.mLayerMenu->addAction(mActionHideSelectedLayers);
-
-    mToolbarMenu = new QMenu( "工具栏", this );
-    mToolbarMenu->setObjectName( "mToolbarMenu" );
+    if ( chooseSublayersDialog.exec() )
+    {
+        QString uri = layer->source();
+        //the separator char & was changed to | to be compatible
+        //with url for protocol drivers
+        if ( uri.contains( '|', Qt::CaseSensitive ) )
+        {
+            // If we get here, there are some options added to the filename.
+            // A valid uri is of the form: filename&option1=value1&option2=value2,...
+            // We want only the filename here, so we get the first part of the split.
+            QStringList theURIParts = uri.split( '|' );
+            uri = theURIParts.at( 0 );
+        }
+        QgsDebugMsg( "Layer type " + layertype );
+        // the user has done his choice
+        loadOGRSublayers( layertype, uri, chooseSublayersDialog.selectionNames() );
+    }
 }
 
-//void MainWindow::initOverview()
+void MainWindow::saveAsVectorFileGeneral(QgsVectorLayer *vlayer, bool symbologyOption)
+{
+    if ( !vlayer )
+    {
+        vlayer = qobject_cast<QgsVectorLayer *>( activeLayer() ); // FIXME: output of multiple layers at once?
+    }
+
+    if ( !vlayer )
+        return;
+
+    QgsCoordinateReferenceSystem destCRS;
+
+    int options = QgsVectorLayerSaveAsDialog::AllOptions;
+    if ( !symbologyOption )
+    {
+        options &= ~QgsVectorLayerSaveAsDialog::Symbology;
+    }
+
+    QgsVectorLayerSaveAsDialog *dialog = new QgsVectorLayerSaveAsDialog( vlayer->crs().srsid(), vlayer->extent(), vlayer->selectedFeatureCount() != 0, options, this );
+
+    dialog->setCanvasExtent( mMapCanvas->mapSettings().visibleExtent(), mMapCanvas->mapSettings().destinationCrs() );
+    dialog->setIncludeZ( QgsWKBTypes::hasZ( QGis::fromOldWkbType( vlayer->wkbType() ) ) );
+
+    if ( dialog->exec() == QDialog::Accepted )
+    {
+        QString encoding = dialog->encoding();
+        QString vectorFilename = dialog->filename();
+        QString format = dialog->format();
+        QStringList datasourceOptions = dialog->datasourceOptions();
+        bool autoGeometryType = dialog->automaticGeometryType();
+        QgsWKBTypes::Type forcedGeometryType = dialog->geometryType();
+
+        QgsCoordinateTransform* ct = nullptr;
+        destCRS = QgsCoordinateReferenceSystem( dialog->crs(), QgsCoordinateReferenceSystem::InternalCrsId );
+
+        if ( destCRS.isValid() && destCRS != vlayer->crs() )
+        {
+            ct = new QgsCoordinateTransform( vlayer->crs(), destCRS );
+
+            //ask user about datum transformation
+            QSettings settings;
+            QList< QList< int > > dt = QgsCoordinateTransform::datumTransformations( vlayer->crs(), destCRS );
+            if ( dt.size() > 1 && settings.value( "/Projections/showDatumTransformDialog", false ).toBool() )
+            {
+                QgsDatumTransformDialog d( vlayer->name(), dt );
+                if ( d.exec() == QDialog::Accepted )
+                {
+                    QList< int > sdt = d.selectedDatumTransform();
+                    if ( !sdt.isEmpty() )
+                    {
+                        ct->setSourceDatumTransform( sdt.at( 0 ) );
+                    }
+                    if ( sdt.size() > 1 )
+                    {
+                        ct->setDestinationDatumTransform( sdt.at( 1 ) );
+                    }
+                    ct->initialise();
+                }
+            }
+        }
+
+        // ok if the file existed it should be deleted now so we can continue...
+        QApplication::setOverrideCursor( Qt::WaitCursor );
+
+        QgsVectorFileWriter::WriterError error;
+        QString errorMessage;
+        QString newFilename;
+        QgsRectangle filterExtent = dialog->filterExtent();
+        error = QgsVectorFileWriter::writeAsVectorFormat(
+            vlayer, vectorFilename, encoding, ct, format,
+            dialog->onlySelected(),
+            &errorMessage,
+            datasourceOptions, dialog->layerOptions(),
+            dialog->skipAttributeCreation(),
+            &newFilename,
+            static_cast< QgsVectorFileWriter::SymbologyExport >( dialog->symbologyExport() ),
+            dialog->scaleDenominator(),
+            dialog->hasFilterExtent() ? &filterExtent : nullptr,
+            autoGeometryType ? QgsWKBTypes::Unknown : forcedGeometryType,
+            dialog->forceMulti(),
+            dialog->includeZ()
+            );
+
+        delete ct;
+
+        QApplication::restoreOverrideCursor();
+
+        if ( error == QgsVectorFileWriter::NoError )
+        {
+            if ( dialog->addToCanvas() )
+            {
+                addVectorLayers( QStringList( newFilename ), encoding, "file" );
+            }
+            emit layerSavedAs( vlayer, vectorFilename );
+            messageBar()->pushMessage( tr( "Saving done" ),
+                tr( "Export to vector file has been completed" ),
+                QgsMessageBar::INFO, messageTimeout() );
+        }
+        else
+        {
+            QgsMessageViewer *m = new QgsMessageViewer( nullptr );
+            m->setWindowTitle( tr( "Save error" ) );
+            m->setMessageAsPlainText( tr( "Export to vector file failed.\nError: %1" ).arg( errorMessage ) );
+            m->exec();
+        }
+    }
+
+    delete dialog;
+}
+
+//void MainWindow::initMenus()
 //{
-//    // overview canvas
-//    mOverviewCanvas = new QgsMapOverviewCanvas( nullptr, mMapCanvas );
+//    // Panel and Toolbar Submenus
+//    mPanelMenu = new QMenu( tr( "Panels" ), this );
+//    mPanelMenu->setObjectName( "mPanelMenu" );
+//    mToolbarMenu = new QMenu( tr( "Toolbars" ), this );
+//    mToolbarMenu->setObjectName( "mToolbarMenu" );
 
-//    //set canvas color to default
-//    QSettings settings;
-//    int red = settings.value( "/eqi/default_canvas_color_red", 255 ).toInt();
-//    int green = settings.value( "/eqi/default_canvas_color_green", 255 ).toInt();
-//    int blue = settings.value( "/eqi/default_canvas_color_blue", 255 ).toInt();
-//    mOverviewCanvas->setBackgroundColor( QColor( red, green, blue ) );
+//    //! 视图菜单
+//    ui.mViewMenu->addAction(mActionPan);
+//    ui.mViewMenu->addAction(mActionPanToSelected);
+//    ui.mViewMenu->addAction(mActionZoomIn);
+//    ui.mViewMenu->addAction(mActionZoomOut);
+//    ui.mViewMenu->addSeparator();
 
-//    mOverviewCanvas->setWhatsThis( "鹰眼地图画布。此画布可以用来显示一个地图定位器，"
-//                                   "显示在地图上画布的当前程度。当前范围被示为红色矩形。"
-//                                   "地图上的任何层都可以被添加到鹰眼画布。" );
+//    QMenu *menuSelect = ui.mViewMenu->addMenu("选择");
+//    menuSelect->addAction(mActionSelectFeatures);
+//    menuSelect->addAction(mActionSelectPolygon);
+//    menuSelect->addAction(mActionDeselectAll);
+//    menuSelect->addAction(mActionSelectAll);
+//    menuSelect->addAction(mActionInvertSelection);
+
+//    ui.mViewMenu->addAction(mActionIdentify);
+
+//    QMenu *menuMeasure = ui.mViewMenu->addMenu("测量");
+//    menuMeasure->addAction(mActionMeasure);
+//    menuMeasure->addAction(mActionMeasureArea);
+
+//    ui.mViewMenu->addAction(mActionStatisticalSummary);
+//    ui.mViewMenu->addSeparator();
+//    ui.mViewMenu->addAction(mActionZoomFullExtent);
+//    ui.mViewMenu->addAction(mActionZoomToLayer);
+//    ui.mViewMenu->addAction(mActionZoomToSelected);
+//    ui.mViewMenu->addAction(mActionZoomLast);
+//    ui.mViewMenu->addAction(mActionZoomNext);
+//    ui.mViewMenu->addAction(mActionZoomActualSize);
+//    ui.mViewMenu->addSeparator();
+//    ui.mViewMenu->addAction(mActionMapTips);
+//    ui.mViewMenu->addAction(mActionDraw);
+
+//    //! 图层菜单
+//    QMenu *mNewLayerMenu = ui.mLayerMenu->addMenu("创建图层");
+//    mNewLayerMenu->addAction(mActionNewVectorLayer);
+
+//    QMenu *mAddLayerMenu = ui.mLayerMenu->addMenu("添加图层");
+//    mAddLayerMenu->addAction(mActionAddOgrLayer);
+//    mAddLayerMenu->addAction(mActionAddRasterLayer);
+//    mAddLayerMenu->addAction(mActionAddDelimitedText);
+
+//    ui.mLayerMenu->addSeparator();
+//    ui.mLayerMenu->addAction(mActionCopyStyle);
+//    ui.mLayerMenu->addAction(mActionPasteStyle);
+//    ui.mLayerMenu->addSeparator();
+//    ui.mLayerMenu->addAction(mActionOpenTable);
+//    ui.mLayerMenu->addSeparator();
+//    ui.mLayerMenu->addAction(mActionLayerSaveAs);
+//    ui.mLayerMenu->addAction(mActionRemoveLayer);
+//    ui.mLayerMenu->addAction(mActionSetLayerCRS);
+//    ui.mLayerMenu->addAction(mActionSetProjectCRSFromLayer);
+//    ui.mLayerMenu->addAction(mActionLayerProperties);
+//    ui.mLayerMenu->addAction(mActionLayerSubsetString);
+//    ui.mLayerMenu->addAction(mActionLabeling);
+//    ui.mLayerMenu->addSeparator();
+//    ui.mLayerMenu->addAction(mActionAddToOverview);
+//    ui.mLayerMenu->addAction(mActionAddAllToOverview);
+//    ui.mLayerMenu->addAction(mActionRemoveAllFromOverview);
+//    ui.mLayerMenu->addSeparator();
+//    ui.mLayerMenu->addAction(mActionShowAllLayers);
+//    ui.mLayerMenu->addAction(mActionHideAllLayers);
+//    ui.mLayerMenu->addAction(mActionShowSelectedLayers);
+//    ui.mLayerMenu->addAction(mActionHideSelectedLayers);
+
+//    mToolbarMenu = new QMenu( "工具栏", this );
+//    mToolbarMenu->setObjectName( "mToolbarMenu" );
+//}
+/*
+void MainWindow::initOverview()
+{
+    // overview canvas
+    mOverviewCanvas = new QgsMapOverviewCanvas( nullptr, mMapCanvas );
+
+    //set canvas color to default
+    QSettings settings;
+    int red = settings.value( "/eqi/default_canvas_color_red", 255 ).toInt();
+    int green = settings.value( "/eqi/default_canvas_color_green", 255 ).toInt();
+    int blue = settings.value( "/eqi/default_canvas_color_blue", 255 ).toInt();
+    mOverviewCanvas->setBackgroundColor( QColor( red, green, blue ) );
+
+    mOverviewCanvas->setWhatsThis( "鹰眼地图画布。此画布可以用来显示一个地图定位器，"
+                                   "显示在地图上画布的当前程度。当前范围被示为红色矩形。"
+                                   "地图上的任何层都可以被添加到鹰眼画布。" );
 
 //    mOverviewMapCursor = new QCursor( Qt::OpenHandCursor );
 //    mOverviewCanvas->setCursor( *mOverviewMapCursor );
-//    mOverviewDock = new QDockWidget( "鹰眼图面板", this );
-//    mOverviewDock->setObjectName( "Overview" );
-////    QFont myFont( "微软雅黑", 9 );
-////    mOverviewDock->setFont(myFont);
-//    mOverviewDock->setAllowedAreas( Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea );
-//    mOverviewDock->setWidget( mOverviewCanvas );
-//    mOverviewDock->hide();
-//    addDockWidget( Qt::LeftDockWidgetArea, mOverviewDock );
-//    // add to the Panel submenu
+    mOverviewDock = new QDockWidget( "鹰眼图面板", this );
+    mOverviewDock->setObjectName( "Overview" );
+    mOverviewDock->setAllowedAreas( Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea );
+    mOverviewDock->setWidget( mOverviewCanvas );
+    mOverviewDock->hide();
+    addDockWidget( Qt::LeftDockWidgetArea, mOverviewDock );
+    // add to the Panel submenu
 //    mPanelMenu->addAction( mOverviewDock->toggleViewAction() );
 
-//    mMapCanvas->enableOverviewMode( mOverviewCanvas );
+    mMapCanvas->enableOverviewMode( mOverviewCanvas );
 
-//    // moved here to set anti aliasing to both map canvas and overview
-//    QSettings mySettings;
-//    // Anti Aliasing enabled by default as of QGIS 1.7
-//    mMapCanvas->enableAntiAliasing( mySettings.value( "/eqi/enable_anti_aliasing", true ).toBool() );
+    // 移动到这里以将反锯齿设置为地图画布和概览
+    // QGIS 1.7 默认情况下启用了抗锯齿
+    mMapCanvas->enableAntiAliasing( settings.value( "/eqi/enable_anti_aliasing", true ).toBool() );
 
-//    int action = mySettings.value( "/eqi/wheel_action", 2 ).toInt();
-//    double zoomFactor = mySettings.value( "/eqi/zoom_factor", 2 ).toDouble();
-//    mMapCanvas->setWheelAction( static_cast< QgsMapCanvas::WheelAction >( action ), zoomFactor );
+    int action = settings.value( "/eqi/wheel_action", 2 ).toInt();
+    double zoomFactor = settings.value( "/eqi/zoom_factor", 2 ).toDouble();
+    mMapCanvas->setWheelAction( static_cast< QgsMapCanvas::WheelAction >( action ), zoomFactor );
 
-//    mMapCanvas->setCachingEnabled( mySettings.value( "/eqi/enable_render_caching", true ).toBool() );
+    mMapCanvas->setCachingEnabled( settings.value( "/eqi/enable_render_caching", true ).toBool() );
 
-//    mMapCanvas->setParallelRenderingEnabled( mySettings.value( "/eqi/parallel_rendering", false ).toBool() );
+    mMapCanvas->setParallelRenderingEnabled( settings.value( "/eqi/parallel_rendering", false ).toBool() );
 
-//    mMapCanvas->setMapUpdateInterval( mySettings.value( "/eqi/map_update_interval", 250 ).toInt() );
-//}
-
+    mMapCanvas->setMapUpdateInterval( settings.value( "/eqi/map_update_interval", 250 ).toInt() );
+}
+*/
 void MainWindow::showRotation()
 {
     // 更新当前状态栏的旋转标签。
@@ -663,6 +1069,28 @@ void MainWindow::toggleLogMessageIcon(bool hasLogMessage)
     else
     {
         mMessageButton->setIcon( eqiApplication::getThemeIcon( "mMessageLogRead.svg" ) );
+    }
+}
+
+void MainWindow::identify()
+{
+    mMapCanvas->setMapTool( mMapTools.mIdentify );
+}
+
+void MainWindow::saveAsFile()
+{
+    QgsMapLayer* layer = activeLayer();
+    if ( !layer )
+        return;
+
+    QgsMapLayer::LayerType layerType = layer->type();
+    if ( layerType == QgsMapLayer::RasterLayer )
+    {
+        //saveAsRasterFile();
+    }
+    else if ( layerType == QgsMapLayer::VectorLayer )
+    {
+        saveAsVectorFileGeneral();
     }
 }
 
@@ -769,7 +1197,7 @@ void MainWindow::showProgress(int theProgress, int theTotalSteps)
     }
     else
     {
-        //only call show if not already hidden to reduce flicker 只有调用show如果尚未隐藏，以减少闪烁
+        // 只有调用show如果尚未隐藏，以减少闪烁
         if ( !mProgressBar->isVisible() )
         {
             mProgressBar->show();
@@ -859,4 +1287,188 @@ void MainWindow::updateMouseCoordinatePrecision()
 void MainWindow::showStatusMessage(const QString &theMessage)
 {
     statusBar()->showMessage( theMessage );
+}
+
+void MainWindow::legendLayerZoomNative()
+{
+    if ( !mLayerTreeView )
+        return;
+
+    //找到当前图层
+    QgsMapLayer* currentLayer = mLayerTreeView->currentLayer();
+    if ( !currentLayer )
+        return;
+
+    QgsRasterLayer *layer =  qobject_cast<QgsRasterLayer *>( currentLayer );
+    if ( layer )
+    {
+        QgsDebugMsg( "Raster units per pixel  : " + QString::number( layer->rasterUnitsPerPixelX() ) );
+        QgsDebugMsg( "MapUnitsPerPixel before : " + QString::number( mMapCanvas->mapUnitsPerPixel() ) );
+
+        if ( mMapCanvas->hasCrsTransformEnabled() )
+        {
+            // 得到中央的画布像素宽度的长度源栅格CRS
+            QgsRectangle e = mMapCanvas->extent();
+            QSize s = mMapCanvas->mapSettings().outputSize();
+            QgsPoint p1( e.center().x(), e.center().y() );
+            QgsPoint p2( e.center().x() + e.width() / s.width(), e.center().y() + e.height() / s.height() );
+            QgsCoordinateTransform ct( mMapCanvas->mapSettings().destinationCrs(), layer->crs() );
+            p1 = ct.transform( p1 );
+            p2 = ct.transform( p2 );
+            double width = sqrt( p1.sqrDist( p2 ) ); // 投影像素的宽度（实际对角线）
+            mMapCanvas->zoomByFactor( sqrt( layer->rasterUnitsPerPixelX() * layer->rasterUnitsPerPixelX() +
+                                            layer->rasterUnitsPerPixelY() * layer->rasterUnitsPerPixelY() ) / width );
+        }
+        else
+        {
+            mMapCanvas->zoomByFactor( qAbs( layer->rasterUnitsPerPixelX() / mMapCanvas->mapUnitsPerPixel() ) );
+        }
+        mMapCanvas->refresh();
+        QgsDebugMsg( "MapUnitsPerPixel after  : " + QString::number( mMapCanvas->mapUnitsPerPixel() ) );
+    }
+}
+
+void MainWindow::addVectorLayer()
+{
+    mMapCanvas->freeze();
+    QgsOpenVectorLayerDialog *ovl = new QgsOpenVectorLayerDialog( this );
+
+    if ( ovl->exec() )
+    {
+        QStringList selectedSources = ovl->dataSources();
+        QString enc = ovl->encoding();
+        if ( !selectedSources.isEmpty() )
+        {
+            addVectorLayers( selectedSources, enc, ovl->dataSourceType() );
+        }
+    }
+
+    mMapCanvas->freeze( false );
+    mMapCanvas->refresh();
+
+    delete ovl;
+}
+
+bool MainWindow::addVectorLayers(const QStringList &theLayerQStringList, const QString &enc, const QString &dataSourceType)
+{
+    bool wasfrozen = mMapCanvas->isFrozen();
+    QList<QgsMapLayer *> myList;
+    foreach ( QString src, theLayerQStringList )
+    {
+        src = src.trimmed();
+        QString base;
+        if ( dataSourceType == "file" )
+        {
+          QFileInfo fi( src );
+          base = fi.completeBaseName();
+        }
+        else if ( dataSourceType == "database" )
+        {
+          base = src;
+        }
+        else //directory //protocol
+        {
+          QFileInfo fi( src );
+          base = fi.completeBaseName();
+        }
+
+        QgsDebugMsg( "completeBaseName: " + base );
+
+        // 创建一个矢量图层
+        QgsVectorLayer *layer = new QgsVectorLayer( src, base, "ogr", false );
+        Q_CHECK_PTR( layer );
+
+        if ( ! layer )
+        {
+            mMapCanvas->freeze( false );
+            return false;
+        }
+
+        if ( layer->isValid() )
+        {
+            layer->setProviderEncoding( enc );
+
+            QStringList sublayers = layer->dataProvider()->subLayers();
+            QgsDebugMsg( QString( "got valid layer with %1 sublayers" ).arg( sublayers.count() ) );
+
+            // 如果新创建的层具有多个子图层数据，我们显示子层选择对话框，这样用户可以选择实际加载的子层
+            if ( sublayers.count() > 1 )
+            {
+                askUserForOGRSublayers( layer );
+
+                // 装在第一层不是在这种情况下是有用的。如果他要加载它，用户可以在列表中选择它
+                delete layer;
+            }
+            else if ( !sublayers.isEmpty() ) // 只有单个可用数据
+            {
+                QStringList sublayers = layer->dataProvider()->subLayers();
+                QStringList elements = sublayers.at( 0 ).split( ':' );
+
+                Q_ASSERT( elements.size() >= 4 );
+                if ( layer->name() != elements.at( 1 ) )
+                {
+                    layer->setLayerName( QString( "%1 %2 %3" ).arg( layer->name(), elements.at( 1 ), elements.at( 3 ) ) );
+                }
+
+                myList << layer;
+            }
+            else
+            {
+                QString msg = QString("%1 不具有任何图层").arg( src );
+                messageBar()->pushMessage( "无效数据源", msg, QgsMessageBar::CRITICAL, messageTimeout() );
+                delete layer;
+            }
+        }
+        else
+        {
+            QString msg = QString("%1 不是有效或被支持的数据源").arg( src );
+            messageBar()->pushMessage( "无效数据源", msg, QgsMessageBar::CRITICAL, messageTimeout() );
+
+            // since the layer is bad, stomp on it
+            delete layer;
+        }
+
+    }
+
+    // 确保至少一个图层已成功添加
+    if ( myList.isEmpty() )
+    {
+        return false;
+    }
+
+    // 在图层注册表中注册这个图层
+    QgsMapLayerRegistry::instance()->addMapLayers( myList );
+
+    foreach ( QgsMapLayer *l, myList )
+    {
+        bool ok;
+        l->loadDefaultStyle( ok );
+    }
+
+    // 只有当我们在此方法冻结更新地图
+    if ( !wasfrozen )
+    {
+        mMapCanvas->freeze( false );
+        mMapCanvas->refresh();
+    }
+    mMapCanvas->setCurrentLayer( myList.first() );
+
+    return true;
+}
+
+QgsMapLayer *MainWindow::activeLayer()
+{
+    return mLayerTreeView ? mLayerTreeView->currentLayer() : nullptr;
+}
+
+void MainWindow::pointToTk()
+{
+    eqiMapToolPointToTk *gcd = new eqiMapToolPointToTk(mMapCanvas);
+    mMapCanvas->setMapTool(gcd);
+}
+
+void MainWindow::prjtransformsetting()
+{
+    dialog_PrjTransformSetting *ptfs = new dialog_PrjTransformSetting(this);
+    ptfs->exec();
 }

@@ -466,8 +466,8 @@ void QgsProjectProperties::apply()
   QgsProject::instance()->writeEntry( "Gui", "/CanvasColorGreenPart", myColor.green() );
   QgsProject::instance()->writeEntry( "Gui", "/CanvasColorBluePart", myColor.blue() );
   mMapCanvas->setCanvasColor( myColor );
-  MainWindow::instance()->mapOverviewCanvas()->setBackgroundColor( myColor );
-  MainWindow::instance()->mapOverviewCanvas()->refresh();
+//  MainWindow::instance()->mapOverviewCanvas()->setBackgroundColor( myColor );
+//  MainWindow::instance()->mapOverviewCanvas()->refresh();
 
   // 保存工程比例尺
   QStringList myScales;

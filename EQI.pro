@@ -82,7 +82,17 @@ SOURCES += \
     qgis/app/qgsmaplayerstyleguiutils.cpp \
     qgis/app/qgsprojectproperties.cpp \
     qgis/app/qgsmeasuretool.cpp \
-    qgis/app/qgsmeasuredialog.cpp
+    qgis/app/qgsmeasuredialog.cpp \
+    ui/toolTab/tab_mapbrowsing.cpp \
+    ui/toolTab/tab_fractalmanagement.cpp \
+    eqi/eqifractalmanagement.cpp \
+    eqi/eqiProjectionTransformation.cpp \
+    ui/dialog/dialog_prjtransformsetting.cpp \
+    eqi/maptool/eqimaptoolpointtotk.cpp \
+    qgis/app/qgsmaptoolselectutils.cpp \
+    ui/toolTab/tab_datamanagement.cpp \
+    qgis/ogr/qgsopenvectorlayerdialog.cpp \
+    qgis/app/qgsvectorlayersaveasdialog.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -97,7 +107,17 @@ HEADERS += \
     qgis/app/qgsmaplayerstyleguiutils.h \
     qgis/app/qgsprojectproperties.h \
     qgis/app/qgsmeasuretool.h \
-    qgis/app/qgsmeasuredialog.h
+    qgis/app/qgsmeasuredialog.h \
+    ui/toolTab/tab_mapbrowsing.h \
+    ui/toolTab/tab_fractalmanagement.h \
+    eqi/eqifractalmanagement.h \
+    eqi/eqiProjectionTransformation.h \
+    ui/dialog/dialog_prjtransformsetting.h \
+    eqi/maptool/eqimaptoolpointtotk.h \
+    qgis/app/qgsmaptoolselectutils.h \
+    ui/toolTab/tab_datamanagement.h \
+    qgis/ogr/qgsopenvectorlayerdialog.h \
+    qgis/app/qgsvectorlayersaveasdialog.h
 
 FORMS += \
         mainwindow.ui \
@@ -105,7 +125,15 @@ FORMS += \
     ui/toolTab/tab_uavdatamanagement.ui \
     ui/qgis/qgssymbolv2selectordialogbase.ui \
     ui/qgis/qgsmeasurebase.ui \
-    ui/qgis/qgsprojectpropertiesbase.ui
+    ui/qgis/qgsprojectpropertiesbase.ui \
+    ui/toolTab/tab_mapbrowsing.ui \
+    ui/toolTab/tab_fractalmanagement.ui \
+    ui/dialog/dialog_prjtransformsetting.ui \
+    ui/toolTab/tab_datamanagement.ui \
+    ui/qgis/qgsopenvectorlayerdialogbase.ui \
+    ui/qgis/qgsvectorlayersaveasdialogbase.ui \
+    ui/qgis/qgsextentgroupboxwidget.ui \
+    ui/qgis/qgsdatumtransformdialogbase.ui
 
 RESOURCES += \
     Resources/images/images.qrc
