@@ -1,15 +1,20 @@
 ﻿// My
 #include "mainwindow.h"
 #include "eqi/eqiapplication.h"
-#include "ui_mainwindow.h"
 #include "eqi/eqifractalmanagement.h"
 #include "eqi/maptool/eqimaptoolpointtotk.h"
+#include "eqi/pos/posdataprocessing.h"
+#include "eqi/eqippinteractive.h"
+#include "ui_mainwindow.h"
 #include "ui/toolTab/tab_mapbrowsing.h"
 #include "ui/toolTab/tab_coordinatetransformation.h"
 #include "ui/toolTab/tab_uavdatamanagement.h"
 #include "ui/toolTab/tab_fractalmanagement.h"
 #include "ui/toolTab/tab_datamanagement.h"
+#include "ui/dialog/dialog_posloaddialog.h"
+#include "ui/dialog/dialog_printtktoxy_txt.h"
 #include "ui/dialog/dialog_prjtransformsetting.h"
+#include "ui/dialog/dialog_possetting.h"
 #include "qgis/app/qgsstatusbarcoordinateswidget.h"
 #include "qgis/app/qgsapplayertreeviewmenuprovider.h"
 #include "qgis/app/qgsclipboard.h"
@@ -60,6 +65,9 @@
 #include "qgssublayersdialog.h"
 #include "qgsdatumtransformdialog.h"
 #include "qgsmessageviewer.h"
+#include "qgsmaptoolzoom.h"
+#include "qgsmaptoolpan.h"
+//#include "qgscoordinatereferencesystem.h"
 
 //#include "qgsmapoverviewcanvas.h"
 
@@ -80,7 +88,11 @@ MainWindow::MainWindow(QWidget *parent) :
     , mLayerTreeCanvasBridge( nullptr )
     , mInternalClipboard( nullptr )
     , mShowProjectionTab( false )
+    , posdp( nullptr )
+    , ppInter( nullptr )
 {
+
+
     if ( smInstance )
     {
         QMessageBox::critical( this, "EQI的多个实例", "检测到多个EQI应用对象的实例。" );
@@ -129,6 +141,7 @@ MainWindow::MainWindow(QWidget *parent) :
     initStatusBar();
     initLayerTreeView();
 //    initOverview();
+    createCanvasTools();
     mMapCanvas->freeze();
 
     // 消息面板
@@ -145,6 +158,11 @@ MainWindow::MainWindow(QWidget *parent) :
     connect( mMessageButton, SIGNAL( toggled( bool ) ), this, SLOT( toggleLogMessageIcon( bool ) ) );
     // end
 
+    // 连接POS处理进度
+    posdp = new posDataProcessing(this);
+    connect( posdp, SIGNAL( startProcess() ), this, SLOT( canvasRefreshStarted ) );
+    connect( posdp, SIGNAL( stopProcess() ), this, SLOT( canvasRefreshFinished() ) );
+    upDataPosActions();
 }
 
 MainWindow::~MainWindow()
@@ -196,6 +214,9 @@ MainWindow::~MainWindow()
     delete mMapTools.mCircularStringCurvePoint;
     delete mMapTools.mCircularStringRadius;
 
+    delete posdp;
+    delete ppInter;
+
 //    delete mOverviewMapCursor;
 
     // cancel request for FileOpen events
@@ -234,6 +255,11 @@ int MainWindow::messageTimeout()
     return settings.value( "/eqi/messageTimeout", 5 ).toInt();
 }
 
+void MainWindow::openMessageLog()
+{
+    mMessageButton->setChecked( true );
+}
+
 void MainWindow::addDockWidget(Qt::DockWidgetArea area, QDockWidget *dockwidget)
 {
     QMainWindow::addDockWidget( area, dockwidget );
@@ -250,6 +276,40 @@ void MainWindow::addDockWidget(Qt::DockWidgetArea area, QDockWidget *dockwidget)
 
     // refresh the map canvas
     mMapCanvas->refresh();
+}
+
+QgsVectorLayer *MainWindow::createrMemoryMap(const QString &layerName, const QString &geometric, const QStringList &fieldList)
+{
+    QString layerProperties = geometric+"?";		// 几何类型
+
+    // 参照坐标系
+    QString myCrsStr = mSettings.value( "/eqi/prjTransform/projectDefaultCrs", GEO_EPSG_CRS_AUTHID ).toString();
+    QgsCoordinateReferenceSystem mCrs;
+    mCrs.createFromOgcWmsCrs( myCrsStr );
+    layerProperties.append("crs="+mCrs.authid()+"&");
+
+    foreach (QString field, fieldList)
+    {
+        layerProperties.append(field+"&");          // 添加字段
+    }
+
+    layerProperties.append(QString( "index=yes&" ));// 创建索引
+
+    layerProperties.append(QString( "memoryid=%1" ).arg( QUuid::createUuid().toString() ));	// 临时编码
+
+    QgsVectorLayer* newLayer = new QgsVectorLayer(layerProperties, layerName, QString( "memory" ) );
+
+    if (!newLayer->isValid())
+    {
+        messageBar()->pushMessage( "创建矢量图层","创建面图层失败, 运行已终止, 注意检查plugins文件夹!",
+                                   QgsMessageBar::CRITICAL, messageTimeout() );
+        QgsMessageLog::logMessage(QString("创建矢量图层 : \t创建面图层失败, 程序已终止, 注意检查plugins文件夹。"));
+        return nullptr;
+    }
+
+    // 添加到地图
+    QgsMapLayerRegistry::instance()->addMapLayer(newLayer);
+    return newLayer;
 }
 
 void MainWindow::pan()
@@ -415,32 +475,32 @@ void MainWindow::initActions()
     mActionZoomActualSize->setIcon(eqiApplication::getThemeIcon("mActionZoomActual.svg"));
     connect( mActionZoomActualSize, SIGNAL( triggered() ), this, SLOT( zoomActualSize() ) );
 
-//    mActionZoomToSelected = new QAction("缩放到选择的区域(&S)", this);
-//    mActionZoomToSelected->setShortcut(tr("Ctrl+J"));
-//    mActionZoomToSelected->setStatusTip("缩放到选择的区域(S)");
-//    mActionZoomToSelected->setIcon(eqiApplication::getThemeIcon("mActionZoomToSelected.svg"));
-//    connect( mActionZoomToSelected, SIGNAL( triggered() ), this, SLOT( zoomToSelected() ) );
+    mActionZoomToSelected = new QAction("缩放到选择的区域(&S)", this);
+    mActionZoomToSelected->setShortcut(tr("Ctrl+J"));
+    mActionZoomToSelected->setStatusTip("缩放到选择的区域(S)");
+    mActionZoomToSelected->setIcon(eqiApplication::getThemeIcon("mActionZoomToSelected.svg"));
+    connect( mActionZoomToSelected, SIGNAL( triggered() ), this, SLOT( zoomToSelected() ) );
 
-//    mActionZoomToLayer = new QAction("缩放到图层(&L)", this);
-//    mActionZoomToLayer->setStatusTip("缩放到图层(L)");
-//    mActionZoomToLayer->setIcon(eqiApplication::getThemeIcon("mActionZoomToLayer.svg"));
-//    connect( mActionZoomToLayer, SIGNAL( triggered() ), this, SLOT( zoomToLayerExtent() ) );
+    mActionZoomToLayer = new QAction("缩放到图层(&L)", this);
+    mActionZoomToLayer->setStatusTip("缩放到图层(L)");
+    mActionZoomToLayer->setIcon(eqiApplication::getThemeIcon("mActionZoomToLayer.svg"));
+    connect( mActionZoomToLayer, SIGNAL( triggered() ), this, SLOT( zoomToLayerExtent() ) );
 
-//    mActionZoomLast = new QAction("上一视图", this);
-//    mActionZoomLast->setStatusTip("上一视图");
-//    mActionZoomLast->setIcon(eqiApplication::getThemeIcon("mActionZoomLast.svg"));
-//    connect( mActionZoomLast, SIGNAL( triggered() ), this, SLOT( zoomToPrevious() ) );
+    mActionZoomLast = new QAction("上一视图", this);
+    mActionZoomLast->setStatusTip("上一视图");
+    mActionZoomLast->setIcon(eqiApplication::getThemeIcon("mActionZoomLast.svg"));
+    connect( mActionZoomLast, SIGNAL( triggered() ), this, SLOT( zoomToPrevious() ) );
 
-//    mActionZoomNext = new QAction("下一视图", this);
-//    mActionZoomNext->setStatusTip("下一视图");
-//    mActionZoomNext->setIcon(eqiApplication::getThemeIcon("mActionZoomNext.svg"));
-//    connect( mActionZoomNext, SIGNAL( triggered() ), this, SLOT( zoomToNext() ) );
+    mActionZoomNext = new QAction("下一视图", this);
+    mActionZoomNext->setStatusTip("下一视图");
+    mActionZoomNext->setIcon(eqiApplication::getThemeIcon("mActionZoomNext.svg"));
+    connect( mActionZoomNext, SIGNAL( triggered() ), this, SLOT( zoomToNext() ) );
 
-//    mActionDraw = new QAction("刷新", this);
-//    mActionDraw->setShortcut(tr("F5"));
-//    mActionDraw->setStatusTip("刷新");
-//    mActionDraw->setIcon(eqiApplication::getThemeIcon("mActionDraw.svg"));
-//    connect( mActionDraw, SIGNAL( triggered() ), this, SLOT( refreshMapCanvas() ) );
+    mActionDraw = new QAction("刷新", this);
+    mActionDraw->setShortcut(tr("F5"));
+    mActionDraw->setStatusTip("刷新");
+    mActionDraw->setIcon(eqiApplication::getThemeIcon("mActionDraw.svg"));
+    connect( mActionDraw, SIGNAL( triggered() ), this, SLOT( refreshMapCanvas() ) );
 
     mActionIdentify = new QAction("识别要素", this);
     mActionIdentify->setShortcut(tr("Ctrl+Shift+I"));
@@ -477,32 +537,90 @@ void MainWindow::initActions()
     mActionHideSelectedLayers->setIcon(eqiApplication::getThemeIcon("mActionHideSelectedLayers.png"));
     connect( mActionHideSelectedLayers, SIGNAL( triggered() ), this, SLOT( hideSelectedLayers() ) );
 
+    /*----------------------------------------------无人机数据管理-------------------------------------------*/
+    mOpenPosFile = new QAction("载入曝光点文件", this);
+    mOpenPosFile->setStatusTip("载入曝光点文件");
+    mOpenPosFile->setIcon(eqiApplication::getThemeIcon("mActionCapturePoint.png"));
+    connect( mOpenPosFile, SIGNAL( triggered() ), this, SLOT( openPosFile() ) );
+
+    mPosTransform = new QAction("曝光点坐标转换", this);
+    mPosTransform->setStatusTip("曝光点坐标转换");
+    mPosTransform->setIcon(eqiApplication::getThemeIcon("mIconAtlas.svg"));
+    connect( mPosTransform, SIGNAL( triggered() ), this, SLOT( posTransform() ) );
+
+    mPosSketchMap = new QAction("创建航飞略图", this);
+    mPosSketchMap->setStatusTip("创建航飞略图");
+    mPosSketchMap->setIcon(eqiApplication::getThemeIcon("mActionCapturePolygon.png"));
+    connect( mPosSketchMap, SIGNAL( triggered() ), this, SLOT( posSketchMap() ) );
+
+    mPosSketchMapSwitch = new QAction("显示曝光点", this);
+    mPosSketchMapSwitch->setStatusTip("切换显示曝光点与航飞略图。");
+    mPosSketchMapSwitch->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionSketchMapsurface.png"));
+    connect( mPosSketchMapSwitch, SIGNAL( triggered() ), this, SLOT( posSketchMapSwitch() ) );
+
+    mPPLinkPhoto = new QAction("PP动态联动", this);
+    mPPLinkPhoto->setStatusTip("创建POS文件与photo相片之间的联动关系。");
+    mPPLinkPhoto->setIcon(eqiApplication::getThemeIcon("mActionLink.svg"));
+    connect( mPPLinkPhoto, SIGNAL( triggered() ), this, SLOT( posLinkPhoto() ) );
+
+    mPosOneButton = new QAction("一键处理", this);
+    mPosOneButton->setStatusTip("一键处理");
+    mPosOneButton->setIcon(eqiApplication::getThemeIcon("mActionSelect.svg"));
+    connect( mPosOneButton, SIGNAL( triggered() ), this, SLOT( posOneButton() ) );
+
+    mPosExport = new QAction("导出曝光点文件", this);
+    mPosExport->setStatusTip("导出曝光点文件");
+    mPosExport->setIcon(eqiApplication::getThemeIcon("mActionSharingExport.svg"));
+    connect( mPosExport, SIGNAL( triggered() ), this, SLOT( posExport() ) );
+
+    mPosSetting = new QAction("相机参数设置", this);
+    mPosSetting->setIcon(eqiApplication::getThemeIcon("propertyicons/settings.svg"));
+    mPosSetting->setStatusTip("相机参数设置。");
+    connect( mPosSetting, SIGNAL( triggered() ), this, SLOT( posSetting() ));
+
     /*----------------------------------------------坐标转换-------------------------------------------*/
-    mActionCTF = new QAction("加载POS文件", this);
-    mActionCTF->setIcon(eqiApplication::getThemeIcon("mActionShowPluginManager.svg"));
-    mActionCTF->setStatusTip(" 度与度分秒格式互转，仅支持文本格式。 ");
+    // 未实现
+    mActionTextTranfrom = new QAction("坐标转换", this);
+    mActionTextTranfrom->setIcon(eqiApplication::getThemeIcon("mActionShowPluginManager.svg"));
+    mActionTextTranfrom->setStatusTip(" 坐标转换，仅支持文本格式。 ");
+
+    // 未实现
+    mActionDegreeMutual = new QAction("度<->度分秒", this);
+    mActionDegreeMutual->setIcon(eqiApplication::getThemeIcon("mActionShowPluginManager.svg"));
+    mActionDegreeMutual->setStatusTip(" 度与度分秒格式互转。 ");
 
     /*----------------------------------------------分幅管理-------------------------------------------*/
+    // 未实现
+    mActionCreateTK = new QAction("创建分幅图框", this);
+    mActionCreateTK->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionPtoTK.svg"));
+    mActionCreateTK->setStatusTip("输入标准分幅图号创建图框。");
+//    connect( mActionCreateTK, SIGNAL( triggered() ), this, SLOT() );
+
     mActionPtoTK = new QAction("根据坐标\n创建图框", this);
-    mActionPtoTK->setIcon(eqiApplication::getThemeIcon("eqi/mActionPtoTK.svg"));
-    mActionPtoTK->setStatusTip("从屏幕选取或手动输入单点坐标制作图框，利用两个角点坐标可按范围制作图框。");
+    mActionPtoTK->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionPtoTK.svg"));
+    mActionPtoTK->setStatusTip("从屏幕选取范围制作分幅图框。");
     connect( mActionPtoTK, SIGNAL( triggered() ), this, SLOT( pointToTk()) );
 
-    mActionPtoTKSetting = new QAction("参数设置", this);
+    mActionTKtoXY = new QAction("输出图框\n坐标", this);
+    mActionTKtoXY->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionPtoTK.svg"));
+    mActionTKtoXY->setStatusTip("选择一个包含标准图号的txt文本，计算并输出图框四个角点的投影坐标，并重新输出到txt文本中。");
+    connect( mActionTKtoXY, SIGNAL( triggered() ), this, SLOT( TKtoXY() ) );
+
+    mActionPtoTKSetting = new QAction("坐标参数设置", this);
     mActionPtoTKSetting->setIcon(eqiApplication::getThemeIcon("propertyicons/settings.svg"));
-    mActionPtoTKSetting->setStatusTip("与分幅图框相关的参数设置。");
+    mActionPtoTKSetting->setStatusTip("参照坐标系投影参数设置。");
     connect( mActionPtoTKSetting, SIGNAL( triggered() ), this, SLOT( prjtransformsetting() ) );
 
     /*----------------------------------------------数据管理-------------------------------------------*/
     mActionAddOgrLayer = new QAction("添加矢量图层...", this);
     mActionAddOgrLayer->setShortcut(tr("Ctrl+Shift+V"));
     mActionAddOgrLayer->setStatusTip("添加矢量图层...");
-    mActionAddOgrLayer->setIcon(eqiApplication::getThemeIcon("mActionAddOgrLayer.svg"));
+    mActionAddOgrLayer->setIcon(eqiApplication::getThemeIcon("eqi/1/mActionAddOgrLayer.png"));
     connect( mActionAddOgrLayer, SIGNAL( triggered() ), this, SLOT( addVectorLayer() ) );
 
     mActionLayerSaveAs = new QAction("另存为(&S)...", this);
     mActionLayerSaveAs->setStatusTip("另存为");
-    mActionLayerSaveAs->setIcon(eqiApplication::getThemeIcon("mActionLayerSaveAs.svg"));
+    mActionLayerSaveAs->setIcon(eqiApplication::getThemeIcon("eqi/1/mActionLayerSaveAs.png"));
     connect( mActionLayerSaveAs, SIGNAL( triggered() ), this, SLOT( saveAsFile() ) );
 }
 
@@ -512,32 +630,48 @@ void MainWindow::initTabTools()
     tab_mapBrowsing *m_MB = new tab_mapBrowsing(this);
     m_MB->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
     m_MB->addAction(mActionPan);
-    m_MB->addAction(mActionPanToSelected);
     m_MB->addAction(mActionZoomIn);
     m_MB->addAction(mActionZoomOut);
+    m_MB->addAction(mActionZoomLast);
+    m_MB->addAction(mActionZoomNext);
+    m_MB->addSeparator(); //---
     m_MB->addAction(mActionZoomFullExtent);
+    m_MB->addAction(mActionZoomToLayer);
+    m_MB->addAction(mActionPanToSelected);
+    m_MB->addAction(mActionZoomToSelected);
     m_MB->addAction(mActionZoomActualSize);
-//    m_MB->addAction(mActionZoomToSelected);
-//    m_MB->addAction(mActionZoomToLayer);
-//    m_MB->addAction(mActionZoomLast);
-//    m_MB->addAction(mActionZoomNext);
-//    m_MB->addAction(mActionDraw);
+    m_MB->addSeparator(); //---
+    m_MB->addAction(mActionDraw);
     m_MB->addAction(mActionIdentify);
-
-    // 初始化“坐标转换”tab
-    tab_coordinateTransformation *m_tCTF = new tab_coordinateTransformation(this);
-    m_tCTF->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
-    m_tCTF->addAction(mActionCTF);
 
     // 初始化“无人机数据管理”tab
     tab_uavDataManagement *m_uDM = new tab_uavDataManagement(this);
     m_uDM->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
-    m_uDM->addAction(mActionCTF);
+    m_uDM->addAction(mOpenPosFile);
+    m_uDM->addAction(mPosTransform);
+    m_uDM->addAction(mPosSketchMap);
+    m_uDM->addAction(mPPLinkPhoto);
+    m_uDM->addAction(mPosExport);
+    m_uDM->addSeparator(); //---
+    m_uDM->addAction(mPosOneButton);
+    m_uDM->addSeparator(); //---
+    m_uDM->addAction(mPosSketchMapSwitch);
+    m_uDM->addSeparator(); //---
+    m_uDM->addAction(mPosSetting);
+
+    // 初始化“坐标转换”tab
+    tab_coordinateTransformation *m_tCTF = new tab_coordinateTransformation(this);
+    m_tCTF->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    m_tCTF->addAction(mActionTextTranfrom);
+    m_tCTF->addAction(mActionDegreeMutual);
 
     // 初始化“分幅管理”tab
     tab_fractalManagement *m_tFM = new tab_fractalManagement(this);
     m_tFM->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    m_tFM->addAction(mActionCreateTK);
     m_tFM->addAction(mActionPtoTK);
+    m_tFM->addAction(mActionTKtoXY);
+    m_tFM->addSeparator(); //---
     m_tFM->addAction(mActionPtoTKSetting);
 
     // 初始化“数据管理”tab
@@ -778,6 +912,102 @@ void MainWindow::initLayerTreeView()
     connect( mMapCanvas, SIGNAL( mapCanvasRefreshed() ), this, SLOT( updateFilterLegend() ) );
 }
 
+void MainWindow::createCanvasTools()
+{
+    // create tools
+    mMapTools.mZoomIn = new QgsMapToolZoom( mMapCanvas, false /* zoomIn */ );
+    mMapTools.mZoomIn->setAction( mActionZoomIn );
+    mMapTools.mZoomOut = new QgsMapToolZoom( mMapCanvas, true /* zoomOut */ );
+    mMapTools.mZoomOut->setAction( mActionZoomOut );
+    mMapTools.mPan = new QgsMapToolPan( mMapCanvas );
+    mMapTools.mPan->setAction( mActionPan );
+//    mMapTools.mIdentify = new QgsMapToolIdentifyAction( mMapCanvas );
+//    mMapTools.mIdentify->setAction( mActionIdentify );
+    //connect( mMapTools.mIdentify, SIGNAL( copyToClipboard( QgsFeatureStore & ) ),
+    //	this, SLOT( copyFeatures( QgsFeatureStore & ) ) );
+    //mMapTools.mFeatureAction = new QgsMapToolFeatureAction( mMapCanvas );
+    //mMapTools.mFeatureAction->setAction( mActionFeatureAction );
+    mMapTools.mMeasureDist = new QgsMeasureTool( mMapCanvas, false /* area */ );
+//    mMapTools.mMeasureDist->setAction( mActionMeasure );
+    mMapTools.mMeasureArea = new QgsMeasureTool( mMapCanvas, true /* area */ );
+//    mMapTools.mMeasureArea->setAction( mActionMeasureArea );
+    //mMapTools.mMeasureAngle = new QgsMapToolMeasureAngle( mMapCanvas );
+    //mMapTools.mMeasureAngle->setAction( mActionMeasureAngle );
+//	mMapTools.mTextAnnotation = new QgsMapToolTextAnnotation( mMapCanvas );
+//	mMapTools.mTextAnnotation->setAction( mActionTextAnnotation );
+//	mMapTools.mFormAnnotation = new QgsMapToolFormAnnotation( mMapCanvas );
+//	mMapTools.mFormAnnotation->setAction( mActionFormAnnotation );
+//	mMapTools.mHtmlAnnotation = new QgsMapToolHtmlAnnotation( mMapCanvas );
+//	mMapTools.mHtmlAnnotation->setAction( mActionHtmlAnnotation );
+//	mMapTools.mSvgAnnotation = new QgsMapToolSvgAnnotation( mMapCanvas );
+//	mMapTools.mSvgAnnotation->setAction( mActionSvgAnnotation );
+//	mMapTools.mAnnotation = new QgsMapToolAnnotation( mMapCanvas );
+//	mMapTools.mAnnotation->setAction( mActionAnnotation );
+//	mMapTools.mAddFeature = new QgsMapToolAddFeature( mMapCanvas );
+//	mMapTools.mAddFeature->setAction( mActionAddFeature );
+//	mMapTools.mCircularStringCurvePoint = new QgsMapToolCircularStringCurvePoint( dynamic_cast<QgsMapToolAddFeature*>( mMapTools.mAddFeature ), mMapCanvas );
+//	mMapTools.mCircularStringCurvePoint->setAction( mActionCircularStringCurvePoint );
+//	mMapTools.mCircularStringRadius = new QgsMapToolCircularStringRadius( dynamic_cast<QgsMapToolAddFeature*>( mMapTools.mAddFeature ), mMapCanvas );
+//	mMapTools.mCircularStringRadius->setAction( mActionCircularStringRadius );
+//	mMapTools.mMoveFeature = new QgsMapToolMoveFeature( mMapCanvas );
+//	mMapTools.mMoveFeature->setAction( mActionMoveFeature );
+//	mMapTools.mRotateFeature = new QgsMapToolRotateFeature( mMapCanvas );
+//	mMapTools.mRotateFeature->setAction( mActionRotateFeature );
+//	//need at least geos 3.3 for OffsetCurve tool
+//#if defined(GEOS_VERSION_MAJOR) && defined(GEOS_VERSION_MINOR) && \
+//	((GEOS_VERSION_MAJOR>3) || ((GEOS_VERSION_MAJOR==3) && (GEOS_VERSION_MINOR>=3)))
+//	mMapTools.mOffsetCurve = new QgsMapToolOffsetCurve( mMapCanvas );
+//	mMapTools.mOffsetCurve->setAction( mActionOffsetCurve );
+//#else
+//	mAdvancedDigitizeToolBar->removeAction( mActionOffsetCurve );
+//	mEditMenu->removeAction( mActionOffsetCurve );
+//	mMapTools.mOffsetCurve = 0;
+//#endif //GEOS_VERSION
+//	mMapTools.mReshapeFeatures = new QgsMapToolReshape( mMapCanvas );
+//	mMapTools.mReshapeFeatures->setAction( mActionReshapeFeatures );
+//	mMapTools.mSplitFeatures = new QgsMapToolSplitFeatures( mMapCanvas );
+//	mMapTools.mSplitFeatures->setAction( mActionSplitFeatures );
+//	mMapTools.mSplitParts = new QgsMapToolSplitParts( mMapCanvas );
+//	mMapTools.mSplitParts->setAction( mActionSplitParts );
+//    mMapTools.mSelectFeatures = new QgsMapToolSelectFeatures( mMapCanvas );
+//    mMapTools.mSelectFeatures->setAction( mActionSelectFeatures );
+//    mMapTools.mSelectPolygon = new QgsMapToolSelectPolygon( mMapCanvas );
+//    mMapTools.mSelectPolygon->setAction( mActionSelectPolygon );
+//	mMapTools.mSelectFreehand = new QgsMapToolSelectFreehand( mMapCanvas );
+//	mMapTools.mSelectFreehand->setAction( mActionSelectFreehand );
+//	mMapTools.mSelectRadius = new QgsMapToolSelectRadius( mMapCanvas );
+//	mMapTools.mSelectRadius->setAction( mActionSelectRadius );
+//	mMapTools.mAddRing = new QgsMapToolAddRing( mMapCanvas );
+//	mMapTools.mAddRing->setAction( mActionAddRing );
+//	mMapTools.mFillRing = new QgsMapToolFillRing( mMapCanvas );
+//	mMapTools.mFillRing->setAction( mActionFillRing );
+//	mMapTools.mAddPart = new QgsMapToolAddPart( mMapCanvas );
+//	mMapTools.mAddPart->setAction( mActionAddPart );
+//	mMapTools.mSimplifyFeature = new QgsMapToolSimplify( mMapCanvas );
+//	mMapTools.mSimplifyFeature->setAction( mActionSimplifyFeature );
+//	mMapTools.mDeleteRing = new QgsMapToolDeleteRing( mMapCanvas );
+//	mMapTools.mDeleteRing->setAction( mActionDeleteRing );
+//	mMapTools.mDeletePart = new QgsMapToolDeletePart( mMapCanvas );
+//	mMapTools.mDeletePart->setAction( mActionDeletePart );
+//	mMapTools.mNodeTool = new QgsMapToolNodeTool( mMapCanvas );
+//	mMapTools.mNodeTool->setAction( mActionNodeTool );
+//	mMapTools.mRotatePointSymbolsTool = new QgsMapToolRotatePointSymbols( mMapCanvas );
+//	mMapTools.mRotatePointSymbolsTool->setAction( mActionRotatePointSymbols );
+//	mMapTools.mPinLabels = new QgsMapToolPinLabels( mMapCanvas );
+//	mMapTools.mPinLabels->setAction( mActionPinLabels );
+//	mMapTools.mShowHideLabels = new QgsMapToolShowHideLabels( mMapCanvas );
+//	mMapTools.mShowHideLabels->setAction( mActionShowHideLabels );
+//	mMapTools.mMoveLabel = new QgsMapToolMoveLabel( mMapCanvas );
+//	mMapTools.mMoveLabel->setAction( mActionMoveLabel );
+//
+//	mMapTools.mRotateLabel = new QgsMapToolRotateLabel( mMapCanvas );
+//	mMapTools.mRotateLabel->setAction( mActionRotateLabel );
+//	mMapTools.mChangeLabelProperties = new QgsMapToolChangeLabelProperties( mMapCanvas );
+//	mMapTools.mChangeLabelProperties->setAction( mActionChangeLabelProperties );
+    //ensure that non edit tool is initialized or we will get crashes in some situations
+    mNonEditMapTool = mMapTools.mPan;
+}
+
 void MainWindow::askUserForOGRSublayers(QgsVectorLayer *layer)
 {
     if ( !layer )
@@ -921,6 +1151,26 @@ void MainWindow::saveAsVectorFileGeneral(QgsVectorLayer *vlayer, bool symbologyO
     }
 
     delete dialog;
+}
+
+void MainWindow::upDataPosActions()
+{
+    if ( posdp->isValid() )
+    {
+        mPosTransform->setEnabled(true);
+        mPosSketchMap->setEnabled(true);
+        mPosOneButton->setEnabled(true);
+        mPPLinkPhoto->setEnabled(true);
+        mPosExport->setEnabled(true);
+    }
+    else
+    {
+        mPosTransform->setEnabled(false);
+        mPosSketchMap->setEnabled(false);
+        mPosOneButton->setEnabled(false);
+        mPPLinkPhoto->setEnabled(false);
+        mPosExport->setEnabled(false);
+    }
 }
 
 //void MainWindow::initMenus()
@@ -1070,6 +1320,16 @@ void MainWindow::toggleLogMessageIcon(bool hasLogMessage)
     {
         mMessageButton->setIcon( eqiApplication::getThemeIcon( "mMessageLogRead.svg" ) );
     }
+}
+
+void MainWindow::measure()
+{
+    mMapCanvas->setMapTool( mMapTools.mMeasureDist );
+}
+
+void MainWindow::measureArea()
+{
+    mMapCanvas->setMapTool( mMapTools.mMeasureArea );
 }
 
 void MainWindow::identify()
@@ -1461,10 +1721,175 @@ QgsMapLayer *MainWindow::activeLayer()
     return mLayerTreeView ? mLayerTreeView->currentLayer() : nullptr;
 }
 
+void MainWindow::openPosFile()
+{
+    dialog_posloaddialog *posDialog = new dialog_posloaddialog(this);
+    connect( posDialog, SIGNAL( readFieldsList( QString & ) ), posdp, SLOT( readFieldsList( QString & ) ) );
+    int result = posDialog->exec();
+    if (result == QDialog::Accepted)
+    {
+        openMessageLog();
+
+        const QStringList errList = posdp->checkPosSettings();
+        if (!errList.isEmpty())
+        {
+            QString err;
+            foreach (QString str, errList)
+                err += str + "、";
+
+            messageBar()->pushMessage( "曝光点相关参数检查",
+                                       QString("程序检测到%1参数设置可能不正确，请确认参数是否已正确初始化。").arg(err),
+                                       QgsMessageBar::CRITICAL, messageTimeout() );
+            QgsMessageLog::logMessage(QString("曝光点相关参数检查 : \t程序检测到%1参数设置可能不正确，"
+                                              "请确认参数是否已正确初始化。").arg(err));
+        }
+        else
+        {
+            if (posdp->isValid())
+            {
+                QStringList* noList = posdp->noList();
+                messageBar()->pushMessage( "曝光点加载",
+                                           QString("成功加载%1条记录，%2条记录加载失败。")
+                                           .arg(noList->size())
+                                           .arg(posdp->getInvalidLineSize()),
+                                           QgsMessageBar::SUCCESS, messageTimeout() );
+                QgsMessageLog::logMessage(QString("曝光点加载 : \t成功加载%1条记录，%2条记录加载失败。")
+                                          .arg(noList->size())
+                                          .arg(posdp->getInvalidLineSize()));
+                upDataPosActions();
+            }
+            else
+            {
+                messageBar()->pushMessage( "曝光点加载",
+                                           QString("加载曝光点记录失败，请仔细排查错误信息。"),
+                                           QgsMessageBar::CRITICAL, messageTimeout() );
+                QgsMessageLog::logMessage("曝光点加载 : \t加载曝光点记录失败，请仔细排查错误信息。");
+            }
+        }
+    }
+    delete posDialog;
+}
+
+bool MainWindow::posTransform()
+{
+    if (!posdp->isValid()) return false;
+
+    QgsMessageLog::logMessage("\n");
+    return posdp->autoPosTransform();
+}
+
+void MainWindow::posSketchMap()
+{
+    if (!posdp->isValid()) return;
+
+    QgsMessageLog::logMessage("\n");
+    QgsVectorLayer* layer = posdp->autoSketchMap();
+    if (!layer)
+        return;
+    ppInter = new eqiPPInteractive(this, layer, posdp->noList());
+    //	addAllToOverview();
+}
+
+void MainWindow::posSketchMapSwitch()
+{
+    ppInter->testSwitch();
+}
+
+void MainWindow::posLinkPhoto()
+{
+    QgsMessageLog::logMessage("\n");
+
+    if (!ppInter)
+    {
+        messageBar()->pushMessage( "动态联动",
+            "必须在航飞略图成功创建后才能启动联动功能, 联动功能启动失败...",
+            QgsMessageBar::CRITICAL, messageTimeout() );
+        QgsMessageLog::logMessage(QString("动态联动 : \t必须在航飞略图成功创建后才能启动联动功能, 联动功能启动失败..."));
+        return;
+    }
+
+    if (ppInter->islinked())
+    {
+        // 断开连接并更改QAction
+        ppInter->upDataUnLinkedSymbol();
+
+        QgsMessageLog::logMessage("动态联动 : \t已成功断开连接.");
+        messageBar()->pushMessage( "动态联动", "成功断开联动关系.",QgsMessageBar::SUCCESS, messageTimeout() );
+
+        mPPLinkPhoto->setText("PP动态联动");
+        mPPLinkPhoto->setIcon(eqiApplication::getThemeIcon("mActionlink.svg"));
+    }
+    else
+    {
+        if (!ppInter->isValid())
+        {
+            messageBar()->pushMessage( "动态联动",
+                "必须在曝光点文件解析成功后才能启动联动功能, 联动功能启动失败...",
+                QgsMessageBar::CRITICAL, messageTimeout() );
+            QgsMessageLog::logMessage(QString("动态联动 : \t必须在曝光点文件解析成功后才能启动联动功能, 联动功能启动失败..."));
+            return;
+        }
+
+        // 创建联动关系
+        ppInter->upDataLinkedSymbol();
+
+        if (!ppInter->islinked())
+            return;
+
+        QgsMessageLog::logMessage(QString("动态联动 : \t成功创建联动关系."));
+        messageBar()->pushMessage( "动态联动", "成功创建联动关系.",QgsMessageBar::SUCCESS, messageTimeout() );
+
+        mPPLinkPhoto->setText("断开PP动态联动");
+        mPPLinkPhoto->setStatusTip("断开PP动态联动");
+        mPPLinkPhoto->setIcon(eqiApplication::getThemeIcon("mActionUnlink.svg"));
+    }
+}
+
+void MainWindow::posOneButton()
+{
+    // 坐标转换
+    if (mSettings.value("/eqi/options/imagePreprocessing/chkTransform", true).toBool())
+    {
+        if (!posTransform())
+            return;
+    }
+
+    // 创建略图
+    if (mSettings.value("/eqi/options/imagePreprocessing/chkSketchMap", true).toBool())
+    {
+        posSketchMap();
+    }
+
+    // PP联动
+    if (mSettings.value("/eqi/options/imagePreprocessing/chkLinkPhoto", true).toBool())
+    {
+        posLinkPhoto();
+    }
+}
+
+void MainWindow::posExport()
+{
+    if (!posdp->isValid()) return;
+
+    posdp->posExport();
+}
+
+void MainWindow::posSetting()
+{
+    dialog_posSetting *posDialog = new dialog_posSetting(this);
+    posDialog->exec();
+}
+
 void MainWindow::pointToTk()
 {
     eqiMapToolPointToTk *gcd = new eqiMapToolPointToTk(mMapCanvas);
     mMapCanvas->setMapTool(gcd);
+}
+
+void MainWindow::TKtoXY()
+{
+    dialog_printTKtoXY_txt *printxy = new dialog_printTKtoXY_txt(this);
+    printxy->exec();
 }
 
 void MainWindow::prjtransformsetting()

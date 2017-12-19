@@ -1,4 +1,4 @@
-/***************************************************************************
+﻿/***************************************************************************
                           qgsopenvectorlayerdialog.h
  Dialog to select the type and source for ogr vectors, supports
  file, database, directory and protocol sources.

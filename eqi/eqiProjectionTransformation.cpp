@@ -5,31 +5,66 @@
 #include "qgsmessagelog.h"
 #include "sqlite3.h"
 
-eqiProjectionTransformation::eqiProjectionTransformation(QObject *parent) : QObject(parent)
+eqiProjectionTransformation::eqiProjectionTransformation()
+    : QgsCoordinateTransform()
 {
 
 }
 
-QgsPoint eqiProjectionTransformation::prjTransform(const QgsPoint p, const QgsCoordinateReferenceSystem& mSourceCrs,
-                                                                     const QgsCoordinateReferenceSystem& mTargetCrs)
+eqiProjectionTransformation::eqiProjectionTransformation(
+        const QgsCoordinateReferenceSystem& theSource,
+        const QgsCoordinateReferenceSystem& theDest) :
+        QgsCoordinateTransform(theSource, theDest)
+{
+
+}
+
+bool eqiProjectionTransformation::isValidGCS(const QString &authid)
+{
+    if ((authid == "EPSG:4490") ||   // CGCS2000
+        (authid == "EPSG:4214") ||   // beijing1954
+        (authid == "EPSG:4610"))    // xian1980
+    {
+       return true;
+    }
+    return false;
+}
+
+bool eqiProjectionTransformation::isValidPCS(const int postgisSrid)
+{
+    if (!(isSourceBeijing1954Prj(postgisSrid) ||
+          isSourceCGCS2000Prj(postgisSrid) ||
+          isSourceXian1980Prj(postgisSrid)))
+    {
+        return false;
+    }
+    else
+    {
+        return true;
+    }
+}
+
+QgsPoint eqiProjectionTransformation::prjTransform(const QgsPoint p)
 {
     // 创建目标投影
-    if (!mSourceCrs.isValid() || !mTargetCrs.isValid())
+    if (!sourceCrs().isValid() || !destCRS().isValid())
     {
         MainWindow::instance()->messageBar()->pushMessage( "投影变换",
                                                            "投影设置不正确, 运行已终止!",
-                                                           QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
+                                                           QgsMessageBar::CRITICAL,
+                                                           MainWindow::instance()->messageTimeout() );
         QgsMessageLog::logMessage("投影变换 : \t投影设置不正确, 运行已终止.");
         return QgsPoint();
     }
 
     // 创建转换关系
-    QgsCoordinateTransform ct(mSourceCrs, mTargetCrs);
+    QgsCoordinateTransform ct(sourceCrs(), destCRS());
     if (!ct.isInitialised())
     {
         MainWindow::instance()->messageBar()->pushMessage( "投影变换",
                                                            "创建坐标转换关系失败, 运行已终止!",
-                                                           QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
+                                                           QgsMessageBar::CRITICAL,
+                                                           MainWindow::instance()->messageTimeout() );
         QgsMessageLog::logMessage("投影变换 : \t创建坐标转换关系失败, 运行已终止.");
         return QgsPoint();
     }
@@ -39,121 +74,165 @@ QgsPoint eqiProjectionTransformation::prjTransform(const QgsPoint p, const QgsCo
     return point;
 }
 
-bool eqiProjectionTransformation::createTargetCrs()
+bool eqiProjectionTransformation::isSourceCGCS2000Prj(const int postgisSrid)
 {
-    // 获得当前参照坐标系
-    QString myDefaultCrs = mSettings.value( "/eqi/prjTransform/projectDefaultCrs", GEO_EPSG_CRS_AUTHID ).toString();
-    mSourceCrs.createFromOgcWmsCrs( myDefaultCrs );
+    if (postgisSrid > 4491 && postgisSrid < 4554)
+    {
+        return true;
+    }
+    return false;
+}
 
+bool eqiProjectionTransformation::isSourceXian1980Prj(const int postgisSrid)
+{
+    if (postgisSrid > 2327 && postgisSrid < 2390)
+    {
+        return true;
+    }
+    return false;
+}
+
+bool eqiProjectionTransformation::isSourceBeijing1954Prj(const int postgisSrid)
+{
+    if (postgisSrid > 2401 && postgisSrid < 2442)
+    {
+        return true;
+    }
+    return false;
+}
+
+void eqiProjectionTransformation::sjzToDfm(QgsPoint &p)
+{
+    double L = p.x();
+    double B = p.y();
+    sjzToDfm(L);
+    sjzToDfm(B);
+    p.set(L, B);
+}
+
+void eqiProjectionTransformation::sjzToDfm(double &num)
+{
+    double tmj, tmf, tmm;
+    tmj = (int)num;
+    tmf = (int)((num-tmj)*60);
+    tmm = ((num-tmj)*60-tmf)*60;
+    num = tmj + tmf/100 + tmm/10000;
+}
+
+void eqiProjectionTransformation::dfmToMM(QgsPoint &p)
+{
+    double L = p.x();
+    double B = p.y();
+
+    double Lj, Lf, Lm;
+    double Bj, Bf, Bm;
+
+    Lj = (int)L;
+    Lf = (int)((L-Lj)*100);
+    Lm = ((L-Lj)*100-Lf)*100;
+
+    Bj = (int)B;
+    Bf = (int)((B-Bj)*100);
+    Bm = ((B-Bj)*100-Bf)*100;
+
+    p.setX(Lj*3600+Lf*60+Lm);
+    p.setY(Bj*3600+Bf*60+Bm);
+}
+
+int eqiProjectionTransformation::getBandwidth3(double djd)
+{
+    int itmp=(djd-1.5)/3+1;
+    return itmp;
+}
+
+int eqiProjectionTransformation::getCentralmeridian3(double djd)
+{
+    int itmp=(djd-1.5)/3+1;
+    return itmp*3;
+}
+
+bool eqiProjectionTransformation::createTargetCrs(const int cm)
+{
     // 验证源参照坐标系
-    if (!mSourceCrs.isValid())
+    if (!sourceCrs().isValid())
     {
-        MainWindow::instance()->messageBar()->pushMessage( "投影变换",
-                                                           "项目没有指定正确的参照坐标系, 运行已终止!",
-                                                           QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
-        QgsMessageLog::logMessage("投影变换 : \t项目没有指定正确的参照坐标系, 运行已终止!");
         return false;
     }
 
-    // 检查输入的是否是2种常用的地理坐标系
-    if ( !( (mSourceCrs.authid() == "EPSG:4326") ||		// WGS84
-        (mSourceCrs.authid() == "EPSG:4490") ) )		// CGCS2000
+    // 检查输入的是否是常用的地理坐标系
+    if (!isValidGCS(sourceCrs().authid()))
     {
-        MainWindow::instance()->messageBar()->pushMessage( "投影变换",
-                                                           "项目指定了错误的参照坐标系, 目前仅支持WGS84、CGCS2000, 运行已终止!",
-                                                           QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
-        QgsMessageLog::logMessage("投影变换 : \t项目指定了错误的参照坐标系, 目前仅支持WGS84、CGCS2000, 运行已终止!");
+        MainWindow::instance()->messageBar()->pushMessage( "定义投影坐标系",
+                                                           "项目指定了错误的地理坐标系, "
+                                                           "目前仅支持CGCS2000、beijing1954、xian1980, 运行已终止!",
+                                                           QgsMessageBar::CRITICAL,
+                                                           MainWindow::instance()->messageTimeout() );
+        QgsMessageLog::logMessage("定义投影坐标系 : \t项目指定了错误的地理坐标系,"
+                                  "目前仅支持CGCS2000、beijing1954、xian1980, 运行已终止!");
         return false;
     }
-
-    // 获得曝光点文件中的中央经线
-//    double cm = getCentralMeridian();
-    double cm = 87;
 
     // 检查经度是否在正常范围内
-    if ( !((cm>74 && cm<136) || (cm>24 && cm<46) || (cm>12 && cm<24)) )
+    if ( !((cm>=75 && cm<=135) || (cm>=13 && cm<=45)) )
     {
-        MainWindow::instance()->messageBar()->pushMessage( "投影变换",
+        MainWindow::instance()->messageBar()->pushMessage( "定义投影坐标系",
                                                            "中央经线不在中国范围内, 运行已终止!",
-                                                           QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
-        QgsMessageLog::logMessage(QString("投影变换 : \t中央经线 %1 不在中国范围内, 运行已终止!").arg(cm));
+                                                           QgsMessageBar::CRITICAL,
+                                                           MainWindow::instance()->messageTimeout() );
+        QgsMessageLog::logMessage(QString("定义投影坐标系 : \t中央经线 %1 不在中国范围内, 运行已终止!").arg(cm));
         return false;
     }
 
-    // 创建WKT格式投影坐标系
-    QString wkt;
-    QString strDescription;
-    if (mSourceCrs.authid() == "EPSG:4326")
+    // 需要考虑不同坐标系和6度分带----------------------------------------------------------------------
+    QgsCoordinateReferenceSystem mTargetCrs;
+
+    if (sourceCrs().authid() == "EPSG:4490")
     {
-        wkt = createProj4Wgs84Gcs(cm);
-
-        // 投影名称 不加带号
-        if (cm>74 && cm<136)
-            strDescription = QString("WGS 84 / Gauss-Kruger CM %1E").arg(cm);
-        // 投影名称 加带号
-        if (cm>12 && cm<46)
-            strDescription = QString("WGS 84 / Gauss-Kruger zone %1").arg(cm);
+        mTargetCrs.createFromId(getPCSauthid_2000(cm, 3));
     }
-    else if (mSourceCrs.authid() == "EPSG:4490")
-    {
-        wkt = createProj4Cgcs2000Gcs(cm);
-
-        // 投影名称 不加带号
-        if (cm>74 && cm<136)
-            strDescription = QString("CGCS2000 / Gauss-Kruger CM %1E").arg(cm);
-        // 投影名称 加带号
-        if (cm>12 && cm<46)
-            strDescription = QString("CGCS2000 / Gauss-Kruger zone %1").arg(cm);
-    }
-
-    mTargetCrs.createFromProj4(wkt);
 
     if ( !mTargetCrs.isValid() )
     {
-        MainWindow::instance()->messageBar()->pushMessage( "投影变换",
-                                                           QString("中央经线为%1, 创建投影参考坐标系失败, 运行已终止!").arg(cm),
-                                                           QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
-        QgsMessageLog::logMessage(QString("投影变换 : \t中央经线为%1, 创建投影参考坐标系失败, 运行已终止!").arg(cm));
+        MainWindow::instance()->messageBar()->pushMessage( "定义投影坐标系",
+                                                           QString("定义投影参考坐标系 %1 失败, 运行已终止!")
+                                                           .arg(mTargetCrs.description()),
+                                                           QgsMessageBar::CRITICAL,
+                                                           MainWindow::instance()->messageTimeout() );
+        QgsMessageLog::logMessage(QString("定义投影坐标系 : \t定义投影参考坐标系 %1 失败, 运行已终止!")
+                                  .arg(mTargetCrs.description()));
         return false;
     }
 
-    QgsMessageLog::logMessage(QString("投影变换 : \t中央经线为%1, 创建投影参考坐标系\"%2\"成功.").arg(cm).arg(mTargetCrs.description()));
-
-    // 填充参照坐标系名称列表
-    if (descriptionList.isEmpty())
-    {
-        if (!descriptionForDb(descriptionList))
-            return false;
-    }
-    if (descriptionUserList.isEmpty())
-    {
-        if (!descriptionForUserDb(descriptionUserList))
-            return false;
-    }
-
-    // 如果数据库中没有这个参照坐标系，则写入
-    if (descriptionList.contains(strDescription) || descriptionUserList.contains(strDescription))
-        return true;
-    else
-    {
-        long return_id = mTargetCrs.saveAsUserCRS( strDescription );
-        if (!(return_id == -1))
-        {
-            descriptionUserList.clear();
-            if (!descriptionForUserDb(descriptionUserList))
-                return false;
-        }
-        else
-        {
-            MainWindow::instance()->messageBar()->pushMessage( "投影变换",
-                QString("向数据库中写入 %1 参考坐标系失败, 运行已终止!").arg(strDescription),
-                QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
-            QgsMessageLog::logMessage(QString("投影变换 : \t向数据库中写入 %1 参考坐标系失败, 运行已终止!").arg(strDescription));
-            return false;
-        }
-    }
+    setDestCRS(mTargetCrs);
+    QgsMessageLog::logMessage(QString("定义投影坐标系 : \t定义投影参考坐标系 %1 成功.").arg(mTargetCrs.description()));
 
     return true;
+}
+
+QgsCoordinateReferenceSystem eqiProjectionTransformation::getGCS(const QgsCoordinateReferenceSystem &sourceCrs)
+{
+    QgsCoordinateReferenceSystem crs;
+
+    // 判断源参照坐标系是否是支持的地理坐标系
+    int postgisSrid = sourceCrs.postgisSrid();
+    if ( isValidPCS(postgisSrid) )
+    {
+        int iEPSG = 0;
+        // 判断对应的是哪个投影坐标系
+        if (isSourceBeijing1954Prj(postgisSrid))
+            iEPSG = 4214;
+        else if (isSourceXian1980Prj(postgisSrid))
+            iEPSG = 4610;
+        else if (isSourceCGCS2000Prj(postgisSrid))
+            iEPSG = 4490;
+
+        crs.createFromId(iEPSG);
+    }
+    else if ( isValidGCS(sourceCrs.authid()) )
+    {
+        return sourceCrs;
+    }
+    return crs;
 }
 
 bool eqiProjectionTransformation::descriptionForDb(QStringList &list)
@@ -270,48 +349,118 @@ bool eqiProjectionTransformation::descriptionForUserDb(QStringList &list)
     return true;
 }
 
-QString eqiProjectionTransformation::createProj4Cgcs2000Gcs(const double cm)
+int eqiProjectionTransformation::getPCSauthid_2000(const int cm, const int bw)
 {
-    QString pszCGCS_2000;
+    int id = 0;
+    if (bw==3)
+    {
+        if (cm >= 75 && cm <= 135)
+        {
+            id = 4534;
+            int cmJz = 75;
+            int cmIn = getCentralmeridian3(cm);
+            while (cmJz != cmIn)
+            {
+                cmJz += 3;
+                ++id;
+            }
+        }
+        else if (cm >= 25 && cm <= 45)
+        {
+            id = 4513;
+            int cmJz = 25;
+            int cmIn = getBandwidth3(cm);
+            while (cmJz != cmIn)
+            {
+                ++cmJz;
+                ++id;
+            }
+        }
+    }
+    else if (bw==6)
+    {
 
-    //3度分带，不加带号
-    if (cm>74 && cm<136)
-    {
-        pszCGCS_2000 = QString("+proj=tmerc +lat_0=0 +lon_0=%1 +k=1 +x_0=500000 +y_0=0 +ellps=GRS80 +units=m +no_defs").arg(cm);
     }
-    //3度分带，加带号
-    if (cm>24 && cm<46)
-    {
-        pszCGCS_2000 = QString("+proj=tmerc +lat_0=0 +lon_0=%1 +k=1 +x_0=%2 +y_0=0 +ellps=GRS80 +units=m +no_defs").arg(cm*3).arg(cm*1000000+500000);
-    }
-    //6度分带，加带号
-    if (cm>12 && cm<24)
-    {
-        pszCGCS_2000 = QString("+proj=tmerc +lat_0=0 +lon_0=%1 +k=1 +x_0=%2 +y_0=0 +ellps=GRS80 +units=m +no_defs").arg(cm*6-3).arg(cm*1000000+500000);
-    }
-
-    return pszCGCS_2000;
+    return id;
 }
 
-QString eqiProjectionTransformation::createProj4Wgs84Gcs(const double cm)
+QString eqiProjectionTransformation::createProj4Cgcs2000Gcs(const double cm)
 {
-    QString pszCGCS_84;
+    QString pszCGCS;
 
     //3度分带，不加带号
     if (cm>74 && cm<136)
     {
-        pszCGCS_84 = QString("+proj=tmerc +lat_0=0 +lon_0=%1 +k=1 +x_0=500000 +y_0=0 +datum=WGS84 +units=m +no_defs").arg(cm);
+        pszCGCS = QString("+proj=tmerc +lat_0=0 +lon_0=%1 +k=1 "
+                          "+x_0=500000 +y_0=0 +ellps=GRS80 +units=m +no_defs").arg(cm);
     }
     //3度分带，加带号
     if (cm>24 && cm<46)
     {
-        pszCGCS_84 = QString("+proj=tmerc +lat_0=0 +lon_0=%1 +k=1 +x_0=%2 +y_0=0 +datum=WGS84 +units=m +no_defs").arg(cm*3).arg(cm*1000000+500000);
+        pszCGCS = QString("+proj=tmerc +lat_0=0 +lon_0=%1 +k=1 "
+                          "+x_0=%2 +y_0=0 +ellps=GRS80 +units=m +no_defs").arg(cm*3).arg(cm*1000000+500000);
     }
     //6度分带，加带号
     if (cm>12 && cm<24)
     {
-        pszCGCS_84 = QString("+proj=tmerc +lat_0=0 +lon_0=%1 +k=1 +x_0=%2 +y_0=0 +datum=WGS84 +units=m +no_defs").arg(cm*6-3).arg(cm*1000000+500000);
+        pszCGCS = QString("+proj=tmerc +lat_0=0 +lon_0=%1 +k=1 "
+                          "+x_0=%2 +y_0=0 +ellps=GRS80 +units=m +no_defs").arg(cm*6-3).arg(cm*1000000+500000);
     }
 
-    return pszCGCS_84;
+    return pszCGCS;
+}
+
+QString eqiProjectionTransformation::createProj4Xian1980Gcs(const double cm)
+{
+    QString pszCGCS;
+
+    //3度分带，不加带号
+    if (cm>74 && cm<136)
+    {
+        pszCGCS = QString("+proj=tmerc +lat_0=0 +lon_0=%1 +k=1 +x_0=500000 +y_0=0 "
+                          "+a=6378140 +b=6356755.288157528 +units=m +no_defs").arg(cm);
+    }
+    //3度分带，加带号
+    if (cm>24 && cm<46)
+    {
+        pszCGCS = QString("+proj=tmerc +lat_0=0 +lon_0=%1 +k=1 +x_0=%2 +y_0=0 "
+                          "+a=6378140 +b=6356755.288157528 +units=m +no_defs").arg(cm*3).arg(cm*1000000+500000);
+    }
+    //6度分带，加带号
+    if (cm>12 && cm<24)
+    {
+        pszCGCS = QString("+proj=tmerc +lat_0=0 +lon_0=%1 +k=1 +x_0=%2 +y_0=0 "
+                          "+a=6378140 +b=6356755.288157528 +units=m +no_defs").arg(cm*6-3).arg(cm*1000000+500000);
+    }
+
+    return pszCGCS;
+}
+
+QString eqiProjectionTransformation::createProj4Beijing1954Gcs(const double cm)
+{
+    QString pszCGCS;
+
+    //3度分带，不加带号
+    if (cm>74 && cm<136)
+    {
+        pszCGCS = QString("+proj=tmerc +lat_0=0 +lon_0=%1 +k=1 "
+                          "+x_0=500000 +y_0=0 +ellps=krass +towgs84=15.8,-154.4,-82.3,0,0,0,0 "
+                          "+units=m +no_defs").arg(cm);
+    }
+    //3度分带，加带号
+    if (cm>24 && cm<46)
+    {
+        pszCGCS = QString("+proj=tmerc +lat_0=0 +lon_0=%1 +k=1 "
+                          "+x_0=%2 +y_0=0 +ellps=krass +towgs84=15.8,-154.4,-82.3,0,0,0,0 "
+                          "+units=m +no_defs").arg(cm*3).arg(cm*1000000+500000);
+    }
+    //6度分带，加带号
+    if (cm>12 && cm<24)
+    {
+        pszCGCS = QString("+proj=tmerc +lat_0=0 +lon_0=%1 +k=1 "
+                          "+x_0=%2 +y_0=0 +ellps=krass +towgs84=15.8,-154.4,-82.3,0,0,0,0 "
+                          "+units=m +no_defs").arg(cm*6-3).arg(cm*1000000+500000);
+    }
+
+    return pszCGCS;
 }

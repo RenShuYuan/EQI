@@ -3,6 +3,7 @@
 
 // Qt
 #include <QMainWindow>
+#include <QSettings>
 
 class QAction;
 class QTabBar;
@@ -16,7 +17,7 @@ class QCursor;
 // QGis
 #include "qgsmapcanvas.h"
 #include "qgsmessagebar.h"
-//class QgsMapCanvas;
+
 class QgsStatusBarCoordinatesWidget;
 class QgsScaleComboBox;
 class QgsDoubleSpinBox;
@@ -28,6 +29,12 @@ class QgsClipboard;
 class QgsMessageLogViewer;
 class QgsMapTool;
 class QgsMapOverviewCanvas;
+
+class posDataProcessing;
+class eqiPPInteractive;
+
+// 分幅图框字段名称
+const static QString ThFieldName = "TH";
 
 namespace Ui {
 class MainWindow;
@@ -49,7 +56,16 @@ public:
     //! 控制信息显示条显示的时间: 默认为5秒
     int messageTimeout();
 
+    /** 打开消息面板 **/
+    void openMessageLog();
+
     void addDockWidget( Qt::DockWidgetArea area, QDockWidget *dockwidget );
+
+    // 创建临时图层
+    // "point", "linestring", "polygon", "multipoint","multilinestring","multipolygon"
+    QgsVectorLayer* createrMemoryMap( const QString& layerName,
+                                      const QString& geometric,
+                                      const QStringList& fieldList );
 
     static MainWindow *instance() { return smInstance; }
     QAction *actionHideAllLayers() { return mActionHideAllLayers; }
@@ -78,6 +94,7 @@ private:
     void initTabTools();
     void initStatusBar();
     void initLayerTreeView();
+    void createCanvasTools();
 //    void initMenus();
 //    void initOverview();
 
@@ -85,6 +102,8 @@ private:
     void askUserForOGRSublayers( QgsVectorLayer *layer );
 
     void saveAsVectorFileGeneral( QgsVectorLayer* vlayer = nullptr, bool symbologyOption = true );
+
+    void upDataPosActions();
 
 private slots:
     void showRotation();
@@ -98,6 +117,8 @@ private slots:
     //! 改变状态栏中消息按钮的图标
     void toggleLogMessageIcon( bool hasLogMessage );
 
+    void measure();
+    void measureArea();
     void identify();
     void saveAsFile();
 
@@ -143,7 +164,41 @@ private slots:
     //! 返回活动图层的指针
     QgsMapLayer *activeLayer();
 
+    /************************* 自定义 *************************/
+
+    /************ 无人机数据管理 ************/
+    //! 载入曝光点文件
+    void openPosFile();
+
+    //! 曝光点坐标转换
+    bool posTransform();
+
+    //! 创建航飞略图
+    void posSketchMap();
+
+    //! 切换显示略图
+    void posSketchMapSwitch();
+
+    //! 创建PP动态联动
+    void posLinkPhoto();
+
+    //! 一键处理
+    void posOneButton();
+
+    //! 导出曝光点文件
+    void posExport();
+
+    //! 相机设置
+    void posSetting();
+
+    /************ 分幅管理 ************/
+    //! 根据坐标创建图框
     void pointToTk();
+
+    //! 输出图框坐标
+    void TKtoXY();
+
+    //! 分幅管理的参数设置
     void prjtransformsetting();
 
 signals:
@@ -152,24 +207,28 @@ signals:
 private:
     Ui::MainWindow *ui;
     static MainWindow *smInstance;
+    QSettings mSettings;
+    posDataProcessing *posdp;
+    eqiPPInteractive* ppInter;
 
     //! 标志，表示该项目属性对话框是怎么出现
     bool mShowProjectionTab;
 
-
+    //! 地图浏览动作
     QAction *mActionPan;
     QAction *mActionPanToSelected;
     QAction *mActionZoomIn;
     QAction *mActionZoomOut;
     QAction *mActionZoomFullExtent;
     QAction *mActionZoomActualSize;
-//    QAction *mActionZoomToSelected;
-//    QAction *mActionZoomToLayer;
-//    QAction *mActionZoomLast;
-//    QAction *mActionZoomNext;
-//    QAction *mActionDraw;
+    QAction *mActionZoomToSelected;
+    QAction *mActionZoomToLayer;
+    QAction *mActionZoomLast;
+    QAction *mActionZoomNext;
+    QAction *mActionDraw;
     QAction *mActionIdentify;
 
+    //! 图层管理动作
     QAction *mActionFilterLegend;
     QAction *mActionRemoveLayer;
     QAction *mActionShowAllLayers;
@@ -177,11 +236,29 @@ private:
     QAction *mActionShowSelectedLayers;
     QAction *mActionHideSelectedLayers;
 
-    QAction *mActionCTF;
+    //! 无人机数据管理动作
+    QAction *mOpenPosFile;
+    QAction *mPosTransform;
+    QAction *mPosSketchMap;
+    QAction *mPosSketchMapSwitch;
+    QAction *mPosOneButton;
+    QAction *mPosExport;
+    QAction *mPosSetting;
 
+    //! 无人机数据联动
+    QAction *mPPLinkPhoto;
+
+    //! 坐标转换动作
+    QAction *mActionTextTranfrom;
+    QAction *mActionDegreeMutual;
+
+    //! 分幅动作
     QAction *mActionPtoTK;
+    QAction *mActionCreateTK;
+    QAction *mActionTKtoXY;
     QAction *mActionPtoTKSetting;
 
+    //! 数据管理动作
     QAction *mActionAddOgrLayer;
     QAction *mActionLayerSaveAs;
 
@@ -212,6 +289,8 @@ private:
     QgsClipboard *mInternalClipboard;
     QgsMessageLogViewer *mLogViewer;
 //    QgsMapOverviewCanvas *mOverviewCanvas;
+
+    QgsMapTool *mNonEditMapTool;
 
     class Tools
     {

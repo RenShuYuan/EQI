@@ -55,6 +55,10 @@ LIBS += -LC:/OSGeo4W/lib    -llibexpat \
                             -lszip \
                             -lspatialindex_i \
 
+#win32: LIBS += -L C:/gdal201/lib/ -lgdal
+#INCLUDEPATH += C:/gdal201/include
+#DEPENDPATH += C:/gdal201/include
+
 DEFINES += NOMINMAX
 DEFINES += WITH_QTWEBKIT
 DEFINES += CORE_EXPORT=__declspec(dllimport)
@@ -86,13 +90,22 @@ SOURCES += \
     ui/toolTab/tab_mapbrowsing.cpp \
     ui/toolTab/tab_fractalmanagement.cpp \
     eqi/eqifractalmanagement.cpp \
-    eqi/eqiProjectionTransformation.cpp \
     ui/dialog/dialog_prjtransformsetting.cpp \
     eqi/maptool/eqimaptoolpointtotk.cpp \
     qgis/app/qgsmaptoolselectutils.cpp \
     ui/toolTab/tab_datamanagement.cpp \
     qgis/ogr/qgsopenvectorlayerdialog.cpp \
-    qgis/app/qgsvectorlayersaveasdialog.cpp
+    qgis/app/qgsvectorlayersaveasdialog.cpp \
+    qgis/ogr/qgsogrhelperfunctions.cpp \
+    ui/dialog/dialog_printtktoxy_txt.cpp \
+    ui/dialog/dialog_posloaddialog.cpp \
+    eqi/pos/posdataprocessing.cpp \
+    eqi/eqiinquiredemvalue.cpp \
+    eqi/eqiProjectionTransformation.cpp \
+    qgis/app/delimitedtext/qgsdelimitedtextfile.cpp \
+    ui/dialog/dialog_possetting.cpp \
+    eqi/eqippinteractive.cpp \
+    eqi/eqisymbol.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -111,13 +124,22 @@ HEADERS += \
     ui/toolTab/tab_mapbrowsing.h \
     ui/toolTab/tab_fractalmanagement.h \
     eqi/eqifractalmanagement.h \
-    eqi/eqiProjectionTransformation.h \
     ui/dialog/dialog_prjtransformsetting.h \
     eqi/maptool/eqimaptoolpointtotk.h \
     qgis/app/qgsmaptoolselectutils.h \
     ui/toolTab/tab_datamanagement.h \
     qgis/ogr/qgsopenvectorlayerdialog.h \
-    qgis/app/qgsvectorlayersaveasdialog.h
+    qgis/app/qgsvectorlayersaveasdialog.h \
+    qgis/ogr/qgsogrhelperfunctions.h \
+    ui/dialog/dialog_printtktoxy_txt.h \
+    ui/dialog/dialog_posloaddialog.h \
+    eqi/pos/posdataprocessing.h \
+    eqi/eqiinquiredemvalue.h \
+    eqi/eqiProjectionTransformation.h \
+    qgis/app/delimitedtext/qgsdelimitedtextfile.h \
+    ui/dialog/dialog_possetting.h \
+    eqi/eqippinteractive.h \
+    eqi/eqisymbol.h
 
 FORMS += \
         mainwindow.ui \
@@ -133,7 +155,10 @@ FORMS += \
     ui/qgis/qgsopenvectorlayerdialogbase.ui \
     ui/qgis/qgsvectorlayersaveasdialogbase.ui \
     ui/qgis/qgsextentgroupboxwidget.ui \
-    ui/qgis/qgsdatumtransformdialogbase.ui
+    ui/qgis/qgsdatumtransformdialogbase.ui \
+    ui/dialog/dialog_printtktoxy_txt.ui \
+    ui/dialog/dialog_posloaddialog.ui \
+    ui/dialog/dialog_possetting.ui
 
 RESOURCES += \
     Resources/images/images.qrc

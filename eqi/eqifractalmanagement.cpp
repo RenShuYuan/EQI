@@ -1,14 +1,37 @@
 ﻿#include "eqifractalmanagement.h"
 #include "qgsvectorlayer.h"
 #include "qgsmessagelog.h"
+#include "mainwindow.h"
 #include <QDebug>
 
 eqiFractalManagement::eqiFractalManagement(QObject *parent) : QObject(parent)
 {
+    // 获得分幅管理设置的坐标系
+    QString myDefaultCrs = mSettings.value( "/eqi/prjTransform/projectDefaultCrs", GEO_EPSG_CRS_AUTHID ).toString();
+    mSourceCrs.createFromOgcWmsCrs( myDefaultCrs );
 
+    // 设置源坐标系
+    eqiPrj.setSourceCrs(mSourceCrs);
+    if (!eqiPrj.sourceCrs().isValid())
+    {
+        MainWindow::instance()->messageBar()->pushMessage( "分幅管理",
+                                                           "源参照坐标系定义错误，请重新设置，否则相关结果不正确!",
+                                                           QgsMessageBar::CRITICAL,
+                                                           MainWindow::instance()->messageTimeout() );
+    }
+
+    // 设置目标坐标系
+    if (!setGCS())
+    {
+        MainWindow::instance()->messageBar()->pushMessage( "分幅管理",
+                                                           "目前只支持CGCS2000、XIAN 1980、BEIJING 1954，"
+                                                           "请重新设置，否则相关结果不正确!",
+                                                           QgsMessageBar::CRITICAL,
+                                                           MainWindow::instance()->messageTimeout() );
+    }
 }
 
-QgsPolygon eqiFractalManagement::dNToLal(const QString dNStr)
+QVector<QgsPoint> eqiFractalManagement::dNToLal(const QString dNStr)
 {
     int a=0, b=0, c=0, d=0;
 
@@ -42,27 +65,74 @@ QgsPolygon eqiFractalManagement::dNToLal(const QString dNStr)
     tempStr = dNStr.mid(7,3);
     d = tempStr.toInt();
 
-//    //根据比例尺得到经差与纬差
-//    double djc = mJwc.djc/60;
-//    double dwc = mJwc.dwc/60;
-    double djc = 1.875;
-    double dwc = 1.25;
+    //根据比例尺得到经差与纬差
+    double djc = mJwc.djc/60;
+    double dwc = mJwc.dwc/60;
 
     //计算出西南角的经纬度,十进制表示
     double djd=((b-31)*360+(d-1)*djc)/60;
     double dwd=((a-1)*240+(240/dwc-c)*dwc)/60;
 
-    qDebug() << dNStr << "(" << djd << "," << dwd << "):" << a << ", " << b << ", " << c << ", " << d;///
+    QVector<QgsPoint> list;
+    list << QgsPoint( djd, dwd )                //西南
+         << QgsPoint( djd, dwd+dwc/60 )         //西北
+         << QgsPoint( djd+djc/60, dwd+dwc/60 )  //东北
+         << QgsPoint( djd+djc/60, dwd );        //东南
 
+    return list;
+}
+
+QVector<QgsPoint> eqiFractalManagement::dNToXy(const QString dNStr)
+{
+    QVector<QgsPoint> points = dNToLal(dNStr);
+
+    eqiProjectionTransformation tmpPrj;
+    QgsCoordinateReferenceSystem destcrs;
+
+    // 定义源坐标系
+    tmpPrj.setSourceCrs(eqiPrj.sourceCrs());
+
+    // 计算图幅中央经线, 并创建对应的投影坐标系
+    int dh = eqiProjectionTransformation::getCentralmeridian3(points.at(0).x());
+    QString prj4Def = eqiProjectionTransformation::createProj4Cgcs2000Gcs(dh);
+    destcrs.createFromProj4(prj4Def);
+    tmpPrj.setDestCRS(destcrs);
+
+    QVector<QgsPoint> pointsOut;
+    pointsOut << tmpPrj.transform( points.at(0) );
+    pointsOut << tmpPrj.transform( points.at(1) );
+    pointsOut << tmpPrj.transform( points.at(2) );
+    pointsOut << tmpPrj.transform( points.at(3) );
+
+    return pointsOut;
+}
+
+QgsPolygon eqiFractalManagement::createTkPolygon(const QVector<QgsPoint> list)
+{
     // 计算四个角点坐标，并生成QgsPolygon
     QgsPolyline polyline;
     QgsPolygon polyon;
-    polyline << QgsPoint( djd, dwd )                //西南
-             << QgsPoint( djd, dwd+dwc/60 )         //西北
-             << QgsPoint( djd+djc/60, dwd+dwc/60 )  //东北
-             << QgsPoint( djd+djc/60, dwd );        //东南
-    polyon << polyline;
 
+    if (list.size() != 4)
+    {
+        return polyon;
+    }
+
+    // 检查源坐标系，是否需要坐标转换
+    if (eqiPrj.sourceCrs().geographicFlag())
+    {
+        polyline = list;
+        polyon << polyline;
+    }
+    else
+    {
+        polyline << eqiPrj.transform( list.at(0), QgsCoordinateTransform::ReverseTransform )    //西南
+                 << eqiPrj.transform( list.at(1), QgsCoordinateTransform::ReverseTransform )    //西北
+                 << eqiPrj.transform( list.at(2), QgsCoordinateTransform::ReverseTransform )    //东北
+                 << eqiPrj.transform( list.at(3), QgsCoordinateTransform::ReverseTransform );   //东南
+    }
+
+    polyon << polyline;
     return polyon;
 }
 
@@ -77,8 +147,8 @@ QString eqiFractalManagement::pointToTh(const QgsPoint p)
     b = mP.y()/4+1;
 
     //将十进制经纬度转换为度分秒,并全部转换为秒方便计算
-    sjzToDfm( mP );
-    dfmToMM(mP);
+    eqiProjectionTransformation::sjzToDfm( mP );
+    eqiProjectionTransformation::dfmToMM(mP);
 
     //计算出1:100万图号后的行、列号
     c=(4*3600)/mJwc.dwc-(int)(((int)mP.y()%(4*3600))/mJwc.dwc);
@@ -102,10 +172,7 @@ QString eqiFractalManagement::pointToTh(const QgsPoint p)
     //百万列号
     QString tmpStr = QString::number(a);
     if (tmpStr.size()==1)
-    {
-        th += "0";  //填充0
-        th += tmpStr;
-    }
+        th += tmpStr.prepend("0");
     else
         th += tmpStr;
 
@@ -114,32 +181,12 @@ QString eqiFractalManagement::pointToTh(const QgsPoint p)
 
     //行号及列号
     tmpStr = QString::number(c);
-    if (tmpStr.size()==1)
-    {
-        th += "00";  //填充0
-        th += tmpStr;
-    }
-    else if (tmpStr.size()==2)
-    {
-        th += "0";  //填充0
-        th += tmpStr;
-    }
-    else
-        th += tmpStr;
+    fill0(tmpStr);
+    th += tmpStr;
 
     tmpStr = QString::number(d);
-    if (tmpStr.size()==1)
-    {
-        th += "00";  //填充0
-        th += tmpStr;
-    }
-    else if (tmpStr.size()==2)
-    {
-        th += "0";  //填充0
-        th += tmpStr;
-    }
-    else
-        th += tmpStr;
+    fill0(tmpStr);
+    th += tmpStr;
 
     return th;
 }
@@ -147,13 +194,29 @@ QString eqiFractalManagement::pointToTh(const QgsPoint p)
 QStringList eqiFractalManagement::rectToTh(const QgsPoint lastPoint, const QgsPoint nextPoint)
 {
     QStringList thList;
+    QgsPoint lastPointD;
+    QgsPoint nextPointD;
+
+    // 如果是投影坐标系，则转换为经纬度
+    if (eqiPrj.sourceCrs().geographicFlag() || (checkLBisCnExtent(lastPoint) && checkLBisCnExtent(nextPoint)))
+    {
+        lastPointD = lastPoint;
+        nextPointD = nextPoint;
+    }
+    else
+    {
+        lastPointD = eqiPrj.transform(lastPoint);
+        nextPointD = eqiPrj.transform(nextPoint);
+    }
+
+    qDebug() << "lastPointD=" << lastPointD.toString() << ", nextPointD=" << nextPointD.toString(); ///
 
     // 分开保存最大经度、纬度，与最小经度、纬度
     QgsPoint maxPoint, minPoint;
-    maxPoint.set( lastPoint.x()>nextPoint.x() ? lastPoint.x():nextPoint.x(),
-                  lastPoint.y()>nextPoint.y() ? lastPoint.y():nextPoint.y());
-    minPoint.set( lastPoint.x()<nextPoint.x() ? lastPoint.x():nextPoint.x(),
-                  lastPoint.y()<nextPoint.y() ? lastPoint.y():nextPoint.y());
+    maxPoint.set( lastPointD.x()>nextPointD.x() ? lastPointD.x():nextPointD.x(),
+                  lastPointD.y()>nextPointD.y() ? lastPointD.y():nextPointD.y());
+    minPoint.set( lastPointD.x()<nextPointD.x() ? lastPointD.x():nextPointD.x(),
+                  lastPointD.y()<nextPointD.y() ? lastPointD.y():nextPointD.y());
 
     QString maxTh = pointToTh(maxPoint);
     QString minTh = pointToTh(minPoint);
@@ -237,42 +300,26 @@ void eqiFractalManagement::setBlc(const int blc)
     setBlcAbb();        //设置比例尺对应字母
 }
 
-void eqiFractalManagement::sjzToDfm(QgsPoint &p)
+int eqiFractalManagement::getScale(const int index)
 {
-    double L = p.x();
-    double B = p.y();
-    sjzToDfm(L);
-    sjzToDfm(B);
-    p.set(L, B);
-}
-
-void eqiFractalManagement::sjzToDfm(double &num)
-{
-    double tmj, tmf, tmm;
-    tmj = (int)num;
-    tmf = (int)((num-tmj)*60);
-    tmm = ((num-tmj)*60-tmf)*60;
-    num = tmj + tmf/100 + tmm/10000;
-}
-
-void eqiFractalManagement::dfmToMM(QgsPoint &p)
-{
-    double L = p.x();
-    double B = p.y();
-
-    double Lj, Lf, Lm;
-    double Bj, Bf, Bm;
-
-    Lj = (int)L;
-    Lf = (int)((L-Lj)*100);
-    Lm = ((L-Lj)*100-Lf)*100;
-
-    Bj = (int)B;
-    Bf = (int)((B-Bj)*100);
-    Bm = ((B-Bj)*100-Bf)*100;
-
-    p.setX(Lj*3600+Lf*60+Lm);
-    p.setY(Bj*3600+Bf*60+Bm);
+    switch (index) {
+    case 0:
+        return 5000;  break;
+    case 1:
+        return 10000;  break;
+    case 2:
+        return 25000;  break;
+    case 3:
+        return 50000;  break;
+    case 4:
+        return 100000;  break;
+    case 5:
+        return 250000;  break;
+    case 6:
+        return 500000;  break;
+    default:
+        return 10000;  break;
+    }
 }
 
 void eqiFractalManagement::setJwc()
@@ -340,11 +387,56 @@ void eqiFractalManagement::setBlcAbb()
 void eqiFractalManagement::setRanks()
 {
     if (mBlc == 5000)
-    {
         mJwc.ranks = 192;
-    }
     else if (mBlc == 10000)
-    {
         mJwc.ranks = 96;
+    else if (mBlc == 25000)
+        mJwc.ranks = 48;
+    else if (mBlc == 50000)
+        mJwc.ranks = 24;
+    else if (mBlc == 100000)
+        mJwc.ranks = 12;
+    else if (mBlc == 250000)
+        mJwc.ranks = 4;
+    else if (mBlc == 500000)
+        mJwc.ranks = 2;
+}
+
+void eqiFractalManagement::fill0(QString &str)
+{
+    if (str.size()==1)
+    {
+        str = str.prepend("00");
+    }
+    else if (str.size()==2)
+    {
+        str = str.prepend("0");
+    }
+}
+
+bool eqiFractalManagement::setGCS()
+{   
+    QgsCoordinateReferenceSystem crs;
+    crs = eqiPrj.getGCS(eqiPrj.sourceCrs());
+
+    if ( crs.isValid() )
+    {
+        eqiPrj.setDestCRS(crs);
+        return true;
+    }
+    else
+        return false;
+}
+
+bool eqiFractalManagement::checkLBisCnExtent(const QgsPoint &point)
+{
+    if (point.x()>=73 && point.x()<=136 &&
+        point.y()>=3 && point.y()<=54)
+    {
+        return true;
+    }
+    else
+    {
+        return false;
     }
 }
