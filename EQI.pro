@@ -105,7 +105,11 @@ SOURCES += \
     qgis/app/delimitedtext/qgsdelimitedtextfile.cpp \
     ui/dialog/dialog_possetting.cpp \
     eqi/eqippinteractive.cpp \
-    eqi/eqisymbol.cpp
+    eqi/eqisymbol.cpp \
+    ui/toolTab/tab_selectfeatures.cpp \
+    qgis/app/qgsmaptoolselectfreehand.cpp \
+    qgis/app/qgsmaptoolselectpolygon.cpp \
+    qgis/app/qgsmaptoolselectrectangle.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -139,7 +143,11 @@ HEADERS += \
     qgis/app/delimitedtext/qgsdelimitedtextfile.h \
     ui/dialog/dialog_possetting.h \
     eqi/eqippinteractive.h \
-    eqi/eqisymbol.h
+    eqi/eqisymbol.h \
+    ui/toolTab/tab_selectfeatures.h \
+    qgis/app/qgsmaptoolselectfreehand.h \
+    qgis/app/qgsmaptoolselectpolygon.h \
+    qgis/app/qgsmaptoolselectrectangle.h
 
 FORMS += \
         mainwindow.ui \
@@ -158,7 +166,8 @@ FORMS += \
     ui/qgis/qgsdatumtransformdialogbase.ui \
     ui/dialog/dialog_printtktoxy_txt.ui \
     ui/dialog/dialog_posloaddialog.ui \
-    ui/dialog/dialog_possetting.ui
+    ui/dialog/dialog_possetting.ui \
+    ui/toolTab/tab_selectfeatures.ui
 
 RESOURCES += \
     Resources/images/images.qrc

@@ -45,7 +45,7 @@ public:
     * @author                   YuanLong
     * @return					返回一个指向相片编号的指针
     */
-    QStringList* noList();
+    const QStringList* noList();
 
 
     /**
@@ -72,14 +72,6 @@ public:
     */
 //    void setPosRecord(const QString& keyField, const QString& valueField, const QString& value);
 
-    /**
-    * @brief                    删除内存中曝光点记录
-    * @author                   YuanLong
-    * @param No 				要删除的相片编号
-    * @return
-    */
-    void deletePosRecord( const QString& No );
-
     // POS坐标转换
     bool autoPosTransform();
 
@@ -96,9 +88,18 @@ signals:
     void startProcess();
     void stopProcess();
 
-private slots:
+public slots:
     // 读取POS文件并设置字段列表
     void readFieldsList(QString &);
+
+    /**
+    * @brief                    删除内存中曝光点记录
+    * @author                   YuanLong
+    * @param No 				要删除的相片编号
+    * @return
+    */
+    void deletePosRecord( const QString& No );
+    void deletePosRecords( QStringList& NoList );
 
 private:
     // 计算中央经度, 以多为准

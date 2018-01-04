@@ -11,6 +11,7 @@
 #include "ui/toolTab/tab_uavdatamanagement.h"
 #include "ui/toolTab/tab_fractalmanagement.h"
 #include "ui/toolTab/tab_datamanagement.h"
+#include "ui/toolTab/tab_selectfeatures.h"
 #include "ui/dialog/dialog_posloaddialog.h"
 #include "ui/dialog/dialog_printtktoxy_txt.h"
 #include "ui/dialog/dialog_prjtransformsetting.h"
@@ -24,6 +25,9 @@
 #include "qgis/app/qgsmeasuretool.h"
 #include "qgis/ogr/qgsopenvectorlayerdialog.h"
 #include "qgis/app/qgsvectorlayersaveasdialog.h"
+#include "qgis/app/qgsmaptoolselectrectangle.h"
+#include "qgis/app/qgsmaptoolselectpolygon.h"
+#include "qgis/app/qgsmaptoolselectfreehand.h"
 
 // Qt
 #include <QAction>
@@ -49,7 +53,6 @@
 #include "qgslayertreenode.h"
 #include "qgslayertreeregistrybridge.h"
 #include "qgslayertreeviewdefaultactions.h"
-#include "qgslayertreemapcanvasbridge.h"
 #include "qgslayertreemapcanvasbridge.h"
 #include "qgscustomlayerorderwidget.h"
 #include "qgsmessagelogviewer.h"
@@ -91,8 +94,6 @@ MainWindow::MainWindow(QWidget *parent) :
     , posdp( nullptr )
     , ppInter( nullptr )
 {
-
-
     if ( smInstance )
     {
         QMessageBox::critical( this, "EQI的多个实例", "检测到多个EQI应用对象的实例。" );
@@ -439,6 +440,26 @@ void MainWindow::loadOGRSublayers(const QString &layertype, const QString &uri, 
     }
 }
 
+void MainWindow::autoSelectAddedLayer(QList<QgsMapLayer *> layers)
+{
+    if ( !layers.isEmpty() )
+    {
+        QgsLayerTreeLayer* nodeLayer = QgsProject::instance()->layerTreeRoot()->findLayer( layers[0]->id() );
+
+        if ( !nodeLayer )
+            return;
+
+        QModelIndex index = mLayerTreeView->layerTreeModel()->node2index( nodeLayer );
+        mLayerTreeView->setCurrentIndex( index );
+    }
+}
+
+void MainWindow::activeLayerChanged(QgsMapLayer *layer)
+{
+    if ( mMapCanvas )
+        mMapCanvas->setCurrentLayer( layer );
+}
+
 void MainWindow::initActions()
 {
     /*--------------------------------------------地图浏览---------------------------------------------*/
@@ -508,6 +529,48 @@ void MainWindow::initActions()
     mActionIdentify->setIcon(eqiApplication::getThemeIcon("mActionIdentify.svg"));
     connect( mActionIdentify, SIGNAL( triggered() ), this, SLOT( identify() ) );
 
+    /*--------------------------------------------要素选择---------------------------------------------*/
+    mActionSelectFeatures = new QAction("选择要素", this);
+    mActionSelectFeatures->setStatusTip("选择要素");
+    mActionSelectFeatures->setIcon(eqiApplication::getThemeIcon("mActionSelectRectangle.svg"));
+    connect( mActionSelectFeatures, SIGNAL( triggered() ), this, SLOT( selectFeatures() ) );
+
+    mActionSelectPolygon = new QAction("按多边形\n选择要素", this);
+    mActionSelectPolygon->setStatusTip("按多边形选择要素");
+    mActionSelectPolygon->setIcon(eqiApplication::getThemeIcon("mActionSelectPolygon.svg"));
+    connect( mActionSelectPolygon, SIGNAL( triggered() ), this, SLOT( selectByPolygon() ) );
+
+    mActionSelectFreehand = new QAction("自由手绘\n选择要素", this);
+    mActionSelectFreehand->setStatusTip("自由手绘选择要素");
+    mActionSelectFreehand->setIcon(eqiApplication::getThemeIcon("mActionSelectFreehand.svg"));
+    connect( mActionSelectFreehand, SIGNAL( triggered() ), this, SLOT( selectByFreehand() ) );
+
+    mActionDeselectAll = new QAction("取消选择要素", this);
+    mActionDeselectAll->setShortcut(tr("Ctrl+Shift+A"));
+    mActionDeselectAll->setStatusTip("在所有图层中取消选择要素");
+    mActionDeselectAll->setIcon(eqiApplication::getThemeIcon("mActionDeselectAll.svg"));
+    connect( mActionDeselectAll, SIGNAL( triggered() ), this, SLOT( deselectAll() ) );
+
+    mActionSelectAll = new QAction("选择所有要素", this);
+    mActionSelectAll->setShortcut(tr("Ctrl+A"));
+    mActionSelectAll->setStatusTip("选择所有要素");
+    mActionSelectAll->setIcon(eqiApplication::getThemeIcon("mActionSelectAll.svg"));
+    connect( mActionSelectAll, SIGNAL( triggered() ), this, SLOT( selectAll() ) );
+
+    mActionInvertSelection = new QAction("反选要素", this);
+    mActionInvertSelection->setStatusTip("反选要素");
+    mActionInvertSelection->setIcon(eqiApplication::getThemeIcon("mActionInvertSelection.svg"));
+    connect( mActionInvertSelection, SIGNAL( triggered() ), this, SLOT( invertSelection() ) );
+
+    mActionDelSelect = new QAction("删除选择要素", this);
+    mActionDelSelect->setStatusTip("将删除选择的略图、POS、相片数据，保持一套数据完整性。");
+    mActionDelSelect->setIcon(eqiApplication::getThemeIcon("eqi/other/delSelect.png"));
+    connect( mActionDelSelect, SIGNAL( triggered() ), this, SLOT( delSelect() ) );
+
+    mActionSaveSelect = new QAction("保存选择要素", this);
+    mActionSaveSelect->setStatusTip("将选择的略图、POS、相片数据保存到指定路径中，保持一套数据完整性。");
+    mActionSaveSelect->setIcon(eqiApplication::getThemeIcon("eqi/other/saveSelect.png"));
+    connect( mActionSaveSelect, SIGNAL( triggered() ), this, SLOT(  ) );
     /*--------------------------------------------图层操作---------------------------------------------*/
     mActionRemoveLayer = new QAction("移除图层/组", this);
     mActionRemoveLayer->setShortcut(tr("Ctrl+D"));
@@ -644,6 +707,20 @@ void MainWindow::initTabTools()
     m_MB->addAction(mActionDraw);
     m_MB->addAction(mActionIdentify);
 
+    // 初始化“要素选择、编辑”tab
+    tab_selectFeatures *m_SF = new tab_selectFeatures(this);
+    m_SF->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    m_SF->addAction(mActionSelectFeatures);
+    m_SF->addAction(mActionSelectPolygon);
+    m_SF->addAction(mActionSelectFreehand);
+    m_SF->addSeparator(); //---
+    m_SF->addAction(mActionDeselectAll);
+    m_SF->addAction(mActionSelectAll);
+    m_SF->addAction(mActionInvertSelection);
+    m_SF->addSeparator(); //---
+    m_SF->addAction(mActionDelSelect);
+    m_SF->addAction(mActionSaveSelect);
+
     // 初始化“无人机数据管理”tab
     tab_uavDataManagement *m_uDM = new tab_uavDataManagement(this);
     m_uDM->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
@@ -683,6 +760,7 @@ void MainWindow::initTabTools()
     // 添加tab到窗口
     toolTab = new QTabWidget;
     toolTab->addTab(m_MB, "地图浏览");
+    toolTab->addTab(m_SF, "要素选择");
     toolTab->addTab(m_uDM, "无人机数据管理");
     toolTab->addTab(m_tCTF, "　　坐标转换　　");
     toolTab->addTab(m_tFM, "　　分幅管理　　");
@@ -969,12 +1047,12 @@ void MainWindow::createCanvasTools()
 //	mMapTools.mSplitFeatures->setAction( mActionSplitFeatures );
 //	mMapTools.mSplitParts = new QgsMapToolSplitParts( mMapCanvas );
 //	mMapTools.mSplitParts->setAction( mActionSplitParts );
-//    mMapTools.mSelectFeatures = new QgsMapToolSelectFeatures( mMapCanvas );
-//    mMapTools.mSelectFeatures->setAction( mActionSelectFeatures );
-//    mMapTools.mSelectPolygon = new QgsMapToolSelectPolygon( mMapCanvas );
-//    mMapTools.mSelectPolygon->setAction( mActionSelectPolygon );
-//	mMapTools.mSelectFreehand = new QgsMapToolSelectFreehand( mMapCanvas );
-//	mMapTools.mSelectFreehand->setAction( mActionSelectFreehand );
+    mMapTools.mSelectFeatures = new QgsMapToolSelectFeatures( mMapCanvas );
+    mMapTools.mSelectFeatures->setAction( mActionSelectFeatures );
+    mMapTools.mSelectPolygon = new QgsMapToolSelectPolygon( mMapCanvas );
+    mMapTools.mSelectPolygon->setAction( mActionSelectPolygon );
+    mMapTools.mSelectFreehand = new QgsMapToolSelectFreehand( mMapCanvas );
+    mMapTools.mSelectFreehand->setAction( mActionSelectFreehand );
 //	mMapTools.mSelectRadius = new QgsMapToolSelectRadius( mMapCanvas );
 //	mMapTools.mSelectRadius->setAction( mActionSelectRadius );
 //	mMapTools.mAddRing = new QgsMapToolAddRing( mMapCanvas );
@@ -1352,6 +1430,98 @@ void MainWindow::saveAsFile()
     {
         saveAsVectorFileGeneral();
     }
+}
+
+void MainWindow::selectFeatures()
+{
+    mMapCanvas->setMapTool( mMapTools.mSelectFeatures );
+}
+
+void MainWindow::selectByPolygon()
+{
+    mMapCanvas->setMapTool( mMapTools.mSelectPolygon );
+}
+
+void MainWindow::selectByFreehand()
+{
+    mMapCanvas->setMapTool( mMapTools.mSelectFreehand );
+}
+
+void MainWindow::deselectAll()
+{
+    // 关闭渲染以提高速度
+    bool renderFlagState = mMapCanvas->renderFlag();
+    if ( renderFlagState )
+        mMapCanvas->setRenderFlag( false );
+
+    QMap<QString, QgsMapLayer*> layers = QgsMapLayerRegistry::instance()->mapLayers();
+    for ( QMap<QString, QgsMapLayer*>::iterator it = layers.begin(); it != layers.end(); ++it )
+    {
+        QgsVectorLayer *vl = qobject_cast<QgsVectorLayer *>( it.value() );
+        if ( !vl )
+            continue;
+
+        vl->removeSelection();
+    }
+
+    // 打开渲染
+    if ( renderFlagState )
+        mMapCanvas->setRenderFlag( true );
+}
+
+void MainWindow::selectAll()
+{
+    QgsVectorLayer *vlayer = qobject_cast<QgsVectorLayer *>( mMapCanvas->currentLayer() );
+    if ( !vlayer )
+    {
+        messageBar()->pushMessage( "没有活动的矢量图层", "要选择所有，请在图层管理器中选择一个矢量图层",
+                                   QgsMessageBar::INFO, messageTimeout() );
+        return;
+    }
+
+    // 关闭渲染以提高速度
+    bool renderFlagState = mMapCanvas->renderFlag();
+    if ( renderFlagState )
+        mMapCanvas->setRenderFlag( false );
+
+    vlayer->selectAll();
+
+    // 打开渲染
+    if ( renderFlagState )
+        mMapCanvas->setRenderFlag( true );
+}
+
+void MainWindow::invertSelection()
+{
+    QgsVectorLayer *vlayer = qobject_cast<QgsVectorLayer *>( mMapCanvas->currentLayer() );
+    if ( !vlayer )
+    {
+        messageBar()->pushMessage( "没有活动的矢量图层",
+                                   "要反向选择，请在图层管理器中选择一个矢量图层",
+                                   QgsMessageBar::INFO, messageTimeout() );
+        return;
+    }
+
+    // 关闭渲染以提高速度
+    bool renderFlagState = mMapCanvas->renderFlag();
+    if ( renderFlagState )
+        mMapCanvas->setRenderFlag( false );
+
+    vlayer->invertSelection();
+
+    // 打开渲染
+    if ( renderFlagState )
+        mMapCanvas->setRenderFlag( true );
+}
+
+void MainWindow::delSelect()
+{
+    if (!ppInter)
+    {
+        return;
+    }
+
+    ppInter->delSelect();
 }
 
 void MainWindow::removeLayer()
@@ -1747,7 +1917,7 @@ void MainWindow::openPosFile()
         {
             if (posdp->isValid())
             {
-                QStringList* noList = posdp->noList();
+                const QStringList* noList = posdp->noList();
                 messageBar()->pushMessage( "曝光点加载",
                                            QString("成功加载%1条记录，%2条记录加载失败。")
                                            .arg(noList->size())
@@ -1783,16 +1953,19 @@ void MainWindow::posSketchMap()
     if (!posdp->isValid()) return;
 
     QgsMessageLog::logMessage("\n");
-    QgsVectorLayer* layer = posdp->autoSketchMap();
-    if (!layer)
+    //! 用于保存航飞略图
+    QgsVectorLayer* sketchMapLayer = posdp->autoSketchMap();
+    if (!sketchMapLayer)
         return;
-    ppInter = new eqiPPInteractive(this, layer, posdp->noList());
-    //	addAllToOverview();
+    ppInter = new eqiPPInteractive(this, sketchMapLayer, posdp->noList());
+
+    connect( ppInter, SIGNAL( delPos( QStringList& ) ), posdp, SLOT( deletePosRecords( QStringList& ) ) );
 }
 
 void MainWindow::posSketchMapSwitch()
 {
-    ppInter->testSwitch();
+//    ppInter->testSwitch();
+    QgsMessageLog::logMessage("test");
 }
 
 void MainWindow::posLinkPhoto()

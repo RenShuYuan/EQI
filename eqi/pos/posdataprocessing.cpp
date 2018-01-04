@@ -438,9 +438,6 @@ QgsVectorLayer* posDataProcessing::autoSketchMap()
     // 将地图画布设置为与图层同样的参照坐标系
     MainWindow::instance()->mapCanvas()->setDestinationCrs(eqiPrj.destCRS());
 
-    // 添加到地图
-    QgsMapLayerRegistry::instance()->addMapLayer(newLayer);
-
     QgsVectorDataProvider* dateProvider = newLayer->dataProvider();
 
     QMap< QString, QStringList >::iterator it_n = mFieldsList.find("noField");
@@ -524,9 +521,12 @@ QgsVectorLayer* posDataProcessing::autoSketchMap()
 
     emit stopProcess();
 
-    QgsMessageLog::logMessage(QString("创建航飞略图 : \t成功创建%1张相片略图。").arg(newLayer->featureCount()));
+    // 添加到地图
+    QgsMapLayerRegistry::instance()->addMapLayer(newLayer);
     MainWindow::instance()->mapCanvas()->freeze( false );
     MainWindow::instance()->refreshMapCanvas();
+
+    QgsMessageLog::logMessage(QString("创建航飞略图 : \t成功创建%1张相片略图。").arg(newLayer->featureCount()));
     return newLayer;
 }
 
@@ -553,7 +553,7 @@ bool posDataProcessing::isValid()
     return !mFieldsList.isEmpty();
 }
 
-QStringList* posDataProcessing::noList()
+const QStringList *posDataProcessing::noList()
 {
     QMap< QString, QStringList >::iterator it_no = mFieldsList.find("noField");
     if (it_no != mFieldsList.end())
@@ -587,7 +587,7 @@ QString posDataProcessing::getPosRecord( const QString& noValue, const QString& 
 
 //}
 
-void posDataProcessing::deletePosRecord( const QString& No )
+void posDataProcessing::deletePosRecord(const QString &No )
 {
     if (No.isEmpty())
     {
@@ -625,7 +625,21 @@ void posDataProcessing::deletePosRecord( const QString& No )
     it_omega->removeAt(index);
     it_phi->removeAt(index);
     it_kappa->removeAt(index);
-    it_photoMark->removeAt(index);
+    if (it_photoMark != mFieldsList.end())
+        it_photoMark->removeAt(index);
+}
+
+void posDataProcessing::deletePosRecords(QStringList &NoList)
+{
+    if (NoList.isEmpty())
+    {
+        return;
+    }
+
+    foreach (QString no, NoList)
+    {
+        deletePosRecord(no);
+    }
 }
 
 double posDataProcessing::calculateResolution( const double &absoluteHeight, const double &groundHeight )

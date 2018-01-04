@@ -89,6 +89,10 @@ public slots:
     void zoomToNext();
     void refreshMapCanvas();
     void loadOGRSublayers( const QString& layertype, const QString& uri, const QStringList& list );
+
+    //! 连接到图层树桥注册表，首先选择新添加的地图图层
+    void autoSelectAddedLayer( QList<QgsMapLayer*> layers );
+    void activeLayerChanged( QgsMapLayer *layer );
 private:
     void initActions();
     void initTabTools();
@@ -164,7 +168,29 @@ private slots:
     //! 返回活动图层的指针
     QgsMapLayer *activeLayer();
 
-    /************************* 自定义 *************************/
+    /************************* 面板 *************************/
+
+    /************ 要素选择、编辑 ************/
+    //! 选择要素
+    void selectFeatures();
+
+    //! 按多边形选择要素
+    void selectByPolygon();
+
+    //! 自由手绘选择要素
+    void selectByFreehand();
+
+    //! 取消选择要素
+    void deselectAll();
+
+    //! 选择所有要素
+    void selectAll();
+
+    //! 反选要素
+    void invertSelection();
+
+    //! 删除选择要素
+    void delSelect();
 
     /************ 无人机数据管理 ************/
     //! 载入曝光点文件
@@ -227,6 +253,16 @@ private:
     QAction *mActionZoomNext;
     QAction *mActionDraw;
     QAction *mActionIdentify;
+
+    //! 要素选择、编辑
+    QAction *mActionSelectFeatures;
+    QAction *mActionSelectPolygon;
+    QAction *mActionSelectFreehand;
+    QAction *mActionDeselectAll;
+    QAction *mActionSelectAll;
+    QAction *mActionInvertSelection;
+    QAction *mActionDelSelect;
+    QAction *mActionSaveSelect;
 
     //! 图层管理动作
     QAction *mActionFilterLegend;

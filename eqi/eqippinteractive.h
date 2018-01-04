@@ -6,6 +6,9 @@
 #include <QColor>
 #include <QMap>
 
+class eqiSymbol;
+class QgsVectorLayer;
+
 /*
  *负责曝光点与相片的所有互交细节
  **/
@@ -15,8 +18,7 @@ class eqiPPInteractive : public QObject
 public:
     enum linkedType { linked, unlinked, error, warning };
 
-    explicit eqiPPInteractive(QObject *parent = nullptr);
-    explicit eqiPPInteractive(QObject *parent, QgsVectorLayer* layer, QStringList* noFields);
+    explicit eqiPPInteractive(QObject *parent, QgsVectorLayer* layer, const QStringList* noFields);
     ~eqiPPInteractive();
 
     /**
@@ -33,6 +35,13 @@ public:
     * @return			有效则返回true
     */
     bool islinked(){ return isLinked; };
+
+    /**
+    * @brief            检查POS与photo是否已全部对应
+    * @author           YuanLong
+    * @return			有效则返回true
+    */
+    bool isAlllinked();
 
     /**
     * @brief            设置航飞略图
@@ -77,41 +86,24 @@ public:
     *					的匹配规则将曝光点名称与相片名称修改为一致
     * @return			当成功匹配则返回true
     */
-    void matchPosName();
+//    void matchPosName();
 
     /**
-    * @brief			addChangedItem
-    * @author			YuanLong
-    * @Access			public
-    * @Param item
-    * @Param QgsSymbolV2*
-    * @warning			将对应的item添加到更新列表中，并同时指定符号。
-    * @Returns			void
+    * @brief            切换图层符号
+    * @author           YuanLong
+    * @warning          采用符号渲染方式，将图层符号在面状与点状间切换。
+    * @return
     */
-    void addChangedItem(const QString& item, QgsSymbolV2*);
-    void addChangedItem(const QString& item, eqiPPInteractive::linkedType type);
+//    void pTosSwitch();
 
     /**
-    * @brief			clearAllChangedItem
-    * @author			YuanLong
-    * @Access			public
-    * @warning			清除更新列表中所有项
-    * @Returns			void
+    * @brief            删除所选相片
+    * @author           YuanLong
+    * @warning          将选中的相片、曝光点数据、以及略图删除。
+    * @return
     */
-    void clearAllChangedItem();
+    void delSelect();
 
-    /**
-    * @brief			updata
-    * @author			YuanLong
-    * @Access			public
-    * @warning			使用更新列表中的项和符号更新略图，
-    *					全部更新完后清空列表。
-    * @Returns			void
-    */
-    void updata();
-
-
-    void testSwitch();
 signals:
     /**
     * @brief            向主窗口发送信号更新繁忙进度条状态
@@ -121,19 +113,17 @@ signals:
     void startProcess();
     void stopProcess();
 
-private:
-    // 初始化图层的渲染方式为分类渲染
-    void initLayerCategorizedSymbolRendererV2();
-
-    // 返回符号样式拷贝
-    QgsSymbolV2* linkedSymbolV2();
-    QgsSymbolV2* unlinkedSymbolV2();
-    QgsSymbolV2* warningSymbolV2();
-    QgsSymbolV2* errorSymbolV2();
+    void delPos(QStringList& photoList);
 
 private:
-    QObject *parent;
+    int delMap();
+    void delPhoto(QStringList& photoList);
+
+private:
     QSettings mSetting;
+    eqiSymbol *mySymbol;
+    QgsVectorLayer* mLayer;
+    QString fieldName;
 
     // 是否联动成功
     bool isLinked;
@@ -141,24 +131,8 @@ private:
     // 相片列表,保存文件baseName与完整路径
     QMap<QString, QString> mPhotoMap;
 
-    // 关联图层指针
-    QgsVectorLayer* mLayer;
-
-    // 保存需要更新的符号项
-    QMap< QString, QgsSymbolV2* > mChangeList;
-
-    QColor cLinked;			// 已关联的符号颜色
-    QColor cUnlinked;		// 未关联符号颜色
-    QColor cError;			// 错误符号颜色
-    QColor cWarning;		// 警告符号颜色
-
-    QgsSymbolV2* mLinkedSymbolV2;	// 已关联的符号类
-    QgsSymbolV2* mUnlinkedSymbolV2;	// 未关联的符号类
-    QgsSymbolV2* mErrorSymbolV2;	// 错误的符号类
-    QgsSymbolV2* mWarningSymbolV2;	// 警告的符号类
-
     QStringList photosList;		// 用于保存搜索到的相片路径
-    QStringList* mNoFields;		// 关联POS列表指针
+    const QStringList* mNoFields;		// 关联POS列表指针
 };
 
 #endif // EQIPPINTERACTIVE_H
