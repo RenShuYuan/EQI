@@ -109,7 +109,8 @@ SOURCES += \
     ui/toolTab/tab_selectfeatures.cpp \
     qgis/app/qgsmaptoolselectfreehand.cpp \
     qgis/app/qgsmaptoolselectpolygon.cpp \
-    qgis/app/qgsmaptoolselectrectangle.cpp
+    qgis/app/qgsmaptoolselectrectangle.cpp \
+    ui/dialog/dialog_selectsetting.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -147,7 +148,8 @@ HEADERS += \
     ui/toolTab/tab_selectfeatures.h \
     qgis/app/qgsmaptoolselectfreehand.h \
     qgis/app/qgsmaptoolselectpolygon.h \
-    qgis/app/qgsmaptoolselectrectangle.h
+    qgis/app/qgsmaptoolselectrectangle.h \
+    ui/dialog/dialog_selectsetting.h
 
 FORMS += \
         mainwindow.ui \
@@ -167,7 +169,8 @@ FORMS += \
     ui/dialog/dialog_printtktoxy_txt.ui \
     ui/dialog/dialog_posloaddialog.ui \
     ui/dialog/dialog_possetting.ui \
-    ui/toolTab/tab_selectfeatures.ui
+    ui/toolTab/tab_selectfeatures.ui \
+    ui/dialog/dialog_selectsetting.ui
 
 RESOURCES += \
     Resources/images/images.qrc

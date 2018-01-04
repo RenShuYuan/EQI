@@ -189,9 +189,14 @@ private slots:
     //! 反选要素
     void invertSelection();
 
-    //! 删除选择要素
+    //! 删除选择航飞数据
     void delSelect();
 
+    //! 保存选择航飞数据
+    void saveSelect();
+
+    //! 设置
+    void selectSetting();
     /************ 无人机数据管理 ************/
     //! 载入曝光点文件
     void openPosFile();
@@ -263,6 +268,7 @@ private:
     QAction *mActionInvertSelection;
     QAction *mActionDelSelect;
     QAction *mActionSaveSelect;
+    QAction *mselectSetting;
 
     //! 图层管理动作
     QAction *mActionFilterLegend;

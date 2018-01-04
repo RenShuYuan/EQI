@@ -16,6 +16,7 @@
 #include "ui/dialog/dialog_printtktoxy_txt.h"
 #include "ui/dialog/dialog_prjtransformsetting.h"
 #include "ui/dialog/dialog_possetting.h"
+#include "ui/dialog/dialog_selectsetting.h"
 #include "qgis/app/qgsstatusbarcoordinateswidget.h"
 #include "qgis/app/qgsapplayertreeviewmenuprovider.h"
 #include "qgis/app/qgsclipboard.h"
@@ -41,6 +42,7 @@
 #include <QDockWidget>
 #include <QCursor>
 #include <QMenu>
+#include <QFileDialog>
 
 // QGis
 //#include "qgsmapcanvas.h"
@@ -562,15 +564,20 @@ void MainWindow::initActions()
     mActionInvertSelection->setIcon(eqiApplication::getThemeIcon("mActionInvertSelection.svg"));
     connect( mActionInvertSelection, SIGNAL( triggered() ), this, SLOT( invertSelection() ) );
 
-    mActionDelSelect = new QAction("删除选择要素", this);
-    mActionDelSelect->setStatusTip("将删除选择的略图、POS、相片数据，保持一套数据完整性。");
+    mActionDelSelect = new QAction("删除所选\n航飞数据", this);
+    mActionDelSelect->setStatusTip("将选择的略图、POS、相片数据删除，保持一套数据完整性。");
     mActionDelSelect->setIcon(eqiApplication::getThemeIcon("eqi/other/delSelect.png"));
     connect( mActionDelSelect, SIGNAL( triggered() ), this, SLOT( delSelect() ) );
 
-    mActionSaveSelect = new QAction("保存选择要素", this);
+    mActionSaveSelect = new QAction("保存所选\n航飞数据", this);
     mActionSaveSelect->setStatusTip("将选择的略图、POS、相片数据保存到指定路径中，保持一套数据完整性。");
     mActionSaveSelect->setIcon(eqiApplication::getThemeIcon("eqi/other/saveSelect.png"));
-    connect( mActionSaveSelect, SIGNAL( triggered() ), this, SLOT(  ) );
+    connect( mActionSaveSelect, SIGNAL( triggered() ), this, SLOT( saveSelect() ) );
+
+    mselectSetting = new QAction("设置", this);
+    mselectSetting->setIcon(eqiApplication::getThemeIcon("propertyicons/settings.svg"));
+    mselectSetting->setStatusTip("删除、保存所选航飞数据的相关设置。");
+    connect( mselectSetting, SIGNAL( triggered() ), this, SLOT( selectSetting() ));
     /*--------------------------------------------图层操作---------------------------------------------*/
     mActionRemoveLayer = new QAction("移除图层/组", this);
     mActionRemoveLayer->setShortcut(tr("Ctrl+D"));
@@ -636,9 +643,9 @@ void MainWindow::initActions()
     mPosExport->setIcon(eqiApplication::getThemeIcon("mActionSharingExport.svg"));
     connect( mPosExport, SIGNAL( triggered() ), this, SLOT( posExport() ) );
 
-    mPosSetting = new QAction("相机参数设置", this);
+    mPosSetting = new QAction("参数设置", this);
     mPosSetting->setIcon(eqiApplication::getThemeIcon("propertyicons/settings.svg"));
-    mPosSetting->setStatusTip("相机参数设置。");
+    mPosSetting->setStatusTip("相机参数、POS一键处理设置。");
     connect( mPosSetting, SIGNAL( triggered() ), this, SLOT( posSetting() ));
 
     /*----------------------------------------------坐标转换-------------------------------------------*/
@@ -720,6 +727,8 @@ void MainWindow::initTabTools()
     m_SF->addSeparator(); //---
     m_SF->addAction(mActionDelSelect);
     m_SF->addAction(mActionSaveSelect);
+    m_SF->addSeparator(); //---
+    m_SF->addAction(mselectSetting);
 
     // 初始化“无人机数据管理”tab
     tab_uavDataManagement *m_uDM = new tab_uavDataManagement(this);
@@ -788,7 +797,7 @@ void MainWindow::initStatusBar()
     //显示坐标控件
     mCoordsEdit = new QgsStatusBarCoordinatesWidget( ui->statusBar );
     mCoordsEdit->setMapCanvas( mMapCanvas );
-    ui->statusBar->addPermanentWidget( mCoordsEdit );
+    ui->statusBar->addPermanentWidget( mCoordsEdit, 0 );
 
     // 添加一个标签显示比例尺
     mScaleLabel = new QLabel( QString(), ui->statusBar );
@@ -869,7 +878,6 @@ void MainWindow::initStatusBar()
 
     // 消息按钮
     mMessageButton = new QToolButton( ui->statusBar );
-    mMessageButton = new QToolButton( this );
     mMessageButton->setAutoRaise( true );
     mMessageButton->setIcon( eqiApplication::getThemeIcon("mMessageLog.svg") );
     mMessageButton->setToolTip( tr( "Messages" ) );
@@ -1522,6 +1530,53 @@ void MainWindow::delSelect()
     }
 
     ppInter->delSelect();
+}
+
+void MainWindow::saveSelect()
+{
+    QString savePath;
+    int iSave = mSettings.value("/eqi/options/selectEdit/save", SAVE_TEMPDIR).toInt();
+
+    if (iSave == SAVE_CUSTOMIZE) // 选择文件夹
+    {
+        // 读取保存的上一次路径
+        QString strListPath = mSettings.value( "/eqi/pos/pathName", QDir::homePath()).toString();
+
+        //浏览文件夹
+        QString dir = QFileDialog::getExistingDirectory(this, "选择文件夹", strListPath,
+                                                        QFileDialog::ShowDirsOnly |
+                                                        QFileDialog::DontResolveSymlinks);
+        if (!dir.isEmpty())
+        {
+            mSettings.setValue("/eqi/pos/pathName", dir);
+            savePath = dir;
+        }
+    }
+    else // 自动创建临时文件夹
+    {
+
+    }
+
+    // 检查
+    if (savePath.isEmpty())
+    {
+        return;
+    }
+    if (!QDir(savePath).exists())
+    {
+        messageBar()->pushMessage( "保存航摄数据",
+                                   "选择的是一个无效文件夹路径。",
+                                   QgsMessageBar::INFO, messageTimeout() );
+        return;
+    }
+
+    // 保存数据
+}
+
+void MainWindow::selectSetting()
+{
+    dialog_selectSetting *selectDialog = new dialog_selectSetting(this);
+    selectDialog->exec();
 }
 
 void MainWindow::removeLayer()

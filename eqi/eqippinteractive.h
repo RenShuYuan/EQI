@@ -97,12 +97,20 @@ public:
 //    void pTosSwitch();
 
     /**
-    * @brief            删除所选相片
+    * @brief            删除所选航摄数据
     * @author           YuanLong
     * @warning          将选中的相片、曝光点数据、以及略图删除。
     * @return
     */
     void delSelect();
+
+    /**
+    * @brief            保存所选航摄数据
+    * @author           YuanLong
+    * @warning          将选中的相片、曝光点数据、以及略图另存为。
+    * @return
+    */
+    void saveSelect(const QString& savePath);
 
 signals:
     /**

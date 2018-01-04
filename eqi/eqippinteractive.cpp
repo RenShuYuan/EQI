@@ -156,6 +156,11 @@ void eqiPPInteractive::delSelect()
 
 }
 
+void eqiPPInteractive::saveSelect(const QString &savePath)
+{
+
+}
+
 int eqiPPInteractive::delMap()
 {
     int deletedCount = 0;
