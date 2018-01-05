@@ -564,12 +564,12 @@ void MainWindow::initActions()
     mActionInvertSelection->setIcon(eqiApplication::getThemeIcon("mActionInvertSelection.svg"));
     connect( mActionInvertSelection, SIGNAL( triggered() ), this, SLOT( invertSelection() ) );
 
-    mActionDelSelect = new QAction("删除所选\n航飞数据", this);
+    mActionDelSelect = new QAction("删除航摄数据", this);
     mActionDelSelect->setStatusTip("将选择的略图、POS、相片数据删除，保持一套数据完整性。");
     mActionDelSelect->setIcon(eqiApplication::getThemeIcon("eqi/other/delSelect.png"));
     connect( mActionDelSelect, SIGNAL( triggered() ), this, SLOT( delSelect() ) );
 
-    mActionSaveSelect = new QAction("保存所选\n航飞数据", this);
+    mActionSaveSelect = new QAction("保存航摄数据", this);
     mActionSaveSelect->setStatusTip("将选择的略图、POS、相片数据保存到指定路径中，保持一套数据完整性。");
     mActionSaveSelect->setIcon(eqiApplication::getThemeIcon("eqi/other/saveSelect.png"));
     connect( mActionSaveSelect, SIGNAL( triggered() ), this, SLOT( saveSelect() ) );
@@ -1524,12 +1524,36 @@ void MainWindow::invertSelection()
 
 void MainWindow::delSelect()
 {
-    if (!ppInter)
+    QString delPath;
+    int iDelete = mSettings.value("/eqi/options/selectEdit/delete", DELETE_DIR).toInt();
+
+    if (iDelete == DELETE_DIR) // 移动到临时文件夹中
     {
-        return;
+        QString autoPath = mSettings.value("/eqi/pos/lePosFile", "").toString();
+        autoPath = QFileInfo(autoPath).path();
+
+        QDateTime current_date_time = QDateTime::currentDateTime();
+        QString current_date = current_date_time.toString("yyyy-MM-dd");
+        autoPath = QString("%1/删除的相片-%3").arg(autoPath).arg(current_date);
+
+        if (!QDir(autoPath).exists())
+        {
+            QDir dir;
+            if ( !dir.mkpath(autoPath) )
+            {
+                QgsMessageLog::logMessage(QString("删除航摄数据 : \t自动创建文件夹失败，请手动指定。"));
+                return;
+            }
+        }
+
+        delPath = autoPath;
     }
 
-    ppInter->delSelect();
+    if (ppInter)
+    {
+        QgsMessageLog::logMessage("\n");
+        ppInter->delSelect(delPath);
+    }
 }
 
 void MainWindow::saveSelect()
@@ -1554,7 +1578,24 @@ void MainWindow::saveSelect()
     }
     else // 自动创建临时文件夹
     {
+        QString autoPath = mSettings.value("/eqi/pos/lePosFile", "").toString();
+        autoPath = QFileInfo(autoPath).path();
 
+        QDateTime current_date_time = QDateTime::currentDateTime();
+        QString current_date = current_date_time.toString("yyyy-MM-dd-hh-mm");
+        autoPath = QString("%1/航摄数据-%3").arg(autoPath).arg(current_date);
+
+        if (!QDir(autoPath).exists())
+        {
+            QDir dir;
+            if ( !dir.mkpath(autoPath) )
+            {
+                QgsMessageLog::logMessage(QString("保存航摄数据 : \t自动创建文件夹失败，请手动指定。"));
+                return;
+            }
+        }
+
+        savePath = autoPath;
     }
 
     // 检查
@@ -1571,6 +1612,13 @@ void MainWindow::saveSelect()
     }
 
     // 保存数据
+    if (ppInter)
+    {
+        QgsMessageLog::logMessage("\n");
+
+        // 保存略图与相片
+        ppInter->saveSelect(savePath);
+    }
 }
 
 void MainWindow::selectSetting()
@@ -2012,9 +2060,7 @@ void MainWindow::posSketchMap()
     QgsVectorLayer* sketchMapLayer = posdp->autoSketchMap();
     if (!sketchMapLayer)
         return;
-    ppInter = new eqiPPInteractive(this, sketchMapLayer, posdp->noList());
-
-    connect( ppInter, SIGNAL( delPos( QStringList& ) ), posdp, SLOT( deletePosRecords( QStringList& ) ) );
+    ppInter = new eqiPPInteractive(this, sketchMapLayer, posdp);
 }
 
 void MainWindow::posSketchMapSwitch()

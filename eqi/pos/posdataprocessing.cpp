@@ -400,35 +400,44 @@ QStringList posDataProcessing::getPosElev()
 
 QgsVectorLayer* posDataProcessing::autoSketchMap()
 {
-    MainWindow::instance()->mapCanvas()->freeze();
-
     emit startProcess();
 
-    QString layerProperties = "Polygon?";													// 几何类型
-    layerProperties.append(QString( "field=id:integer&field=相片编号:string(50)"				// 添加字段
-                                                    "&field=曝光点坐标:string(30)"
-                                                    "&field=Omega:string(10)"
-                                                    "&field=Phi:string(10)"
-                                                    "&field=Kappa:string(10)"
-                                                    "&field=地面分辨率:string(10)&"));
-    layerProperties.append(QString( "index=yes&" ));										// 创建索引
-    layerProperties.append(QString( "memoryid=%1" ).arg( QUuid::createUuid().toString() ));	// 临时编码
+//    QString layerProperties = "Polygon?";													// 几何类型
+//    layerProperties.append(QString( "field=id:integer&field=相片编号:string(50)"				// 添加字段
+//                                                    "&field=曝光点坐标:string(30)"
+//                                                    "&field=Omega:string(10)"
+//                                                    "&field=Phi:string(10)"
+//                                                    "&field=Kappa:string(10)"
+//                                                    "&field=地面分辨率:string(10)&"));
+//    layerProperties.append(QString( "index=yes&" ));										// 创建索引
+//    layerProperties.append(QString( "memoryid=%1" ).arg( QUuid::createUuid().toString() ));	// 临时编码
 
     QString sketchMapName;
     sketchMapName = mSettings.value("/eqi/pos/lePosFile", "").toString();
     sketchMapName = QFileInfo(sketchMapName).baseName();
     if (sketchMapName.isEmpty())
-        sketchMapName = "航飞略图";
+        sketchMapName = "航摄略图";
 
-    QgsVectorLayer* newLayer = new QgsVectorLayer(
-        layerProperties, sketchMapName, QString( "memory" ) );
+//    QgsVectorLayer* newLayer = new QgsVectorLayer(
+//        layerProperties, sketchMapName, QString( "memory" ) );
 
-    if (!newLayer->isValid())
+    QgsVectorLayer* newLayer = MainWindow::instance()->createrMemoryMap(sketchMapName,
+                                                        "Polygon",
+                                                        QStringList()
+                                                        << "field=id:integer"
+                                                        << "field=相片编号:string(50)"
+                                                        << "field=曝光点坐标:string(30)"
+                                                        << "field=Omega:string(10)"
+                                                        << "field=Phi:string(10)"
+                                                        << "field=Kappa:string(10)"
+                                                        << "field=地面分辨率:string(10)");
+
+    if (!newLayer && !newLayer->isValid())
     {
-        MainWindow::instance()->messageBar()->pushMessage( "创建航飞略图",
+        MainWindow::instance()->messageBar()->pushMessage( "创建航摄略图",
             "创建略图失败, 运行已终止, 注意检查plugins文件夹!",
             QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
-        QgsMessageLog::logMessage(QString("创建航飞略图 : \t创建略图失败, 程序已终止, 注意检查plugins文件夹。"));
+        QgsMessageLog::logMessage(QString("创建航摄略图 : \t创建略图失败, 程序已终止, 注意检查plugins文件夹。"));
         return nullptr;
     }
 
@@ -497,6 +506,8 @@ QgsVectorLayer* posDataProcessing::autoSketchMap()
         featureList.append(MyFeature);
     }
 
+    MainWindow::instance()->mapCanvas()->freeze();
+
     // 开始编辑
     newLayer->startEditing();
 
@@ -521,8 +532,8 @@ QgsVectorLayer* posDataProcessing::autoSketchMap()
 
     emit stopProcess();
 
-    // 添加到地图
-    QgsMapLayerRegistry::instance()->addMapLayer(newLayer);
+//    // 添加到地图
+//    QgsMapLayerRegistry::instance()->addMapLayer(newLayer);
     MainWindow::instance()->mapCanvas()->freeze( false );
     MainWindow::instance()->refreshMapCanvas();
 
@@ -562,7 +573,7 @@ const QStringList *posDataProcessing::noList()
         return nullptr;
 }
 
-QString posDataProcessing::getPosRecord( const QString& noValue, const QString& valueField )
+const QString posDataProcessing::getPosRecord( const QString& noValue, const QString& valueField )
 {
     QString returnStr;
     QStringList* noList;
@@ -570,9 +581,11 @@ QString posDataProcessing::getPosRecord( const QString& noValue, const QString& 
     QMap< QString, QStringList >::iterator it_no = mFieldsList.find("noField");
     QMap< QString, QStringList >::iterator it_value = mFieldsList.find(valueField);
 
-    if (it_no != mFieldsList.end()) noList = &(it_no.value());
-    if (it_no != mFieldsList.end()) valueList = &(it_value.value());
+    if (it_no == mFieldsList.end() || it_value == mFieldsList.end())
+        return returnStr;
 
+    noList = &(it_no.value());
+    valueList = &(it_value.value());
     int noIndex = noList->indexOf(noValue);
     if (noIndex != -1)
     {

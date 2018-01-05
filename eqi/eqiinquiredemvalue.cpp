@@ -103,7 +103,7 @@ void eqiInquireDemValue::loadDem()
         else
         {
             QgsMessageLog::logMessage(QString("\t\t加载%1失败, 将使用预设的平均高程计算地面分辨率.")
-                                      .arg(QDir::toNativeSeparators(path)));
+                                      .arg(QFileInfo(path).baseName()));
         }
         ++it;
     }

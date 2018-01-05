@@ -57,7 +57,7 @@ public:
     * @warning
     * @Returns			QT_NAMESPACE::QString	返回查询字段值
     */
-    QString getPosRecord(const QString& noValue, const QString& valueField);
+    const QString getPosRecord(const QString& noValue, const QString& valueField);
 
 
     /**
@@ -84,13 +84,6 @@ public:
     // 返回无效记录数量
     int getInvalidLineSize();
 
-signals:
-    void startProcess();
-    void stopProcess();
-
-public slots:
-    // 读取POS文件并设置字段列表
-    void readFieldsList(QString &);
 
     /**
     * @brief                    删除内存中曝光点记录
@@ -100,6 +93,14 @@ public slots:
     */
     void deletePosRecord( const QString& No );
     void deletePosRecords( QStringList& NoList );
+
+signals:
+    void startProcess();
+    void stopProcess();
+
+public slots:
+    // 读取POS文件并设置字段列表
+    void readFieldsList(QString &);
 
 private:
     // 计算中央经度, 以多为准

@@ -36,7 +36,7 @@ eqiMapToolPointToTk::eqiMapToolPointToTk(QgsMapCanvas *canvas)
             newLayer = MainWindow::instance()->createrMemoryMap("标准分幅略图",
                                                                 "Polygon",
                                                                 QStringList() << "field=TH:string(10)");
-            if (!newLayer)
+            if (!newLayer && !newLayer->isValid())
             {
                 MainWindow::instance()->messageBar()->pushMessage(
                             "坐标生图框",
@@ -121,8 +121,6 @@ void eqiMapToolPointToTk::canvasReleaseEvent(QgsMapMouseEvent *e)
                 return;
             }
 
-            MainWindow::instance()->mapCanvas()->freeze();
-
             // 生成图幅要素
             QgsFeatureList featureList;
             foreach (QString th, thList)
@@ -139,6 +137,8 @@ void eqiMapToolPointToTk::canvasReleaseEvent(QgsMapMouseEvent *e)
                 MyFeature.setAttributes(QgsAttributes() << QVariant(th));
                 featureList.append(MyFeature);
             }
+
+            MainWindow::instance()->mapCanvas()->freeze();
 
             // 开始编辑
             newLayer->startEditing();

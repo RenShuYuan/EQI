@@ -8,6 +8,7 @@
 
 class eqiSymbol;
 class QgsVectorLayer;
+class posDataProcessing;
 
 /*
  *负责曝光点与相片的所有互交细节
@@ -18,7 +19,7 @@ class eqiPPInteractive : public QObject
 public:
     enum linkedType { linked, unlinked, error, warning };
 
-    explicit eqiPPInteractive(QObject *parent, QgsVectorLayer* layer, const QStringList* noFields);
+    explicit eqiPPInteractive(QObject *parent, QgsVectorLayer* layer, posDataProcessing *posdp);
     ~eqiPPInteractive();
 
     /**
@@ -102,11 +103,12 @@ public:
     * @warning          将选中的相片、曝光点数据、以及略图删除。
     * @return
     */
-    void delSelect();
+    void delSelect(const QString& movePath);
 
     /**
     * @brief            保存所选航摄数据
     * @author           YuanLong
+    * @param savePath  保存相片的文件夹路径
     * @warning          将选中的相片、曝光点数据、以及略图另存为。
     * @return
     */
@@ -125,12 +127,26 @@ signals:
 
 private:
     int delMap();
-    void delPhoto(QStringList& photoList);
+
+    /**
+    * @brief                删除所选相片
+    * @author               YuanLong
+    * @param tempFolder    字符串为空则直接删除相片，
+    *                       否则将相片移动到指定文件夹中。
+    * @warning
+    * @return
+    */
+    void delPhoto(const QStringList& photoList, const QString& tempFolder);
+
+    void saveMap(const QString& savePath);
+    void savePos(const QString& savePath, const QStringList &photoList);
+    void savePhoto(const QString& savePath, const QStringList &photoList);
 
 private:
     QSettings mSetting;
     eqiSymbol *mySymbol;
     QgsVectorLayer* mLayer;
+    posDataProcessing* mPosdp;
     QString fieldName;
 
     // 是否联动成功
@@ -140,7 +156,6 @@ private:
     QMap<QString, QString> mPhotoMap;
 
     QStringList photosList;		// 用于保存搜索到的相片路径
-    const QStringList* mNoFields;		// 关联POS列表指针
 };
 
 #endif // EQIPPINTERACTIVE_H
