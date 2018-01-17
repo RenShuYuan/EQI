@@ -96,6 +96,7 @@ SOURCES += \
     ui/toolTab/tab_datamanagement.cpp \
     qgis/ogr/qgsopenvectorlayerdialog.cpp \
     qgis/app/qgsvectorlayersaveasdialog.cpp \
+<<<<<<< HEAD
     qgis/ogr/qgsogrhelperfunctions.cpp \
     ui/dialog/dialog_printtktoxy_txt.cpp \
     ui/dialog/dialog_posloaddialog.cpp \
@@ -113,6 +114,9 @@ SOURCES += \
     ui/dialog/dialog_selectsetting.cpp \
     ui/toolTab/tab_checkaerialphoto.cpp \
     eqi/eqianalysisaerialphoto.cpp
+=======
+    qgis/ogr/qgsogrhelperfunctions.cpp
+>>>>>>> 8408d22f60c6e2f266583bd79469a2a283413c43
 
 HEADERS += \
         mainwindow.h \
@@ -137,6 +141,7 @@ HEADERS += \
     ui/toolTab/tab_datamanagement.h \
     qgis/ogr/qgsopenvectorlayerdialog.h \
     qgis/app/qgsvectorlayersaveasdialog.h \
+<<<<<<< HEAD
     qgis/ogr/qgsogrhelperfunctions.h \
     ui/dialog/dialog_printtktoxy_txt.h \
     ui/dialog/dialog_posloaddialog.h \
@@ -154,6 +159,9 @@ HEADERS += \
     ui/dialog/dialog_selectsetting.h \
     ui/toolTab/tab_checkaerialphoto.h \
     eqi/eqianalysisaerialphoto.h
+=======
+    qgis/ogr/qgsogrhelperfunctions.h
+>>>>>>> 8408d22f60c6e2f266583bd79469a2a283413c43
 
 FORMS += \
         mainwindow.ui \

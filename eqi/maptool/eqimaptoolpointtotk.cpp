@@ -105,6 +105,7 @@ void eqiMapToolPointToTk::canvasReleaseEvent(QgsMapMouseEvent *e)
         else if (count==2)
         {
             nextPoint = toMapCoordinates( e->pos() );
+<<<<<<< HEAD
 
             eqiFractalManagement fm(this);
 
@@ -114,15 +115,24 @@ void eqiMapToolPointToTk::canvasReleaseEvent(QgsMapMouseEvent *e)
 
             QStringList thList = fm.rectToTh(lastPoint, nextPoint);
             if (thList.isEmpty())
+=======
+            qDebug() << "1.开始生成图框";///
+            eqiFractalManagement fm;
+            fm.setBlc(5000);
+            QStringList thList = fm.rectToTh(lastPoint, nextPoint);
+            qDebug() << "1.结束生成图框";///
+            // 是否需要创建矢量图层
+            if (fisrtMap)
+>>>>>>> 8408d22f60c6e2f266583bd79469a2a283413c43
             {
                 return;
             }
-
+            qDebug() << "2.开始生成图框要素";///
             // 生成图幅要素
             QgsFeatureList featureList;
             foreach (QString th, thList)
             {
-                QgsMessageLog::logMessage(th);
+//                QgsMessageLog::logMessage(th);
 
                 QVector< QgsPoint > points = fm.dNToLal(th);
                 QgsPolygon polygon = fm.createTkPolygon(points);
@@ -134,9 +144,13 @@ void eqiMapToolPointToTk::canvasReleaseEvent(QgsMapMouseEvent *e)
                 MyFeature.setAttributes(QgsAttributes() << QVariant(th));
                 featureList.append(MyFeature);
             }
+<<<<<<< HEAD
 
             MainWindow::instance()->mapCanvas()->freeze();
 
+=======
+            qDebug() << "2.结束生成图框要素";///
+>>>>>>> 8408d22f60c6e2f266583bd79469a2a283413c43
             // 开始编辑
             newLayer->startEditing();
 
@@ -153,6 +167,7 @@ void eqiMapToolPointToTk::canvasReleaseEvent(QgsMapMouseEvent *e)
             MainWindow::instance()->refreshMapCanvas();
 
             count = 0;
+            qDebug() << "3.循环结束";///
         }
 
         // 绘制橡皮筋

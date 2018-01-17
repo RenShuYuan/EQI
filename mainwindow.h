@@ -266,8 +266,13 @@ private:
     QAction *mActionZoomToSelected;
     QAction *mActionZoomToLayer;
     QAction *mActionZoomLast;
+<<<<<<< HEAD
     QAction *mActionZoomNext;
     QAction *mActionDraw;
+=======
+//    QAction *mActionZoomNext;
+//    QAction *mActionDraw;
+>>>>>>> 8408d22f60c6e2f266583bd79469a2a283413c43
     QAction *mActionIdentify;
 
     //! 图层管理动作

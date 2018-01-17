@@ -33,37 +33,37 @@ void eqiAnalysisAerialphoto::checkOverlapping()
 //    double sideways_Ed = 60.0;
 //    double sideways_Min = 8.0;
 
-    foreach (QStringList line, mAirLineGroup)
-    {
-        QgsMessageLog::logMessage("重叠度检查");
+//    foreach (QStringList line, mAirLineGroup)
+//    {
+//        QgsMessageLog::logMessage("重叠度检查");
 
-        //! 行带内重叠度检查
-        QString lastPhoto;
-        QString currentPhoto;
-        QgsGeometry* lastGeometry = nullptr;
-        QgsGeometry* currentGeometry = nullptr;
+//        //! 行带内重叠度检查
+//        QString lastPhoto;
+//        QString currentPhoto;
+//        QgsGeometry* lastGeometry = nullptr;
+//        QgsGeometry* currentGeometry = nullptr;
 
-        QgsFeature f;
-        QgsFeatureRequest request;
+//        QgsFeature f;
+//        QgsFeatureRequest request;
 
-        QStringList::iterator it = line.begin();
-        lastPhoto = *it;
+//        QStringList::iterator it = line.begin();
+//        lastPhoto = *it;
 
-        // 获得上个图形
-        request.setFilterExpression(QString("相片编号='%1'").arg(lastPhoto));
-        QgsFeatureIterator It_last = mLayerMap->getFeatures(request);
-        while (It_last.nextFeature(f))
-        {
-            if (f.isValid())
-                lastGeometry = f.geometry();
-            break;
-        }
-        if (!lastGeometry || lastGeometry->isGeosEmpty())
-        {
-            QgsMessageLog::logMessage(QString("检查重叠度 : \t%1 last图形检索失败.").arg(lastPhoto));
-            lastPhoto = currentPhoto;
-            continue;
-        }
+//        // 获得上个图形
+//        request.setFilterExpression(QString("相片编号='%1'").arg(lastPhoto));
+//        QgsFeatureIterator It_last = mLayerMap->getFeatures(request);
+//        while (It_last.nextFeature(f))
+//        {
+//            if (f.isValid())
+//                lastGeometry = f.geometry();
+//            break;
+//        }
+//        if (!lastGeometry || lastGeometry->isGeosEmpty())
+//        {
+//            QgsMessageLog::logMessage(QString("检查重叠度 : \t%1 last图形检索失败.").arg(lastPhoto));
+//            lastPhoto = currentPhoto;
+//            continue;
+//        }
 
 //        while (++it != line.end())
 //        {
@@ -112,7 +112,7 @@ void eqiAnalysisAerialphoto::checkOverlapping()
         // 提取当前相片，与相邻行带所有相片进行重叠检查
 
         // 与上诉相同
-    }
+//    }
 }
 
 void eqiAnalysisAerialphoto::checkOmega()
@@ -229,43 +229,64 @@ void eqiAnalysisAerialphoto::checkKappa()
     double angle_Max = 30.0;
     double angle_Line = 20.0;
 
-
     // 保存超限的相片名称
     QStringList angle_General_List;
     QStringList angle_Max_List;
     QStringList angle_Line_List;
     QStringList angle_Average_List;
 
-    foreach (QStringList line, mAirLineGroup)
+    QList< double > averageAngleList;
+    const QStringList* noList = mPosdp->noList();
+
+    const int lineSize = myOlp.getLineSize();
+    if (!lineSize) return;
+    int lineNumber = 1;
+
+    // 计算出每条行带的平均旋角
+    double averageCount = 0;
+    foreach (QString noName, *noList)
     {
-        double averageAngle = 0;
-        QStringList angle_Line_List_sub;
-
-        // 航带平均角度值
-        foreach (QString noName, line)
+        if (myOlp.getLineNumber(noName) == lineNumber )
         {
             QString str_kappaField = mPosdp->getPosRecord(noName, "kappaField");
-            averageAngle += str_kappaField.toDouble();
+            averageCount += str_kappaField.toDouble();
         }
-        averageAngle = averageAngle / line.size();
-
-        foreach (QString noName, line)
-        {
-            // 得到kappa的角度值
-            QString str_kappaField = mPosdp->getPosRecord(noName, "kappaField");
-            double angle = str_kappaField.toDouble();
-            
-            // 对比
-            if ((angle - averageAngle) >= angle_Max) angle_Max_List.append(noName);
-            else if ((angle - averageAngle) >= angle_Line) angle_Line_List_sub.append(noName);
-            else if ((angle - averageAngle) >= angle_General) angle_General_List.append(noName);
-        }
-
-        // 同一行带间超过20°的片子不应超过3片
-        if ((angle_Line_List_sub.size() + angle_Max_List.size()) > 3)
-            angle_Line_List += angle_Line_List_sub;
         else
-            angle_Average_List += angle_Line_List_sub;
+        {
+            averageAngleList << averageCount / myOlp.getLinePhotoSize(lineNumber);
+            QString str_kappaField = mPosdp->getPosRecord(noName, "kappaField");
+            averageCount = str_kappaField.toDouble();
+            ++lineNumber;
+        }
+    }
+
+    lineNumber = 1;
+    QStringList angle_Line_List_sub;
+    for ( int i=0; noList->size(); ++i )
+    {
+        // 得到kappa的角度值
+        QString str_kappaField = mPosdp->getPosRecord(noName, "kappaField");
+        double angle = str_kappaField.toDouble();
+
+        // 对比
+        if ((angle - averageAngleList.at(lineNumber-1)) >= angle_Max) angle_Max_List.append(noName);
+        else if ((angle - averageAngleList.at(lineNumber-1)) >= angle_Line) angle_Line_List_sub.append(noName);
+        else if ((angle - averageAngleList.at(lineNumber-1)) >= angle_General) angle_General_List.append(noName);
+
+        if (myOlp.getLineNumber(noList->at(i)) == lineNumber )
+        {
+        }
+        else
+        {
+            // 同一行带间超过20°的片子不应超过3片
+            if ((angle_Line_List_sub.size() + angle_Max_List.size()) > 3)
+                angle_Line_List += angle_Line_List_sub;
+            else
+                angle_Average_List += angle_Line_List_sub;
+
+            angle_Line_List_sub.clear();
+            ++lineNumber;
+        }
     }
 
     if ( !mLayer_Kappa || !mLayer_Kappa->isValid() )
@@ -358,9 +379,8 @@ void eqiAnalysisAerialphoto::checkKappa()
 
 void eqiAnalysisAerialphoto::airLineGroup()
 {
+    int lineCount = 1;
     const double LIMITVALUE = 45.0;	// 度
-
-    QStringList childGroup;
     double prev_kappaValue = 0.0;
 
     const QStringList* noList = mPosdp->noList();
@@ -369,36 +389,27 @@ void eqiAnalysisAerialphoto::airLineGroup()
     // 设置初值
     prev_kappaValue = mPosdp->getPosRecord(noList->first(), "kappaField").toDouble();
 
-    for (int i = 0; i < noList->size(); ++i)	// 遍历所有旋片角
+    foreach (QString noName, *noList)	// 遍历所有旋片角
     {
         double kappaValue = 0.0;
-        QString noName = noList->at(i);
         kappaValue = mPosdp->getPosRecord(noName, "kappaField").toDouble();
 
         if ( abs(kappaValue - prev_kappaValue) < LIMITVALUE)
         {
-            childGroup.append(noName);
+            myOlp.addLineNumber(noName, lineCount);
         }
         else
         {
-            mAirLineGroup.append(childGroup);
-            childGroup.clear();
-            childGroup.append(noName);
+            myOlp.addLineNumber(noName, ++lineCount);
         }
         prev_kappaValue = kappaValue;
     }
-    mAirLineGroup.append(childGroup);
     isGroup = true;
 
     // 调试
-    foreach (QStringList list, mAirLineGroup)
+    foreach (QString noName, *noList)
     {
-        QString outStr;
-        foreach (QString str, list)
-        {
-            outStr += str + ", ";
-        }
-        QgsMessageLog::logMessage("航带: " + outStr);
+        QgsMessageLog::logMessage(QString("%1=%2").arg(noName).arg(myOlp.getLineNumber(noName)));
     }
 }
 
@@ -431,6 +442,11 @@ void eqiAnalysisAerialphoto::extractFeature(QgsFeatureList &featureList
 }
 
 
+OverlappingProcessing::OverlappingProcessing()
+{
+
+}
+
 OverlappingProcessing::~OverlappingProcessing()
 {
     QMapIterator<QString, Ol*> it(map);
@@ -442,7 +458,7 @@ OverlappingProcessing::~OverlappingProcessing()
     }
 }
 
-void OverlappingProcessing::setLineNumber(const QString &photoNumber, int lineNumber)
+void OverlappingProcessing::addLineNumber(const QString &photoNumber, int lineNumber)
 {
     if (!map.contains(photoNumber))
     {
@@ -463,4 +479,40 @@ void OverlappingProcessing::setQgsFeature(const QString &photoNumber, QgsFeature
         Ol* ol = map.value(photoNumber);
         ol->mF = f;
     }
+}
+
+int OverlappingProcessing::getLineNumber(const QString &photoNumber)
+{
+    if (map.contains(photoNumber))
+    {
+        return map.value(photoNumber)->mLineNumber;
+    }
+    return -1;
+}
+
+int OverlappingProcessing::getLineSize()
+{
+    QMapIterator<QString, Ol*> it(map);
+    it.toBack();
+    while (it.hasPrevious())
+    {
+        Ol* ol = it.previous().value();
+        return ol->mLineNumber;
+    }
+    return -1;
+}
+
+int OverlappingProcessing::getLinePhotoSize(const int number)
+{
+    int size = 0;
+    QMapIterator<QString, Ol*> it(map);
+    while (it.hasNext())
+    {
+        Ol* ol = it.next().value();
+        if (ol->mLineNumber == number)
+        {
+            ++size;
+        }
+    }
+    return size;
 }

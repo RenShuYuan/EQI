@@ -73,6 +73,7 @@ QVector<QgsPoint> eqiFractalManagement::dNToLal(const QString dNStr)
     double djd=((b-31)*360+(d-1)*djc)/60;
     double dwd=((a-1)*240+(240/dwc-c)*dwc)/60;
 
+<<<<<<< HEAD
     QVector<QgsPoint> list;
     list << QgsPoint( djd, dwd )                //西南
          << QgsPoint( djd, dwd+dwc/60 )         //西北
@@ -109,6 +110,8 @@ QVector<QgsPoint> eqiFractalManagement::dNToXy(const QString dNStr)
 
 QgsPolygon eqiFractalManagement::createTkPolygon(const QVector<QgsPoint> list)
 {
+=======
+>>>>>>> 8408d22f60c6e2f266583bd79469a2a283413c43
     // 计算四个角点坐标，并生成QgsPolygon
     QgsPolyline polyline;
     QgsPolygon polyon;
@@ -218,8 +221,10 @@ QStringList eqiFractalManagement::rectToTh(const QgsPoint lastPoint, const QgsPo
     minPoint.set( lastPointD.x()<nextPointD.x() ? lastPointD.x():nextPointD.x(),
                   lastPointD.y()<nextPointD.y() ? lastPointD.y():nextPointD.y());
 
+    qDebug() << "4.开始生成单幅图框";///
     QString maxTh = pointToTh(maxPoint);
     QString minTh = pointToTh(minPoint);
+    qDebug() << "4.结束生成单幅图框" << maxTh << " : " << minTh ;///
     // 如果两幅图一致则返回
     if (maxTh == minTh)
     {
@@ -229,13 +234,14 @@ QStringList eqiFractalManagement::rectToTh(const QgsPoint lastPoint, const QgsPo
     QString minThRow = minTh;
     while (true)
     {
+        qDebug() << "4.开始遍历行";///
         // 遍历行
         if ( (maxTh.at(0)!=minTh.at(0)) || (maxTh.mid(4,3)!=minTh.mid(4,3)) )
         {
             thList << minTh;
-
+            qDebug() << minTh;///
             int row = (minTh.mid(4,3)).toInt();
-            if (row < mJwc.ranks)
+            if (row > 1)
             {
                 QString tmpStr = QString::number(--row);
                 if (tmpStr.size()==1)
@@ -250,11 +256,12 @@ QStringList eqiFractalManagement::rectToTh(const QgsPoint lastPoint, const QgsPo
                 QByteArray ba = minTh.toLatin1();
                 char ch = ba[0];
                 minTh.replace(0, 1, ++ch);
-                minTh.replace(4, 3, "001");
+                minTh.replace(4, 3, "192");
             }
         }
         else
         {
+            qDebug() << "4.开始遍历列";///
             thList << minTh;
 
             if ( (maxTh.mid(1,2)!=minTh.mid(1,2)) || (maxTh.mid(7,3)!=minTh.mid(7,3)) )

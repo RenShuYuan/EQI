@@ -11,6 +11,46 @@
 #include "qgsvectorlayer.h"
 
 class posDataProcessing;
+//class OverlappingProcessing;
+
+
+// 重叠度处理
+class OverlappingProcessing
+{
+public:
+    OverlappingProcessing();
+    virtual ~OverlappingProcessing();
+
+    void addLineNumber(const QString &photoNumber, int lineNumber);
+    void setQgsFeature(const QString& photoNumber, QgsFeature* f);
+    void setNextPhotoOl(const QString& photoNumber, const int n);
+    void setNextLineOl(const QString& photoNumber, const int n);
+
+    int getLineNumber(const QString &photoNumber);
+
+    // 返回相片数量
+    int getPhotoSize(){ map.size(); }
+
+    // 返回行带数
+    int getLineSize();
+
+    // 返回指定航线相片数量
+    int getLinePhotoSize(const int number);
+private:
+    struct Ol
+    {
+        int mLineNumber; // 航线编号
+        QgsFeature* mF;  // 图形要素
+        QMap<QString*, int> mMapNextPhoto; // 航带内相邻相片
+        QMap<QString*, int> mMapNextLine;  // 航带间有重叠度关系相片
+
+        Ol(){mLineNumber = -1; mF = nullptr;}
+        Ol(int lineNumber){mLineNumber = lineNumber; mF = nullptr;}
+    };
+
+    QMap<QString, Ol*> map;
+};
+
 
 class eqiAnalysisAerialphoto : public QObject
 {
@@ -51,33 +91,6 @@ private:
     QList< QStringList > mAirLineGroup;	// 航带分组
 
     OverlappingProcessing myOlp;
-};
-
-// 重叠度处理
-class OverlappingProcessing
-{
-public:
-    OverlappingProcessing();
-    virtual ~OverlappingProcessing();
-
-    void setLineNumber(const QString &photoNumber, int lineNumber);
-    void setQgsFeature(const QString& photoNumber, QgsFeature* f);
-    void setNextPhotoOl(const QString& photoNumber, const int n);
-    void setNextLineOl(const QString& photoNumber, const int n);
-
-private:
-    struct Ol
-    {
-        int mLineNumber; // 航线编号
-        QgsFeature* mF;  // 图形要素
-        QMap<QString*, int> mMapNextPhoto; // 航带内相邻相片
-        QMap<QString*, int> mMapNextLine;  // 航带间有重叠度关系相片
-
-        Ol(){mLineNumber = 0; mF = nullptr;}
-        Ol(int lineNumber){mLineNumber = lineNumber; mF = nullptr;}
-    };
-
-    QMap<QString, Ol*> map;
 };
 
 #endif // EQIANALYSISAERIALPHOTO_H

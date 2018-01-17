@@ -366,7 +366,6 @@ void MainWindow::refreshMapCanvas()
 {
     //停止任何当前的渲染
     mMapCanvas->stopRendering();
-
     mMapCanvas->refreshAllLayers();
 }
 
@@ -495,7 +494,11 @@ void MainWindow::initActions()
     mActionZoomActualSize->setIcon(eqiApplication::getThemeIcon("mActionZoomActual.svg"));
     connect( mActionZoomActualSize, SIGNAL( triggered() ), this, SLOT( zoomActualSize() ) );
 
+<<<<<<< HEAD
     mActionZoomToSelected = new QAction("缩放到选择的区域(&S)", this);
+=======
+    mActionZoomToSelected = new QAction("缩放到\n选择的区域(&S)", this);
+>>>>>>> 8408d22f60c6e2f266583bd79469a2a283413c43
     mActionZoomToSelected->setShortcut(tr("Ctrl+J"));
     mActionZoomToSelected->setStatusTip("缩放到选择的区域(S)");
     mActionZoomToSelected->setIcon(eqiApplication::getThemeIcon("mActionZoomToSelected.svg"));
@@ -511,6 +514,7 @@ void MainWindow::initActions()
     mActionZoomLast->setIcon(eqiApplication::getThemeIcon("mActionZoomLast.svg"));
     connect( mActionZoomLast, SIGNAL( triggered() ), this, SLOT( zoomToPrevious() ) );
 
+<<<<<<< HEAD
     mActionZoomNext = new QAction("下一视图", this);
     mActionZoomNext->setStatusTip("下一视图");
     mActionZoomNext->setIcon(eqiApplication::getThemeIcon("mActionZoomNext.svg"));
@@ -521,6 +525,18 @@ void MainWindow::initActions()
     mActionDraw->setStatusTip("刷新");
     mActionDraw->setIcon(eqiApplication::getThemeIcon("mActionDraw.svg"));
     connect( mActionDraw, SIGNAL( triggered() ), this, SLOT( refreshMapCanvas() ) );
+=======
+//    mActionZoomNext = new QAction("下一视图", this);
+//    mActionZoomNext->setStatusTip("下一视图");
+//    mActionZoomNext->setIcon(eqiApplication::getThemeIcon("mActionZoomNext.svg"));
+//    connect( mActionZoomNext, SIGNAL( triggered() ), this, SLOT( zoomToNext() ) );
+
+//    mActionDraw = new QAction("刷新", this);
+//    mActionDraw->setShortcut(tr("F5"));
+//    mActionDraw->setStatusTip("刷新");
+//    mActionDraw->setIcon(eqiApplication::getThemeIcon("mActionDraw.svg"));
+//    connect( mActionDraw, SIGNAL( triggered() ), this, SLOT( refreshMapCanvas() ) );
+>>>>>>> 8408d22f60c6e2f266583bd79469a2a283413c43
 
     mActionIdentify = new QAction("识别要素", this);
     mActionIdentify->setShortcut(tr("Ctrl+Shift+I"));
@@ -683,7 +699,11 @@ void MainWindow::initActions()
 
     mActionPtoTK = new QAction("根据坐标\n创建图框", this);
     mActionPtoTK->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionPtoTK.svg"));
+<<<<<<< HEAD
     mActionPtoTK->setStatusTip("从屏幕选取范围制作分幅图框。");
+=======
+    mActionPtoTK->setStatusTip("从屏幕选取或手动输入单点坐标制作图框，利用两个角点坐标可按范围制作图框。");
+>>>>>>> 8408d22f60c6e2f266583bd79469a2a283413c43
     connect( mActionPtoTK, SIGNAL( triggered() ), this, SLOT( pointToTk()) );
 
     mActionTKtoXY = new QAction("输出图框\n坐标", this);
@@ -725,8 +745,16 @@ void MainWindow::initTabTools()
     m_MB->addAction(mActionPanToSelected);
     m_MB->addAction(mActionZoomToSelected);
     m_MB->addAction(mActionZoomActualSize);
+<<<<<<< HEAD
     m_MB->addSeparator(); //---
     m_MB->addAction(mActionDraw);
+=======
+    m_MB->addAction(mActionZoomToSelected);
+    m_MB->addAction(mActionZoomToLayer);
+    m_MB->addAction(mActionZoomLast);
+//    m_MB->addAction(mActionZoomNext);
+//    m_MB->addAction(mActionDraw);
+>>>>>>> 8408d22f60c6e2f266583bd79469a2a283413c43
     m_MB->addAction(mActionIdentify);
 
     // 初始化“无人机数据管理”tab
