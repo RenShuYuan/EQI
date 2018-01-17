@@ -110,7 +110,9 @@ SOURCES += \
     qgis/app/qgsmaptoolselectfreehand.cpp \
     qgis/app/qgsmaptoolselectpolygon.cpp \
     qgis/app/qgsmaptoolselectrectangle.cpp \
-    ui/dialog/dialog_selectsetting.cpp
+    ui/dialog/dialog_selectsetting.cpp \
+    ui/toolTab/tab_checkaerialphoto.cpp \
+    eqi/eqianalysisaerialphoto.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -149,7 +151,9 @@ HEADERS += \
     qgis/app/qgsmaptoolselectfreehand.h \
     qgis/app/qgsmaptoolselectpolygon.h \
     qgis/app/qgsmaptoolselectrectangle.h \
-    ui/dialog/dialog_selectsetting.h
+    ui/dialog/dialog_selectsetting.h \
+    ui/toolTab/tab_checkaerialphoto.h \
+    eqi/eqianalysisaerialphoto.h
 
 FORMS += \
         mainwindow.ui \
@@ -170,7 +174,8 @@ FORMS += \
     ui/dialog/dialog_posloaddialog.ui \
     ui/dialog/dialog_possetting.ui \
     ui/toolTab/tab_selectfeatures.ui \
-    ui/dialog/dialog_selectsetting.ui
+    ui/dialog/dialog_selectsetting.ui \
+    ui/toolTab/tab_checkaerialphoto.ui
 
 RESOURCES += \
     Resources/images/images.qrc

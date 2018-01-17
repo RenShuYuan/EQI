@@ -5,6 +5,7 @@
 #include "eqi/maptool/eqimaptoolpointtotk.h"
 #include "eqi/pos/posdataprocessing.h"
 #include "eqi/eqippinteractive.h"
+#include "eqi/eqianalysisaerialphoto.h"
 #include "ui_mainwindow.h"
 #include "ui/toolTab/tab_mapbrowsing.h"
 #include "ui/toolTab/tab_coordinatetransformation.h"
@@ -12,6 +13,7 @@
 #include "ui/toolTab/tab_fractalmanagement.h"
 #include "ui/toolTab/tab_datamanagement.h"
 #include "ui/toolTab/tab_selectfeatures.h"
+#include "ui/toolTab/tab_checkaerialphoto.h"
 #include "ui/dialog/dialog_posloaddialog.h"
 #include "ui/dialog/dialog_printtktoxy_txt.h"
 #include "ui/dialog/dialog_prjtransformsetting.h"
@@ -45,7 +47,6 @@
 #include <QFileDialog>
 
 // QGis
-//#include "qgsmapcanvas.h"
 #include "qgsscalecombobox.h"
 #include "qgsdoublespinbox.h"
 #include "qgslayertreeview.h"
@@ -72,10 +73,6 @@
 #include "qgsmessageviewer.h"
 #include "qgsmaptoolzoom.h"
 #include "qgsmaptoolpan.h"
-//#include "qgscoordinatereferencesystem.h"
-
-//#include "qgsmapoverviewcanvas.h"
-
 
 MainWindow *MainWindow::smInstance = nullptr;
 
@@ -93,8 +90,8 @@ MainWindow::MainWindow(QWidget *parent) :
     , mLayerTreeCanvasBridge( nullptr )
     , mInternalClipboard( nullptr )
     , mShowProjectionTab( false )
-    , posdp( nullptr )
-    , ppInter( nullptr )
+    , pPosdp( nullptr )
+    , pPPInter( nullptr )
 {
     if ( smInstance )
     {
@@ -162,9 +159,9 @@ MainWindow::MainWindow(QWidget *parent) :
     // end
 
     // 连接POS处理进度
-    posdp = new posDataProcessing(this);
-    connect( posdp, SIGNAL( startProcess() ), this, SLOT( canvasRefreshStarted ) );
-    connect( posdp, SIGNAL( stopProcess() ), this, SLOT( canvasRefreshFinished() ) );
+    pPosdp = new posDataProcessing(this);
+    connect( pPosdp, SIGNAL( startProcess() ), this, SLOT( canvasRefreshStarted ) );
+    connect( pPosdp, SIGNAL( stopProcess() ), this, SLOT( canvasRefreshFinished() ) );
     upDataPosActions();
 }
 
@@ -217,8 +214,8 @@ MainWindow::~MainWindow()
     delete mMapTools.mCircularStringCurvePoint;
     delete mMapTools.mCircularStringRadius;
 
-    delete posdp;
-    delete ppInter;
+    delete pPosdp;
+    delete pPPInter;
 
 //    delete mOverviewMapCursor;
 
@@ -531,7 +528,94 @@ void MainWindow::initActions()
     mActionIdentify->setIcon(eqiApplication::getThemeIcon("mActionIdentify.svg"));
     connect( mActionIdentify, SIGNAL( triggered() ), this, SLOT( identify() ) );
 
-    /*--------------------------------------------要素选择---------------------------------------------*/
+    /*--------------------------------------------图层操作---------------------------------------------*/
+    mActionRemoveLayer = new QAction("移除图层/组", this);
+    mActionRemoveLayer->setShortcut(tr("Ctrl+D"));
+    mActionRemoveLayer->setStatusTip("移除图层/组");
+    mActionRemoveLayer->setIcon(eqiApplication::getThemeIcon("mActionRemoveLayer.svg"));
+    connect( mActionRemoveLayer, SIGNAL( triggered() ), this, SLOT( removeLayer() ) );
+
+    mActionShowAllLayers = new QAction("显示所有图层", this);
+    mActionShowAllLayers->setShortcut(tr("Ctrl+Shift+U"));
+    mActionShowAllLayers->setStatusTip("显示所有图层");
+    mActionShowAllLayers->setIcon(eqiApplication::getThemeIcon("mActionShowAllLayers.png"));
+    connect( mActionShowAllLayers, SIGNAL( triggered() ), this, SLOT( showAllLayers() ) );
+
+    mActionHideAllLayers = new QAction("隐藏所有图层", this);
+    mActionHideAllLayers->setShortcut(tr("Ctrl+Shift+H"));
+    mActionHideAllLayers->setStatusTip("隐藏所有图层");
+    mActionHideAllLayers->setIcon(eqiApplication::getThemeIcon("mActionHideAllLayers.png"));
+    connect( mActionHideAllLayers, SIGNAL( triggered() ), this, SLOT( hideAllLayers() ) );
+
+    mActionShowSelectedLayers = new QAction("显示选中的图层", this);
+    mActionShowSelectedLayers->setStatusTip("显示选中的图层");
+    mActionShowSelectedLayers->setIcon(eqiApplication::getThemeIcon("mActionShowSelectedLayers.png"));
+    connect( mActionShowSelectedLayers, SIGNAL( triggered() ), this, SLOT( showSelectedLayers() ) );
+
+    mActionHideSelectedLayers = new QAction("隐藏选中的图层", this);
+    mActionHideSelectedLayers->setStatusTip("隐藏选中的图层");
+    mActionHideSelectedLayers->setIcon(eqiApplication::getThemeIcon("mActionHideSelectedLayers.png"));
+    connect( mActionHideSelectedLayers, SIGNAL( triggered() ), this, SLOT( hideSelectedLayers() ) );
+
+    /*----------------------------------------------无人机数据管理-------------------------------------------*/
+    mActionOpenPosFile = new QAction("载入曝光点文件", this);
+    mActionOpenPosFile->setStatusTip("载入曝光点文件");
+    mActionOpenPosFile->setIcon(eqiApplication::getThemeIcon("mActionCapturePoint.png"));
+    connect( mActionOpenPosFile, SIGNAL( triggered() ), this, SLOT( openPosFile() ) );
+
+    mActionPosTransform = new QAction("曝光点坐标转换", this);
+    mActionPosTransform->setStatusTip("曝光点坐标转换");
+    mActionPosTransform->setIcon(eqiApplication::getThemeIcon("mIconAtlas.svg"));
+    connect( mActionPosTransform, SIGNAL( triggered() ), this, SLOT( posTransform() ) );
+
+    mActionPosSketchMap = new QAction("创建航飞略图", this);
+    mActionPosSketchMap->setStatusTip("创建航飞略图");
+    mActionPosSketchMap->setIcon(eqiApplication::getThemeIcon("mActionCapturePolygon.png"));
+    connect( mActionPosSketchMap, SIGNAL( triggered() ), this, SLOT( posSketchMap() ) );
+
+    mActionPosSketchMapSwitch = new QAction("显示曝光点", this);
+    mActionPosSketchMapSwitch->setStatusTip("切换显示曝光点与航飞略图。");
+    mActionPosSketchMapSwitch->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionSketchMapsurface.png"));
+    connect( mActionPosSketchMapSwitch, SIGNAL( triggered() ), this, SLOT( posSketchMapSwitch() ) );
+
+    mActionPPLinkPhoto = new QAction("PP动态联动", this);
+    mActionPPLinkPhoto->setStatusTip("创建POS文件与photo相片之间的联动关系。");
+    mActionPPLinkPhoto->setIcon(eqiApplication::getThemeIcon("mActionLink.svg"));
+    connect( mActionPPLinkPhoto, SIGNAL( triggered() ), this, SLOT( posLinkPhoto() ) );
+
+    mActionPosOneButton = new QAction("一键处理", this);
+    mActionPosOneButton->setStatusTip("一键处理");
+    mActionPosOneButton->setIcon(eqiApplication::getThemeIcon("mActionSelect.svg"));
+    connect( mActionPosOneButton, SIGNAL( triggered() ), this, SLOT( posOneButton() ) );
+
+    mActionPosExport = new QAction("导出曝光点文件", this);
+    mActionPosExport->setStatusTip("导出曝光点文件");
+    mActionPosExport->setIcon(eqiApplication::getThemeIcon("mActionSharingExport.svg"));
+    connect( mActionPosExport, SIGNAL( triggered() ), this, SLOT( posExport() ) );
+
+    mActionPosSetting = new QAction("参数设置", this);
+    mActionPosSetting->setIcon(eqiApplication::getThemeIcon("propertyicons/settings.svg"));
+    mActionPosSetting->setStatusTip("相机参数、POS一键处理设置。");
+    connect( mActionPosSetting, SIGNAL( triggered() ), this, SLOT( posSetting() ));
+
+    /*--------------------------------------------航摄检查---------------------------------------------*/
+    mActionCheckOverlapping = new QAction("重叠度检查", this);
+    mActionCheckOverlapping->setStatusTip("重叠度检查");
+    mActionCheckOverlapping->setIcon(eqiApplication::getThemeIcon("mActionMoveItemsToTop.png"));
+    connect( mActionCheckOverlapping, SIGNAL( triggered() ), this, SLOT( checkOverlapping() ) );
+
+    mActionCheckOmega = new QAction("倾斜角检查", this);
+    mActionCheckOmega = new QAction("倾斜角检查", this);
+    mActionCheckOmega->setStatusTip("倾斜角检查");
+    mActionCheckOmega->setIcon(eqiApplication::getThemeIcon("mActionInvertSelection.png"));
+    connect( mActionCheckOmega, SIGNAL( triggered() ), this, SLOT( checkOmega() ));
+
+    mActionCheckKappa = new QAction("旋片角检查", this);
+    mActionCheckKappa->setStatusTip("旋片角检查");
+    mActionCheckKappa->setIcon(eqiApplication::getThemeIcon("mActionNodeTool.png"));
+    connect( mActionCheckKappa, SIGNAL( triggered() ), this, SLOT( checkKappa() ) );
+
+    /*--------------------------------------------要素选择、航摄数据处理---------------------------------------------*/
     mActionSelectFeatures = new QAction("选择要素", this);
     mActionSelectFeatures->setStatusTip("选择要素");
     mActionSelectFeatures->setIcon(eqiApplication::getThemeIcon("mActionSelectRectangle.svg"));
@@ -574,79 +658,10 @@ void MainWindow::initActions()
     mActionSaveSelect->setIcon(eqiApplication::getThemeIcon("eqi/other/saveSelect.png"));
     connect( mActionSaveSelect, SIGNAL( triggered() ), this, SLOT( saveSelect() ) );
 
-    mselectSetting = new QAction("设置", this);
-    mselectSetting->setIcon(eqiApplication::getThemeIcon("propertyicons/settings.svg"));
-    mselectSetting->setStatusTip("删除、保存所选航飞数据的相关设置。");
-    connect( mselectSetting, SIGNAL( triggered() ), this, SLOT( selectSetting() ));
-    /*--------------------------------------------图层操作---------------------------------------------*/
-    mActionRemoveLayer = new QAction("移除图层/组", this);
-    mActionRemoveLayer->setShortcut(tr("Ctrl+D"));
-    mActionRemoveLayer->setStatusTip("移除图层/组");
-    mActionRemoveLayer->setIcon(eqiApplication::getThemeIcon("mActionRemoveLayer.svg"));
-    connect( mActionRemoveLayer, SIGNAL( triggered() ), this, SLOT( removeLayer() ) );
-
-    mActionShowAllLayers = new QAction("显示所有图层", this);
-    mActionShowAllLayers->setShortcut(tr("Ctrl+Shift+U"));
-    mActionShowAllLayers->setStatusTip("显示所有图层");
-    mActionShowAllLayers->setIcon(eqiApplication::getThemeIcon("mActionShowAllLayers.png"));
-    connect( mActionShowAllLayers, SIGNAL( triggered() ), this, SLOT( showAllLayers() ) );
-
-    mActionHideAllLayers = new QAction("隐藏所有图层", this);
-    mActionHideAllLayers->setShortcut(tr("Ctrl+Shift+H"));
-    mActionHideAllLayers->setStatusTip("隐藏所有图层");
-    mActionHideAllLayers->setIcon(eqiApplication::getThemeIcon("mActionHideAllLayers.png"));
-    connect( mActionHideAllLayers, SIGNAL( triggered() ), this, SLOT( hideAllLayers() ) );
-
-    mActionShowSelectedLayers = new QAction("显示选中的图层", this);
-    mActionShowSelectedLayers->setStatusTip("显示选中的图层");
-    mActionShowSelectedLayers->setIcon(eqiApplication::getThemeIcon("mActionShowSelectedLayers.png"));
-    connect( mActionShowSelectedLayers, SIGNAL( triggered() ), this, SLOT( showSelectedLayers() ) );
-
-    mActionHideSelectedLayers = new QAction("隐藏选中的图层", this);
-    mActionHideSelectedLayers->setStatusTip("隐藏选中的图层");
-    mActionHideSelectedLayers->setIcon(eqiApplication::getThemeIcon("mActionHideSelectedLayers.png"));
-    connect( mActionHideSelectedLayers, SIGNAL( triggered() ), this, SLOT( hideSelectedLayers() ) );
-
-    /*----------------------------------------------无人机数据管理-------------------------------------------*/
-    mOpenPosFile = new QAction("载入曝光点文件", this);
-    mOpenPosFile->setStatusTip("载入曝光点文件");
-    mOpenPosFile->setIcon(eqiApplication::getThemeIcon("mActionCapturePoint.png"));
-    connect( mOpenPosFile, SIGNAL( triggered() ), this, SLOT( openPosFile() ) );
-
-    mPosTransform = new QAction("曝光点坐标转换", this);
-    mPosTransform->setStatusTip("曝光点坐标转换");
-    mPosTransform->setIcon(eqiApplication::getThemeIcon("mIconAtlas.svg"));
-    connect( mPosTransform, SIGNAL( triggered() ), this, SLOT( posTransform() ) );
-
-    mPosSketchMap = new QAction("创建航飞略图", this);
-    mPosSketchMap->setStatusTip("创建航飞略图");
-    mPosSketchMap->setIcon(eqiApplication::getThemeIcon("mActionCapturePolygon.png"));
-    connect( mPosSketchMap, SIGNAL( triggered() ), this, SLOT( posSketchMap() ) );
-
-    mPosSketchMapSwitch = new QAction("显示曝光点", this);
-    mPosSketchMapSwitch->setStatusTip("切换显示曝光点与航飞略图。");
-    mPosSketchMapSwitch->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionSketchMapsurface.png"));
-    connect( mPosSketchMapSwitch, SIGNAL( triggered() ), this, SLOT( posSketchMapSwitch() ) );
-
-    mPPLinkPhoto = new QAction("PP动态联动", this);
-    mPPLinkPhoto->setStatusTip("创建POS文件与photo相片之间的联动关系。");
-    mPPLinkPhoto->setIcon(eqiApplication::getThemeIcon("mActionLink.svg"));
-    connect( mPPLinkPhoto, SIGNAL( triggered() ), this, SLOT( posLinkPhoto() ) );
-
-    mPosOneButton = new QAction("一键处理", this);
-    mPosOneButton->setStatusTip("一键处理");
-    mPosOneButton->setIcon(eqiApplication::getThemeIcon("mActionSelect.svg"));
-    connect( mPosOneButton, SIGNAL( triggered() ), this, SLOT( posOneButton() ) );
-
-    mPosExport = new QAction("导出曝光点文件", this);
-    mPosExport->setStatusTip("导出曝光点文件");
-    mPosExport->setIcon(eqiApplication::getThemeIcon("mActionSharingExport.svg"));
-    connect( mPosExport, SIGNAL( triggered() ), this, SLOT( posExport() ) );
-
-    mPosSetting = new QAction("参数设置", this);
-    mPosSetting->setIcon(eqiApplication::getThemeIcon("propertyicons/settings.svg"));
-    mPosSetting->setStatusTip("相机参数、POS一键处理设置。");
-    connect( mPosSetting, SIGNAL( triggered() ), this, SLOT( posSetting() ));
+    mActionSelectSetting = new QAction("设置", this);
+    mActionSelectSetting->setIcon(eqiApplication::getThemeIcon("propertyicons/settings.svg"));
+    mActionSelectSetting->setStatusTip("删除、保存所选航飞数据的相关设置。");
+    connect( mActionSelectSetting, SIGNAL( triggered() ), this, SLOT( selectSetting() ));
 
     /*----------------------------------------------坐标转换-------------------------------------------*/
     // 未实现
@@ -714,6 +729,29 @@ void MainWindow::initTabTools()
     m_MB->addAction(mActionDraw);
     m_MB->addAction(mActionIdentify);
 
+    // 初始化“无人机数据管理”tab
+    tab_uavDataManagement *m_uDM = new tab_uavDataManagement(this);
+    m_uDM->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    m_uDM->addAction(mActionOpenPosFile);
+    m_uDM->addAction(mActionPosTransform);
+    m_uDM->addAction(mActionPosSketchMap);
+    m_uDM->addAction(mActionPPLinkPhoto);
+    m_uDM->addAction(mActionPosExport);
+    m_uDM->addSeparator(); //---
+    m_uDM->addAction(mActionPosOneButton);
+    m_uDM->addSeparator(); //---
+    m_uDM->addAction(mActionPosSketchMapSwitch);
+    m_uDM->addSeparator(); //---
+    m_uDM->addAction(mActionPosSetting);
+
+    // 初始化“航摄检查”tab
+    tab_checkAerialPhoto *m_CAP = new tab_checkAerialPhoto(this);
+    m_CAP->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    m_CAP->addAction(mActionCheckOverlapping);
+    m_CAP->addAction(mActionCheckOmega);
+    m_CAP->addAction(mActionCheckKappa);
+
+
     // 初始化“要素选择、编辑”tab
     tab_selectFeatures *m_SF = new tab_selectFeatures(this);
     m_SF->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
@@ -728,22 +766,7 @@ void MainWindow::initTabTools()
     m_SF->addAction(mActionDelSelect);
     m_SF->addAction(mActionSaveSelect);
     m_SF->addSeparator(); //---
-    m_SF->addAction(mselectSetting);
-
-    // 初始化“无人机数据管理”tab
-    tab_uavDataManagement *m_uDM = new tab_uavDataManagement(this);
-    m_uDM->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
-    m_uDM->addAction(mOpenPosFile);
-    m_uDM->addAction(mPosTransform);
-    m_uDM->addAction(mPosSketchMap);
-    m_uDM->addAction(mPPLinkPhoto);
-    m_uDM->addAction(mPosExport);
-    m_uDM->addSeparator(); //---
-    m_uDM->addAction(mPosOneButton);
-    m_uDM->addSeparator(); //---
-    m_uDM->addAction(mPosSketchMapSwitch);
-    m_uDM->addSeparator(); //---
-    m_uDM->addAction(mPosSetting);
+    m_SF->addAction(mActionSelectSetting);
 
     // 初始化“坐标转换”tab
     tab_coordinateTransformation *m_tCTF = new tab_coordinateTransformation(this);
@@ -768,12 +791,13 @@ void MainWindow::initTabTools()
 
     // 添加tab到窗口
     toolTab = new QTabWidget;
-    toolTab->addTab(m_MB, "地图浏览");
-    toolTab->addTab(m_SF, "要素选择");
-    toolTab->addTab(m_uDM, "无人机数据管理");
-    toolTab->addTab(m_tCTF, "　　坐标转换　　");
-    toolTab->addTab(m_tFM, "　　分幅管理　　");
-    toolTab->addTab(m_tDM, "　　数据管理　　");
+    toolTab->addTab(m_MB, " 地图浏览 ");
+    toolTab->addTab(m_uDM, "航摄数据管理");
+    toolTab->addTab(m_CAP, " 航摄检查 ");
+    toolTab->addTab(m_SF, " 要素选择 ");
+    toolTab->addTab(m_tCTF, "　坐标转换　");
+    toolTab->addTab(m_tFM, "　分幅管理　");
+    toolTab->addTab(m_tDM, "　数据管理　");
     ui->mainToolBar->addWidget(toolTab);
 }
 
@@ -1241,21 +1265,21 @@ void MainWindow::saveAsVectorFileGeneral(QgsVectorLayer *vlayer, bool symbologyO
 
 void MainWindow::upDataPosActions()
 {
-    if ( posdp->isValid() )
+    if ( pPosdp->isValid() )
     {
-        mPosTransform->setEnabled(true);
-        mPosSketchMap->setEnabled(true);
-        mPosOneButton->setEnabled(true);
-        mPPLinkPhoto->setEnabled(true);
-        mPosExport->setEnabled(true);
+        mActionPosTransform->setEnabled(true);
+        mActionPosSketchMap->setEnabled(true);
+        mActionPosOneButton->setEnabled(true);
+        mActionPPLinkPhoto->setEnabled(true);
+        mActionPosExport->setEnabled(true);
     }
     else
     {
-        mPosTransform->setEnabled(false);
-        mPosSketchMap->setEnabled(false);
-        mPosOneButton->setEnabled(false);
-        mPPLinkPhoto->setEnabled(false);
-        mPosExport->setEnabled(false);
+        mActionPosTransform->setEnabled(false);
+        mActionPosSketchMap->setEnabled(false);
+        mActionPosOneButton->setEnabled(false);
+        mActionPPLinkPhoto->setEnabled(false);
+        mActionPosExport->setEnabled(false);
     }
 }
 
@@ -1549,10 +1573,10 @@ void MainWindow::delSelect()
         delPath = autoPath;
     }
 
-    if (ppInter)
+    if (pPPInter)
     {
         QgsMessageLog::logMessage("\n");
-        ppInter->delSelect(delPath);
+        pPPInter->delSelect(delPath);
     }
 }
 
@@ -1612,12 +1636,12 @@ void MainWindow::saveSelect()
     }
 
     // 保存数据
-    if (ppInter)
+    if (pPPInter)
     {
         QgsMessageLog::logMessage("\n");
 
         // 保存略图与相片
-        ppInter->saveSelect(savePath);
+        pPPInter->saveSelect(savePath);
     }
 }
 
@@ -1997,13 +2021,13 @@ QgsMapLayer *MainWindow::activeLayer()
 void MainWindow::openPosFile()
 {
     dialog_posloaddialog *posDialog = new dialog_posloaddialog(this);
-    connect( posDialog, SIGNAL( readFieldsList( QString & ) ), posdp, SLOT( readFieldsList( QString & ) ) );
+    connect( posDialog, SIGNAL( readFieldsList( QString & ) ), pPosdp, SLOT( readFieldsList( QString & ) ) );
     int result = posDialog->exec();
     if (result == QDialog::Accepted)
     {
         openMessageLog();
 
-        const QStringList errList = posdp->checkPosSettings();
+        const QStringList errList = pPosdp->checkPosSettings();
         if (!errList.isEmpty())
         {
             QString err;
@@ -2018,17 +2042,17 @@ void MainWindow::openPosFile()
         }
         else
         {
-            if (posdp->isValid())
+            if (pPosdp->isValid())
             {
-                const QStringList* noList = posdp->noList();
+                const QStringList* noList = pPosdp->noList();
                 messageBar()->pushMessage( "曝光点加载",
                                            QString("成功加载%1条记录，%2条记录加载失败。")
                                            .arg(noList->size())
-                                           .arg(posdp->getInvalidLineSize()),
+                                           .arg(pPosdp->getInvalidLineSize()),
                                            QgsMessageBar::SUCCESS, messageTimeout() );
                 QgsMessageLog::logMessage(QString("曝光点加载 : \t成功加载%1条记录，%2条记录加载失败。")
                                           .arg(noList->size())
-                                          .arg(posdp->getInvalidLineSize()));
+                                          .arg(pPosdp->getInvalidLineSize()));
                 upDataPosActions();
             }
             else
@@ -2045,22 +2069,23 @@ void MainWindow::openPosFile()
 
 bool MainWindow::posTransform()
 {
-    if (!posdp->isValid()) return false;
+    if (!pPosdp->isValid()) return false;
 
     QgsMessageLog::logMessage("\n");
-    return posdp->autoPosTransform();
+    return pPosdp->autoPosTransform();
 }
 
 void MainWindow::posSketchMap()
 {
-    if (!posdp->isValid()) return;
+    if (!pPosdp->isValid()) return;
 
     QgsMessageLog::logMessage("\n");
     //! 用于保存航飞略图
-    QgsVectorLayer* sketchMapLayer = posdp->autoSketchMap();
+    QgsVectorLayer* sketchMapLayer = pPosdp->autoSketchMap();
     if (!sketchMapLayer)
         return;
-    ppInter = new eqiPPInteractive(this, sketchMapLayer, posdp);
+    pPPInter = new eqiPPInteractive(this, sketchMapLayer, pPosdp);
+    pAnalysis = new eqiAnalysisAerialphoto(this, sketchMapLayer, pPosdp);
 }
 
 void MainWindow::posSketchMapSwitch()
@@ -2073,7 +2098,7 @@ void MainWindow::posLinkPhoto()
 {
     QgsMessageLog::logMessage("\n");
 
-    if (!ppInter)
+    if (!pPPInter)
     {
         messageBar()->pushMessage( "动态联动",
             "必须在航飞略图成功创建后才能启动联动功能, 联动功能启动失败...",
@@ -2082,20 +2107,20 @@ void MainWindow::posLinkPhoto()
         return;
     }
 
-    if (ppInter->islinked())
+    if (pPPInter->islinked())
     {
         // 断开连接并更改QAction
-        ppInter->upDataUnLinkedSymbol();
+        pPPInter->upDataUnLinkedSymbol();
 
         QgsMessageLog::logMessage("动态联动 : \t已成功断开连接.");
         messageBar()->pushMessage( "动态联动", "成功断开联动关系.",QgsMessageBar::SUCCESS, messageTimeout() );
 
-        mPPLinkPhoto->setText("PP动态联动");
-        mPPLinkPhoto->setIcon(eqiApplication::getThemeIcon("mActionlink.svg"));
+        mActionPPLinkPhoto->setText("PP动态联动");
+        mActionPPLinkPhoto->setIcon(eqiApplication::getThemeIcon("mActionlink.svg"));
     }
     else
     {
-        if (!ppInter->isValid())
+        if (!pPPInter->isValid())
         {
             messageBar()->pushMessage( "动态联动",
                 "必须在曝光点文件解析成功后才能启动联动功能, 联动功能启动失败...",
@@ -2105,17 +2130,17 @@ void MainWindow::posLinkPhoto()
         }
 
         // 创建联动关系
-        ppInter->upDataLinkedSymbol();
+        pPPInter->upDataLinkedSymbol();
 
-        if (!ppInter->islinked())
+        if (!pPPInter->islinked())
             return;
 
         QgsMessageLog::logMessage(QString("动态联动 : \t成功创建联动关系."));
         messageBar()->pushMessage( "动态联动", "成功创建联动关系.",QgsMessageBar::SUCCESS, messageTimeout() );
 
-        mPPLinkPhoto->setText("断开PP动态联动");
-        mPPLinkPhoto->setStatusTip("断开PP动态联动");
-        mPPLinkPhoto->setIcon(eqiApplication::getThemeIcon("mActionUnlink.svg"));
+        mActionPPLinkPhoto->setText("断开PP动态联动");
+        mActionPPLinkPhoto->setStatusTip("断开PP动态联动");
+        mActionPPLinkPhoto->setIcon(eqiApplication::getThemeIcon("mActionUnlink.svg"));
     }
 }
 
@@ -2143,15 +2168,30 @@ void MainWindow::posOneButton()
 
 void MainWindow::posExport()
 {
-    if (!posdp->isValid()) return;
+    if (!pPosdp->isValid()) return;
 
-    posdp->posExport();
+    pPosdp->posExport();
 }
 
 void MainWindow::posSetting()
 {
     dialog_posSetting *posDialog = new dialog_posSetting(this);
     posDialog->exec();
+}
+
+void MainWindow::checkOverlapping()
+{
+    pAnalysis->checkOverlapping();
+}
+
+void MainWindow::checkOmega()
+{
+    pAnalysis->checkOmega();
+}
+
+void MainWindow::checkKappa()
+{
+    pAnalysis->checkKappa();
 }
 
 void MainWindow::pointToTk()

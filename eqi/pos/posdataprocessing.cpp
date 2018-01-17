@@ -402,24 +402,11 @@ QgsVectorLayer* posDataProcessing::autoSketchMap()
 {
     emit startProcess();
 
-//    QString layerProperties = "Polygon?";													// 几何类型
-//    layerProperties.append(QString( "field=id:integer&field=相片编号:string(50)"				// 添加字段
-//                                                    "&field=曝光点坐标:string(30)"
-//                                                    "&field=Omega:string(10)"
-//                                                    "&field=Phi:string(10)"
-//                                                    "&field=Kappa:string(10)"
-//                                                    "&field=地面分辨率:string(10)&"));
-//    layerProperties.append(QString( "index=yes&" ));										// 创建索引
-//    layerProperties.append(QString( "memoryid=%1" ).arg( QUuid::createUuid().toString() ));	// 临时编码
-
     QString sketchMapName;
     sketchMapName = mSettings.value("/eqi/pos/lePosFile", "").toString();
     sketchMapName = QFileInfo(sketchMapName).baseName();
     if (sketchMapName.isEmpty())
         sketchMapName = "航摄略图";
-
-//    QgsVectorLayer* newLayer = new QgsVectorLayer(
-//        layerProperties, sketchMapName, QString( "memory" ) );
 
     QgsVectorLayer* newLayer = MainWindow::instance()->createrMemoryMap(sketchMapName,
                                                         "Polygon",
@@ -446,8 +433,6 @@ QgsVectorLayer* posDataProcessing::autoSketchMap()
 
     // 将地图画布设置为与图层同样的参照坐标系
     MainWindow::instance()->mapCanvas()->setDestinationCrs(eqiPrj.destCRS());
-
-    QgsVectorDataProvider* dateProvider = newLayer->dataProvider();
 
     QMap< QString, QStringList >::iterator it_n = mFieldsList.find("noField");
     QMap< QString, QStringList >::iterator it_x = mFieldsList.find("xField");
@@ -512,7 +497,7 @@ QgsVectorLayer* posDataProcessing::autoSketchMap()
     newLayer->startEditing();
 
     // 添加要素集到图层中
-    dateProvider->addFeatures(featureList);
+    newLayer->dataProvider()->addFeatures(featureList);
 
     // 保存
     newLayer->commitChanges();
@@ -532,8 +517,7 @@ QgsVectorLayer* posDataProcessing::autoSketchMap()
 
     emit stopProcess();
 
-//    // 添加到地图
-//    QgsMapLayerRegistry::instance()->addMapLayer(newLayer);
+    // 添加到地图
     MainWindow::instance()->mapCanvas()->freeze( false );
     MainWindow::instance()->refreshMapCanvas();
 

@@ -9,7 +9,6 @@
 class QgsMapCanvas;
 class QgsRubberBand;
 class QgsVectorLayer;
-class QgsVectorDataProvider;
 
 class eqiMapToolPointToTk : public QgsMapTool
 {
@@ -37,7 +36,6 @@ private:
     QgsPoint lastPoint;
     QgsPoint nextPoint;
     QgsVectorLayer* newLayer;
-    QgsVectorDataProvider* dateProvider;
 
     //! used for storing all of the maps point for the polygon
     QgsRubberBand* mRubberBand;

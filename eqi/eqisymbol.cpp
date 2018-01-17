@@ -9,34 +9,30 @@
 #include "qgscategorizedsymbolrendererv2.h"
 #include "qgsfillsymbollayerv2.h"
 
+#include "qgsmessagelog.h"  //
+
 eqiSymbol::eqiSymbol(QObject *parent) :
     QObject(parent),
-    mLayer(nullptr),
-    mLinkedSymbolV2(nullptr),
-    mUnlinkedSymbolV2(nullptr),
-    mWarningSymbolV2(nullptr),
-    mErrorSymbolV2(nullptr)
+    mLayer(nullptr)
 {
     cLinked.setRgb(186, 221, 105);
     cUnlinked = Qt::gray;
-    cError = Qt::red;
     cWarning = Qt::yellow;
+    cError = Qt::darkMagenta;
+    cSeriousError = Qt::darkRed;
 }
 
 eqiSymbol::eqiSymbol(QObject *parent, QgsVectorLayer *layer, const QString &field) :
     QObject(parent),
-    mLayer(layer),
-    mLinkedSymbolV2(nullptr),
-    mUnlinkedSymbolV2(nullptr),
-    mWarningSymbolV2(nullptr),
-    mErrorSymbolV2(nullptr)
+    mLayer(layer)
 {
     mField = field;
 
     cLinked.setRgb(186, 221, 105);
     cUnlinked = Qt::gray;
-    cError = Qt::red;
     cWarning = Qt::yellow;
+    cError = Qt::darkMagenta;
+    cSeriousError = Qt::darkRed;
 }
 
 void eqiSymbol::addChangedItem(const QString &item, QgsSymbolV2 *v2)
@@ -46,22 +42,7 @@ void eqiSymbol::addChangedItem(const QString &item, QgsSymbolV2 *v2)
 
 void eqiSymbol::addChangedItem(const QString &item, eqiSymbol::linkedType type)
 {
-    if (type == eqiSymbol::linked)
-    {
-        addChangedItem(item, linkedSymbolV2());
-    }
-    else if (type == eqiSymbol::unlinked)
-    {
-        addChangedItem(item, unlinkedSymbolV2());
-    }
-    else if (type == eqiSymbol::warning)
-    {
-        addChangedItem(item, warningSymbolV2());
-    }
-    else if (type == eqiSymbol::error)
-    {
-        addChangedItem(item, errorSymbolV2());
-    }
+    addChangedItem(item, customizeSymbolV2(type));
 }
 
 void eqiSymbol::clearAllChangedItem()
@@ -130,7 +111,7 @@ void eqiSymbol::initLayerCategorizedSymbolRendererV2(const QString &field)
     while (it.nextFeature(f))
     {
         cats << QgsRendererCategoryV2(f.attribute(field),
-                                      unlinkedSymbolV2(),
+                                      customizeSymbolV2(eqiSymbol::unlinked),
                                       f.attribute(field).toString());
     }
 
@@ -138,7 +119,7 @@ void eqiSymbol::initLayerCategorizedSymbolRendererV2(const QString &field)
     MainWindow::instance()->layerTreeView()->refreshLayerSymbology(mLayer->id());
 }
 
-QgsSymbolV2 *eqiSymbol::linkedSymbolV2()
+QgsSymbolV2 *eqiSymbol::customizeSymbolV2(eqiSymbol::linkedType type)
 {
     // 获得缺省的符号
     QgsSymbolV2* mSymbolV2 = nullptr;
@@ -146,46 +127,17 @@ QgsSymbolV2 *eqiSymbol::linkedSymbolV2()
 
     // 设置透明度与颜色
     mSymbolV2->setAlpha(0.5);
-    mSymbolV2->setColor(cLinked);
 
-    return mSymbolV2->clone();
-}
-
-QgsSymbolV2 *eqiSymbol::unlinkedSymbolV2()
-{
-    // 获得缺省的符号
-    QgsSymbolV2* mSymbolV2 = nullptr;
-    mSymbolV2 = QgsSymbolV2::defaultSymbol(mLayer->geometryType());
-
-    // 设置透明度与颜色
-    mSymbolV2->setAlpha(0.5);
-    mSymbolV2->setColor(cUnlinked);
-
-    return mSymbolV2->clone();
-}
-
-QgsSymbolV2 *eqiSymbol::warningSymbolV2()
-{
-    // 获得缺省的符号
-    QgsSymbolV2* mSymbolV2 = nullptr;
-    mSymbolV2 = QgsSymbolV2::defaultSymbol(mLayer->geometryType());
-
-    // 设置透明度与颜色
-    mSymbolV2->setAlpha(0.5);
-    mSymbolV2->setColor(cWarning);
-
-    return mSymbolV2->clone();
-}
-
-QgsSymbolV2 *eqiSymbol::errorSymbolV2()
-{
-    // 获得缺省的符号
-    QgsSymbolV2* mSymbolV2 = nullptr;
-    mSymbolV2 = QgsSymbolV2::defaultSymbol(mLayer->geometryType());
-
-    // 设置透明度与颜色
-    mSymbolV2->setAlpha(0.5);
-    mSymbolV2->setColor(cError);
+    if (type == eqiSymbol::linked)
+        mSymbolV2->setColor(cLinked);
+    else if (type == eqiSymbol::unlinked)
+        mSymbolV2->setColor(cUnlinked);
+    else if (type == eqiSymbol::warning)
+        mSymbolV2->setColor(cWarning);
+    else if (type == eqiSymbol::error)
+        mSymbolV2->setColor(cError);
+    else if (type == eqiSymbol::SeriousSrror)
+        mSymbolV2->setColor(cSeriousError);
 
     return mSymbolV2->clone();
 }

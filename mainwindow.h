@@ -5,6 +5,10 @@
 #include <QMainWindow>
 #include <QSettings>
 
+// QGis
+#include "qgsmapcanvas.h"
+#include "qgsmessagebar.h"
+
 class QAction;
 class QTabBar;
 class QLabel;
@@ -13,10 +17,6 @@ class QCheckBox;
 class QToolButton;
 class QDockWidget;
 class QCursor;
-
-// QGis
-#include "qgsmapcanvas.h"
-#include "qgsmessagebar.h"
 
 class QgsStatusBarCoordinatesWidget;
 class QgsScaleComboBox;
@@ -32,6 +32,7 @@ class QgsMapOverviewCanvas;
 
 class posDataProcessing;
 class eqiPPInteractive;
+class eqiAnalysisAerialphoto;
 
 // 分幅图框字段名称
 const static QString ThFieldName = "TH";
@@ -221,6 +222,15 @@ private slots:
 
     //! 相机设置
     void posSetting();
+    /************ 航摄检查 ************/
+    //! 重叠度检查
+    void checkOverlapping();
+
+    //! 倾角检查
+    void checkOmega();
+
+    //! 旋片角检查
+    void checkKappa();
 
     /************ 分幅管理 ************/
     //! 根据坐标创建图框
@@ -239,8 +249,9 @@ private:
     Ui::MainWindow *ui;
     static MainWindow *smInstance;
     QSettings mSettings;
-    posDataProcessing *posdp;
-    eqiPPInteractive* ppInter;
+    posDataProcessing *pPosdp;
+    eqiPPInteractive* pPPInter;
+    eqiAnalysisAerialphoto* pAnalysis;
 
     //! 标志，表示该项目属性对话框是怎么出现
     bool mShowProjectionTab;
@@ -259,6 +270,14 @@ private:
     QAction *mActionDraw;
     QAction *mActionIdentify;
 
+    //! 图层管理动作
+    QAction *mActionFilterLegend;
+    QAction *mActionRemoveLayer;
+    QAction *mActionShowAllLayers;
+    QAction *mActionHideAllLayers;
+    QAction *mActionShowSelectedLayers;
+    QAction *mActionHideSelectedLayers;
+
     //! 要素选择、编辑
     QAction *mActionSelectFeatures;
     QAction *mActionSelectPolygon;
@@ -268,27 +287,24 @@ private:
     QAction *mActionInvertSelection;
     QAction *mActionDelSelect;
     QAction *mActionSaveSelect;
-    QAction *mselectSetting;
+    QAction *mActionSelectSetting;
 
-    //! 图层管理动作
-    QAction *mActionFilterLegend;
-    QAction *mActionRemoveLayer;
-    QAction *mActionShowAllLayers;
-    QAction *mActionHideAllLayers;
-    QAction *mActionShowSelectedLayers;
-    QAction *mActionHideSelectedLayers;
+    //! 航摄数据管理动作
+    QAction *mActionOpenPosFile;
+    QAction *mActionPosTransform;
+    QAction *mActionPosSketchMap;
+    QAction *mActionPosSketchMapSwitch;
+    QAction *mActionPosOneButton;
+    QAction *mActionPosExport;
+    QAction *mActionPosSetting;
 
-    //! 无人机数据管理动作
-    QAction *mOpenPosFile;
-    QAction *mPosTransform;
-    QAction *mPosSketchMap;
-    QAction *mPosSketchMapSwitch;
-    QAction *mPosOneButton;
-    QAction *mPosExport;
-    QAction *mPosSetting;
+    //! 航摄数据联动
+    QAction *mActionPPLinkPhoto;
 
-    //! 无人机数据联动
-    QAction *mPPLinkPhoto;
+    //! 航摄检查
+    QAction *mActionCheckOverlapping;
+    QAction *mActionCheckOmega;
+    QAction *mActionCheckKappa;
 
     //! 坐标转换动作
     QAction *mActionTextTranfrom;

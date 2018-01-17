@@ -293,7 +293,7 @@ void eqiPPInteractive::saveMap(const QString &savePath)
 
 void eqiPPInteractive::savePos(const QString &savePath, const QStringList &photoList)
 {
-    QString path = QString("%1/pos(%2)-%3.txt").arg(savePath).arg(photoList.size());
+    QString path = QString("%1/pos(%2).txt").arg(savePath).arg(photoList.size());
 
     QFile file(path);
     if (!file.open(QFile::WriteOnly | QFile::Text | QFile::Truncate))   //只写、文本、重写

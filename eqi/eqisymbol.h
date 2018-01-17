@@ -12,7 +12,7 @@ class eqiSymbol : public QObject
 {
     Q_OBJECT
 public:
-    enum linkedType { linked, unlinked, error, warning };
+    enum linkedType { linked, unlinked, error, warning, SeriousSrror };
 
     explicit eqiSymbol(QObject *parent = nullptr);
     explicit eqiSymbol(QObject *parent, QgsVectorLayer *layer, const QString &field);
@@ -63,10 +63,7 @@ private:
     void initLayerCategorizedSymbolRendererV2(const QString &field);
 
     // 返回符号样式拷贝，定义了颜色与透明度
-    QgsSymbolV2* linkedSymbolV2();
-    QgsSymbolV2* unlinkedSymbolV2();
-    QgsSymbolV2* warningSymbolV2();
-    QgsSymbolV2* errorSymbolV2();
+    QgsSymbolV2* customizeSymbolV2(eqiSymbol::linkedType type);
 
 private:
     // 关联图层指针
@@ -80,13 +77,9 @@ private:
 
     QColor cLinked;			// 已关联的符号颜色
     QColor cUnlinked;		// 未关联符号颜色
-    QColor cError;			// 错误符号颜色
     QColor cWarning;		// 警告符号颜色
-
-    QgsSymbolV2* mLinkedSymbolV2;	// 已关联的符号类
-    QgsSymbolV2* mUnlinkedSymbolV2;	// 未关联的符号类
-    QgsSymbolV2* mErrorSymbolV2;	// 错误的符号类
-    QgsSymbolV2* mWarningSymbolV2;	// 警告的符号类
+    QColor cError;			// 错误符号颜色
+    QColor cSeriousError;	// 严重错误符号颜色
 };
 
 #endif // EQISYMBOL_H

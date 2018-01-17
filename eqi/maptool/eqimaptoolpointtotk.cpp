@@ -8,7 +8,6 @@
 #include "qgsgeometry.h"
 #include "qgsrubberband.h"
 #include "qgsvectordataprovider.h"
-#include "qgsmaplayerregistry.h"
 #include <QDebug>
 #include <QMessageBox>
 
@@ -64,8 +63,6 @@ eqiMapToolPointToTk::eqiMapToolPointToTk(QgsMapCanvas *canvas)
             return;
         }
     }
-
-    dateProvider = newLayer->dataProvider();
 
     mCursor = QCursor( Qt::CrossCursor );
 }
@@ -144,7 +141,7 @@ void eqiMapToolPointToTk::canvasReleaseEvent(QgsMapMouseEvent *e)
             newLayer->startEditing();
 
             // 添加要素集到图层中
-            dateProvider->addFeatures(featureList);
+            newLayer->dataProvider()->addFeatures(featureList);
 
             // 保存
             newLayer->commitChanges();
