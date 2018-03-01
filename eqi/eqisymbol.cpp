@@ -19,7 +19,7 @@ eqiSymbol::eqiSymbol(QObject *parent) :
     cUnlinked = Qt::gray;
     cWarning = Qt::yellow;
     cError = Qt::darkMagenta;
-    cSeriousError = Qt::darkRed;
+    cSeriousError = Qt::red;
 }
 
 eqiSymbol::eqiSymbol(QObject *parent, QgsVectorLayer *layer, const QString &field) :
@@ -32,7 +32,7 @@ eqiSymbol::eqiSymbol(QObject *parent, QgsVectorLayer *layer, const QString &fiel
     cUnlinked = Qt::gray;
     cWarning = Qt::yellow;
     cError = Qt::darkMagenta;
-    cSeriousError = Qt::darkRed;
+    cSeriousError = Qt::red;
 }
 
 void eqiSymbol::addChangedItem(const QString &item, QgsSymbolV2 *v2)

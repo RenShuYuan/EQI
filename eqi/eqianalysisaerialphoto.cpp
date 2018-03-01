@@ -5,7 +5,9 @@
 #include "qgsmessagelog.h"
 #include "qgsvectordataprovider.h"
 
+#include <QSet>
 #include <QStringList>
+#include <QDebug>
 
 eqiAnalysisAerialphoto::eqiAnalysisAerialphoto(QObject *parent, QgsVectorLayer *layer, posDataProcessing *posdp)
     : QObject(parent)
@@ -13,6 +15,7 @@ eqiAnalysisAerialphoto::eqiAnalysisAerialphoto(QObject *parent, QgsVectorLayer *
     , mPosdp(posdp)
     , mLayer_Omega(nullptr)
     , mLayer_Kappa(nullptr)
+    , mLayer_Overlapping(nullptr)
     , isGroup(false)
 {
     airLineGroup();
@@ -26,93 +29,251 @@ void eqiAnalysisAerialphoto::checkOverlapping()
     }
 
     // 重叠度限差
-//    double heading_Bg = 60.0;
-//    double heading_Ed = 80.0;
-//    double heading_Min = 53.0;
-//    double sideways_Bg = 15.0;
-//    double sideways_Ed = 60.0;
-//    double sideways_Min = 8.0;
+    double heading_Bg = 60.0;
+    double heading_Ed = 80.0;
+    double heading_Min = 53.0;
+    double sideways_Bg = 15.0;
+    double sideways_Ed = 60.0;
+    double sideways_Min = 8.0;
 
-//    foreach (QStringList line, mAirLineGroup)
-//    {
-//        QgsMessageLog::logMessage("重叠度检查");
+    int lineSize = myOlp.getLineSize();
+    if (!lineSize) return;
+    int lineNumber = 0;
 
-//        //! 行带内重叠度检查
-//        QString lastPhoto;
-//        QString currentPhoto;
-//        QgsGeometry* lastGeometry = nullptr;
-//        QgsGeometry* currentGeometry = nullptr;
+    while (++lineNumber <= lineSize)
+    {
+        QString currentPhoto;
+        QString nextPhoto;
+        QStringList lineList;
+        QStringList nextlineList;
+        QgsFeature *currentQgsFeature = nullptr;
+        QgsFeature *nextQgsFeature = nullptr;
 
-//        QgsFeature f;
-//        QgsFeatureRequest request;
+        myOlp.getLinePhoto(lineNumber, lineList);
+        if (lineList.isEmpty()) return;
 
-//        QStringList::iterator it = line.begin();
-//        lastPhoto = *it;
+//        QgsMessageLog::logMessage(QString("第%1条航带共%2张相片：").arg(lineNumber).arg(lineList.size()));
 
-//        // 获得上个图形
-//        request.setFilterExpression(QString("相片编号='%1'").arg(lastPhoto));
-//        QgsFeatureIterator It_last = mLayerMap->getFeatures(request);
-//        while (It_last.nextFeature(f))
-//        {
-//            if (f.isValid())
-//                lastGeometry = f.geometry();
-//            break;
-//        }
-//        if (!lastGeometry || lastGeometry->isGeosEmpty())
-//        {
-//            QgsMessageLog::logMessage(QString("检查重叠度 : \t%1 last图形检索失败.").arg(lastPhoto));
-//            lastPhoto = currentPhoto;
-//            continue;
-//        }
+        QStringList::const_iterator i = lineList.constBegin();
+        if (i != lineList.constEnd())
+        {
+            currentPhoto = *i;
+            currentQgsFeature = myOlp.getFeature(currentPhoto);
+            if (!currentQgsFeature)
+            {
+                QgsMessageLog::logMessage(QString("检查重叠度 : \t%1 last图形检索失败.").arg(currentPhoto));
+                continue;
+            }
+        }
 
-//        while (++it != line.end())
-//        {
-//            // 获得当前图形
-//            currentPhoto = *it;
-//            request.setFilterExpression(QString("相片编号='%1'").arg(currentPhoto));
-//            QgsFeatureIterator It_current = mLayerMap->getFeatures(request);
-//            while (It_current.nextFeature(f))
-//            {
-//                if (f.isValid())
-//                    currentGeometry = f.geometry();
-//                break;
-//            }
-//            if (!currentGeometry || currentGeometry->isGeosEmpty())
-//            {
-//                QgsMessageLog::logMessage(QString("检查重叠度 : \t%1 current图形检索失败。").arg(currentPhoto));
-//                break;
-//            }
-//            QgsMessageLog::logMessage(QString("检查重叠度 : \tlast图形面积：%1, current图形面积：%2").arg(lastGeometry->area()).arg(currentGeometry->area()));
-//            QgsMessageLog::logMessage(QString("检查重叠度 : \tcurrent图形面积：%2").arg(currentGeometry->area()));
+        //! 行带内重叠度比较
+        while (++i != lineList.constEnd())
+        {
+            nextPhoto = *i;
+            nextQgsFeature = myOlp.getFeature(nextPhoto);
+            if (!nextQgsFeature)
+            {
+                QgsMessageLog::logMessage(QString("检查重叠度 : \t%1 current图形检索失败.").arg(nextPhoto));
+                continue;
+            }
+
+            QgsGeometry *currentGeometry = currentQgsFeature->geometry();
+            QgsGeometry *nextGeometry = nextQgsFeature->geometry();
 
             // 判断两个图形是否有重叠
-//            if (lastGeometry->intersects(currentGeometry))
-//            {
-////                shortestLine
-//                QgsMessageLog::logMessage(QString("检查重叠度 : \t%1与%2图形之间有重叠度。")
-//                                          .arg(lastPhoto)
-//                                          .arg(currentPhoto));
-//            }
-//            else
-//            {
-//                QgsMessageLog::logMessage(QString("检查重叠度 : \t%1与%2图形之间没有重叠度。")
-//                                          .arg(lastPhoto)
-//                                          .arg(currentPhoto));      // err
-//            }
+            if (currentGeometry->intersects(nextGeometry))
+            {
+                // 计算重叠百分比
+                QgsGeometry *intersectGeometry = currentGeometry->intersection(nextGeometry);
+                double intersectArea = intersectGeometry->area();
+                double currentArea = currentGeometry->area();
+//                double nextArea = nextGeometry->area();
+//                double averageArea = ( intersectArea / currentArea + intersectArea / nextArea ) / 2;
+//                int percentage = (int)(averageArea * 100);
+                int percentage = (int)(intersectArea / currentArea * 100);
+                myOlp.setNextPhotoOl(currentPhoto, nextPhoto, percentage);
 
-//            lastGeometry = currentGeometry;
-//        }
+//                QgsMessageLog::logMessage(QString("检查重叠度 : \t%1与%2图形重叠度为%3%。")
+//                                          .arg(currentPhoto)
+//                                          .arg(nextPhoto)
+//                                          .arg(percentage));
+            }
 
-        // 根据航飞方向，提取相对的角点坐标
+            //! 与下一航带重叠度检查
+            myOlp.getLinePhoto(lineNumber+1, nextlineList);
 
-        // 利用垂点，计算最近距离，计算重叠度
+            QStringList::const_iterator i_next = nextlineList.constBegin();
+            while (i_next != nextlineList.constEnd())
+            {
+                QString photoNo = *i_next++;
+                QgsFeature *feature = myOlp.getFeature(photoNo);
+                if (!feature)
+                {
+                    QgsMessageLog::logMessage(QString("检查重叠度 : \t%1 current图形检索失败.").arg(photoNo));
+                    continue;
+                }
 
-        //! 行带间重叠度检查
+                QgsGeometry *geometry = feature->geometry();
+                // 判断两个图形是否有重叠
+                if (currentGeometry->intersects(geometry))
+                {
+                    // 计算重叠百分比
+                    QgsGeometry *intersectGeometry = currentGeometry->intersection(geometry);
+                    double intersectArea = intersectGeometry->area();
+                    double currentArea = currentGeometry->area();
+                    int percentage = (int)(intersectArea / currentArea * 100);
+                    myOlp.setNextLineOl(currentPhoto, photoNo, percentage);
+                    if (percentage > sideways_Ed) break;
+                }
+            }
 
-        // 提取当前相片，与相邻行带所有相片进行重叠检查
+            currentPhoto = nextPhoto;
+            currentQgsFeature = nextQgsFeature;
+        }
+    }
 
-        // 与上诉相同
-//    }
+    // 创建错误图层
+    if ( !mLayer_Overlapping || !mLayer_Overlapping->isValid() )
+    {
+        mLayer_Overlapping = MainWindow::instance()->createrMemoryMap("重叠度检查",
+                                                            "Polygon",
+                                                            QStringList()
+                                                            << "field=id:integer"
+                                                            << "field=相片编号:string(50)"
+                                                            << "field=与相邻相片重叠度:string(10)"
+                                                            << "field=错误类型:string(100)");
+
+        if (!mLayer_Overlapping && !mLayer_Overlapping->isValid())
+        {
+            MainWindow::instance()->messageBar()->pushMessage( "创建检查图层",
+                "创建图层失败, 运行已终止, 注意检查plugins文件夹!",
+                QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
+            QgsMessageLog::logMessage(QString("创建检查图层 : \t创建图层失败, 程序已终止, 注意检查plugins文件夹。"));
+            return;
+        }
+        mLayer_Overlapping->setCrs(mLayerMap->crs());
+    }
+
+    // 初始化渲染类
+    eqiSymbol *mySymbol = new eqiSymbol(this, mLayer_Overlapping, "相片编号");
+
+    // 对比超限值，输出错误矢量面
+    int index = 0;
+    QgsFeatureList featureList;
+    QList<QString> list = myOlp.getAllPhotoNo();
+    foreach (QString number, list)
+    {
+        //! 航带内
+        QMap<QString, int> map = myOlp.getNextPhotoOverlapping(number);
+        if (map.isEmpty())  // 没有重叠度
+        {
+            // 检查当前相片是否为该航线最后一张
+            QStringList list;
+            int lineNo = myOlp.getLineNumber(number);
+            myOlp.getLinePhoto(lineNo, list);
+            QString last = list.last();
+            if (number != last)
+            {
+                QgsGeometry *errGeometry = myOlp.getFeature(number)->geometry();
+                addOverLappingErrFeature(featureList, errGeometry, number
+                                         , ++index, "0%"
+                                         , "与下张相片没有重叠度"
+                                         , mySymbol, eqiSymbol::SeriousSrror);
+            }
+        }
+        else
+        {
+            QMap<QString, int>::const_iterator it = map.constBegin();
+
+            // 获得相交区域矢量面
+            QgsGeometry *errGeometry = myOlp.getFeature(number)->geometry()
+                    ->intersection(myOlp.getFeature(it.key())->geometry());
+
+            if (it.value() < heading_Min)   // 与航带内下张相片重叠度低于最低标准
+            {
+                addOverLappingErrFeature(featureList, errGeometry, number
+                                         , ++index, QString("航带内%1%").arg(it.value())
+                                         , QString("低于最低阈值%2%").arg(heading_Min)
+                                         , mySymbol, eqiSymbol::SeriousSrror);
+            }
+            else if (it.value() < heading_Bg)   // 与航带内下张相片重叠度低于建议标准
+            {
+                addOverLappingErrFeature(featureList, errGeometry, number
+                                         , ++index, QString("航带内%1%").arg(it.value())
+                                         , QString("低于建议阈值%2%").arg(heading_Bg)
+                                         , mySymbol, eqiSymbol::warning);
+            }
+            else if (it.value() > heading_Ed)   // 与航带内下张相片重叠度大于最大建议值
+            {
+                addOverLappingErrFeature(featureList, errGeometry, number
+                                         , ++index, QString("航带内%1%").arg(it.value())
+                                         , QString("超过建议阈值%2%").arg(heading_Ed)
+                                         , mySymbol, eqiSymbol::warning);
+            }
+        }
+
+        //! 航带间
+        QMap<QString, int> mapNext = myOlp.getNextLineOverlapping(number);
+        if (mapNext.isEmpty())  // 没有重叠度
+        {
+
+        }
+        else
+        {
+            QMap<QString, int>::const_iterator itNext = mapNext.constBegin();
+
+            // 利用获得最大重叠度进行比较
+            QString maxNumber;
+            int maxPercentage = 0;
+            while (itNext != mapNext.constEnd())
+            {
+                if (itNext.value() > maxPercentage)
+                {
+                    maxPercentage = itNext.value();
+                    maxNumber = itNext.key();
+                }
+                ++itNext;
+            }
+
+            // 获得相交区域矢量面
+            QgsGeometry *errGeometry = myOlp.getFeature(number)->geometry()
+                    ->intersection(myOlp.getFeature(maxNumber)->geometry());
+
+            if (maxPercentage < sideways_Min)  // 低于最低标准
+            {
+                addOverLappingErrFeature(featureList, errGeometry, number
+                                         , ++index, QString("航带间%1%").arg(maxPercentage)
+                                         , QString("低于最低阈值%2%").arg(sideways_Min)
+                                         , mySymbol, eqiSymbol::SeriousSrror);
+            }
+            else if (maxPercentage < sideways_Bg) // 低于建议标准
+            {
+                addOverLappingErrFeature(featureList, errGeometry, number
+                                         , ++index, QString("航带间%1%").arg(maxPercentage)
+                                         , QString("低于建议阈值%2%").arg(sideways_Bg)
+                                         , mySymbol, eqiSymbol::warning);
+            }
+            else if (maxPercentage > sideways_Ed) // 大于最大建议
+            {
+                addOverLappingErrFeature(featureList, errGeometry, number
+                                         , ++index, QString("航带间%1%").arg(maxPercentage)
+                                         , QString("超过建议阈值%2%").arg(sideways_Ed)
+                                         , mySymbol, eqiSymbol::warning);
+            }
+        }
+    }
+
+    MainWindow::instance()->mapCanvas()->freeze();
+
+    // 将要素添加到图层中
+    mLayer_Overlapping->startEditing();
+    mLayer_Overlapping->dataProvider()->addFeatures(featureList);
+    mLayer_Overlapping->commitChanges();
+    mLayer_Overlapping->updateExtents();
+
+    MainWindow::instance()->mapCanvas()->freeze( false );
+    MainWindow::instance()->refreshMapCanvas();
+    mySymbol->updata();
 }
 
 void eqiAnalysisAerialphoto::checkOmega()
@@ -157,7 +318,7 @@ void eqiAnalysisAerialphoto::checkOmega()
             MainWindow::instance()->messageBar()->pushMessage( "创建检查图层",
                 "创建图层失败, 运行已终止, 注意检查plugins文件夹!",
                 QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
-            QgsMessageLog::logMessage(QString("创建航摄略图 : \t创建略图失败, 程序已终止, 注意检查plugins文件夹。"));
+            QgsMessageLog::logMessage(QString("创建检查图层 : \t创建图层失败, 程序已终止, 注意检查plugins文件夹。"));
             return;
         }
         mLayer_Omega->setCrs(mLayerMap->crs());
@@ -236,57 +397,56 @@ void eqiAnalysisAerialphoto::checkKappa()
     QStringList angle_Average_List;
 
     QList< double > averageAngleList;
-    const QStringList* noList = mPosdp->noList();
 
-    const int lineSize = myOlp.getLineSize();
+    int lineSize = myOlp.getLineSize();
     if (!lineSize) return;
-    int lineNumber = 1;
+    int lineNumber = 0;
 
     // 计算出每条行带的平均旋角
-    double averageCount = 0;
-    foreach (QString noName, *noList)
+    while (++lineNumber <= lineSize)
     {
-        if (myOlp.getLineNumber(noName) == lineNumber )
+        double averageCount = 0;
+
+        QStringList lineList;
+        myOlp.getLinePhoto(lineNumber, lineList);
+        if (lineList.isEmpty()) return;
+
+        QStringList::const_iterator i = lineList.constBegin();
+        while (i != lineList.constEnd())
         {
-            QString str_kappaField = mPosdp->getPosRecord(noName, "kappaField");
+            QString str_kappaField = mPosdp->getPosRecord(*i++, "kappaField");
             averageCount += str_kappaField.toDouble();
         }
-        else
-        {
-            averageAngleList << averageCount / myOlp.getLinePhotoSize(lineNumber);
-            QString str_kappaField = mPosdp->getPosRecord(noName, "kappaField");
-            averageCount = str_kappaField.toDouble();
-            ++lineNumber;
-        }
+
+        averageAngleList << averageCount / lineList.size();
     }
 
-    lineNumber = 1;
+    lineNumber = 0;
     QStringList angle_Line_List_sub;
-    for ( int i=0; noList->size(); ++i )
+    while (++lineNumber <= myOlp.getLineSize())
     {
-        // 得到kappa的角度值
-        QString str_kappaField = mPosdp->getPosRecord(noName, "kappaField");
-        double angle = str_kappaField.toDouble();
+        QStringList lineList;
+        myOlp.getLinePhoto(lineNumber, lineList);
+        if (lineList.isEmpty()) return;
 
-        // 对比
-        if ((angle - averageAngleList.at(lineNumber-1)) >= angle_Max) angle_Max_List.append(noName);
-        else if ((angle - averageAngleList.at(lineNumber-1)) >= angle_Line) angle_Line_List_sub.append(noName);
-        else if ((angle - averageAngleList.at(lineNumber-1)) >= angle_General) angle_General_List.append(noName);
-
-        if (myOlp.getLineNumber(noList->at(i)) == lineNumber )
+        QStringList::const_iterator i = lineList.constBegin();
+        while (i != lineList.constEnd())
         {
+            QString noName = *i++;
+            QString str_kappaField = mPosdp->getPosRecord(noName, "kappaField");
+            double angle = str_kappaField.toDouble();
+
+            // 对比
+            if ((angle - averageAngleList.at(lineNumber-1)) >= angle_Max) angle_Max_List.append(noName);
+            else if ((angle - averageAngleList.at(lineNumber-1)) >= angle_Line) angle_Line_List_sub.append(noName);
+            else if ((angle - averageAngleList.at(lineNumber-1)) >= angle_General) angle_General_List.append(noName);
         }
+
+        // 同一行带间超过20°的片子不应超过3片
+        if ((angle_Line_List_sub.size() + angle_Max_List.size()) > 3)
+            angle_Line_List += angle_Line_List_sub;
         else
-        {
-            // 同一行带间超过20°的片子不应超过3片
-            if ((angle_Line_List_sub.size() + angle_Max_List.size()) > 3)
-                angle_Line_List += angle_Line_List_sub;
-            else
-                angle_Average_List += angle_Line_List_sub;
-
-            angle_Line_List_sub.clear();
-            ++lineNumber;
-        }
+            angle_Average_List += angle_Line_List_sub;
     }
 
     if ( !mLayer_Kappa || !mLayer_Kappa->isValid() )
@@ -304,7 +464,7 @@ void eqiAnalysisAerialphoto::checkKappa()
             MainWindow::instance()->messageBar()->pushMessage( "创建检查图层",
                 "创建图层失败, 运行已终止, 注意检查plugins文件夹!",
                 QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
-            QgsMessageLog::logMessage(QString("创建航摄略图 : \t创建略图失败, 程序已终止, 注意检查plugins文件夹。"));
+            QgsMessageLog::logMessage(QString("创建检查图层 : \t创建图层失败, 程序已终止, 注意检查plugins文件夹。"));
             return;
         }
         mLayer_Kappa->setCrs(mLayerMap->crs());
@@ -379,38 +539,43 @@ void eqiAnalysisAerialphoto::checkKappa()
 
 void eqiAnalysisAerialphoto::airLineGroup()
 {
-    int lineCount = 1;
+    if (!mLayerMap) return;
+
+    int lineCount = 0;
     const double LIMITVALUE = 45.0;	// 度
-    double prev_kappaValue = 0.0;
+    double prev_kappaValue = 1000.0;
 
-    const QStringList* noList = mPosdp->noList();
-    if (!noList) return;
-
-    // 设置初值
-    prev_kappaValue = mPosdp->getPosRecord(noList->first(), "kappaField").toDouble();
-
-    foreach (QString noName, *noList)	// 遍历所有旋片角
+    QgsFeature f;
+    QgsFeatureIterator it = mLayerMap->getFeatures();
+    while (it.nextFeature(f))
     {
-        double kappaValue = 0.0;
-        kappaValue = mPosdp->getPosRecord(noName, "kappaField").toDouble();
+        if (f.isValid())
+        {
+            QString noName = f.attribute("相片编号").toString();
+            double kappaValue = f.attribute("Kappa").toString().toDouble();
+            QgsFeature *pf =new QgsFeature(f);
+            myOlp.setQgsFeature(noName, pf);
 
-        if ( abs(kappaValue - prev_kappaValue) < LIMITVALUE)
-        {
-            myOlp.addLineNumber(noName, lineCount);
+            if ( abs(kappaValue - prev_kappaValue) < LIMITVALUE)
+            {
+                myOlp.addLineNumber(noName, lineCount);
+            }
+            else
+            {
+                myOlp.addLineNumber(noName, ++lineCount);
+            }
+            prev_kappaValue = kappaValue;
         }
-        else
-        {
-            myOlp.addLineNumber(noName, ++lineCount);
-        }
-        prev_kappaValue = kappaValue;
     }
+
     isGroup = true;
 
     // 调试
-    foreach (QString noName, *noList)
-    {
-        QgsMessageLog::logMessage(QString("%1=%2").arg(noName).arg(myOlp.getLineNumber(noName)));
-    }
+//    const QStringList* noList = mPosdp->noList();
+//    foreach (QString noName, *noList)
+//    {
+//        QgsMessageLog::logMessage(QString("%1=%2").arg(noName).arg(myOlp.getLineNumber(noName)));
+//    }
 }
 
 void eqiAnalysisAerialphoto::extractFeature(QgsFeatureList &featureList
@@ -441,6 +606,25 @@ void eqiAnalysisAerialphoto::extractFeature(QgsFeatureList &featureList
     strExpression.clear();
 }
 
+void eqiAnalysisAerialphoto::addOverLappingErrFeature(QgsFeatureList &featureList
+                                                      , QgsGeometry *errGeometry
+                                                      , const QString &number
+                                                      , const int index
+                                                      , const QString &overlappingVelue
+                                                      , const QString &errType
+                                                      , eqiSymbol *mySymbol
+                                                      , eqiSymbol::linkedType type)
+{
+    QgsFeature MyFeature;
+    MyFeature.setGeometry(errGeometry);
+    MyFeature.setAttributes(QgsAttributes() << QVariant(index)
+                            << QVariant(number)
+                            << QVariant(overlappingVelue)
+                            << QVariant(errType));
+    featureList.append(MyFeature);
+    mySymbol->addChangedItem(number, type);
+}
+
 
 OverlappingProcessing::OverlappingProcessing()
 {
@@ -458,11 +642,16 @@ OverlappingProcessing::~OverlappingProcessing()
     }
 }
 
-void OverlappingProcessing::addLineNumber(const QString &photoNumber, int lineNumber)
+void OverlappingProcessing::addLineNumber(QString &photoNumber, int lineNumber)
 {
     if (!map.contains(photoNumber))
     {
         map[photoNumber] = new Ol(lineNumber);
+    }
+    else
+    {
+        Ol* ol = map.value(photoNumber);
+        ol->mLineNumber = lineNumber;
     }
 }
 
@@ -481,6 +670,26 @@ void OverlappingProcessing::setQgsFeature(const QString &photoNumber, QgsFeature
     }
 }
 
+void OverlappingProcessing::setNextPhotoOl(const QString &currentNumber,
+                                            QString nextNumber, const int n)
+{
+    if (map.contains(currentNumber))
+    {
+        Ol* ol = map.value(currentNumber);
+        ol->mMapNextPhoto.insert(nextNumber, n);
+    }
+}
+
+void OverlappingProcessing::setNextLineOl(const QString &currentNumber
+                                          , QString photoNumber, const int n)
+{
+    if (map.contains(currentNumber))
+    {
+        Ol* ol = map.value(currentNumber);
+        ol->mMapNextLine.insert(photoNumber, n);
+    }
+}
+
 int OverlappingProcessing::getLineNumber(const QString &photoNumber)
 {
     if (map.contains(photoNumber))
@@ -492,27 +701,46 @@ int OverlappingProcessing::getLineNumber(const QString &photoNumber)
 
 int OverlappingProcessing::getLineSize()
 {
-    QMapIterator<QString, Ol*> it(map);
-    it.toBack();
-    while (it.hasPrevious())
-    {
-        Ol* ol = it.previous().value();
-        return ol->mLineNumber;
-    }
-    return -1;
+    QMap<QString, Ol*>::const_iterator itBegin = map.constBegin();
+    QMap<QString, Ol*>::const_iterator itEnd = map.constEnd();
+    int iBengin = itBegin.value()->mLineNumber;
+    int iEnd = (--itEnd).value()->mLineNumber;
+    return iBengin > iEnd ? iBengin : iEnd;
 }
 
-int OverlappingProcessing::getLinePhotoSize(const int number)
+void OverlappingProcessing::getLinePhoto(const int number, QStringList &list)
 {
-    int size = 0;
     QMapIterator<QString, Ol*> it(map);
     while (it.hasNext())
     {
-        Ol* ol = it.next().value();
-        if (ol->mLineNumber == number)
+        it.next();
+        if (it.value()->mLineNumber == number)
         {
-            ++size;
+            list << it.key();
         }
     }
-    return size;
+}
+
+QgsFeature *OverlappingProcessing::getFeature(const QString &photoNumber)
+{
+    if (map.contains(photoNumber))
+    {
+        return map.value(photoNumber)->mF;
+    }
+    return nullptr;
+}
+
+QList<QString> OverlappingProcessing::getAllPhotoNo()
+{
+    return map.keys();
+}
+
+QMap<QString, int> OverlappingProcessing::getNextPhotoOverlapping(const QString &number)
+{
+    return map.value(number)->mMapNextPhoto;
+}
+
+QMap<QString, int> OverlappingProcessing::getNextLineOverlapping(const QString &number)
+{
+    return map.value(number)->mMapNextLine;
 }

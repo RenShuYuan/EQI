@@ -28,16 +28,8 @@
    </property>
   </widget>
   <widget class="QToolBar" name="mainToolBar">
-<<<<<<< HEAD
    <property name="styleSheet">
     <string notr="true"/>
-=======
-   <property name="minimumSize">
-    <size>
-     <width>0</width>
-     <height>120</height>
-    </size>
->>>>>>> 8408d22f60c6e2f266583bd79469a2a283413c43
    </property>
    <attribute name="toolBarArea">
     <enum>TopToolBarArea</enum>

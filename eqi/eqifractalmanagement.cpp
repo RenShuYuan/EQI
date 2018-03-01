@@ -73,7 +73,6 @@ QVector<QgsPoint> eqiFractalManagement::dNToLal(const QString dNStr)
     double djd=((b-31)*360+(d-1)*djc)/60;
     double dwd=((a-1)*240+(240/dwc-c)*dwc)/60;
 
-<<<<<<< HEAD
     QVector<QgsPoint> list;
     list << QgsPoint( djd, dwd )                //西南
          << QgsPoint( djd, dwd+dwc/60 )         //西北
@@ -110,8 +109,6 @@ QVector<QgsPoint> eqiFractalManagement::dNToXy(const QString dNStr)
 
 QgsPolygon eqiFractalManagement::createTkPolygon(const QVector<QgsPoint> list)
 {
-=======
->>>>>>> 8408d22f60c6e2f266583bd79469a2a283413c43
     // 计算四个角点坐标，并生成QgsPolygon
     QgsPolyline polyline;
     QgsPolygon polyon;
