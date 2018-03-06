@@ -124,6 +124,11 @@ void eqiPPInteractive::upDataUnLinkedSymbol()
     mySymbol->updata();
 }
 
+void eqiPPInteractive::pTosSwitch()
+{
+    mLayer = MainWindow::instance()->createrMemoryMap("ss", "point", QStringList() << "field=TH:string(10)" );
+}
+
 void eqiPPInteractive::delSelect(const QString &movePath)
 {
     if (!islinked() || !isAlllinked())

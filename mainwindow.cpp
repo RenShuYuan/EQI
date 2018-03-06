@@ -597,7 +597,7 @@ void MainWindow::initActions()
     mActionPosSetting->setStatusTip("相机参数、POS一键处理设置。");
     connect( mActionPosSetting, SIGNAL( triggered() ), this, SLOT( posSetting() ));
 
-    /*--------------------------------------------航摄检查---------------------------------------------*/
+    /*--------------------------------------------航摄数据预处理---------------------------------------------*/
     mActionCheckOverlapping = new QAction("重叠度检查", this);
     mActionCheckOverlapping->setStatusTip("重叠度检查");
     mActionCheckOverlapping->setIcon(eqiApplication::getThemeIcon("mActionMoveItemsToTop.png"));
@@ -613,6 +613,38 @@ void MainWindow::initActions()
     mActionCheckKappa->setStatusTip("旋片角检查");
     mActionCheckKappa->setIcon(eqiApplication::getThemeIcon("mActionNodeTool.png"));
     connect( mActionCheckKappa, SIGNAL( triggered() ), this, SLOT( checkKappa() ) );
+
+    mActionDelOmega = new QAction("删除倾角\n超限相片", this);
+    mActionDelOmega->setStatusTip("在保证重叠度的情况下，自动删除已检查出所有倾角超限的相片。");
+    mActionDelOmega->setIcon(eqiApplication::getThemeIcon("mActionNodeTool.png"));
+    connect( mActionDelOmega, SIGNAL( triggered() ), this, SLOT( delOmega() ) );
+
+    // ----->待完成
+//    mActionDelKappa = new QAction("删除旋片角\n超限相片", this);
+//    mActionDelKappa->setStatusTip("在保证重叠度的情况下，自动删除已检查出所有旋片角超限的相片。");
+//    mActionDelKappa->setIcon(eqiApplication::getThemeIcon("mActionNodeTool.png"));
+//    connect( mActionDelKappa, SIGNAL( triggered() ), this, SLOT( delKappa() ) );
+
+    // ----->待完成
+//    mActionDelOverlapping = new QAction("删除重叠度\n超限相片", this);
+//    mActionDelOverlapping->setStatusTip("在保证重叠度的情况下，自动删除已检查出所有超过最大重叠度的相片。");
+//    mActionDelOverlapping->setIcon(eqiApplication::getThemeIcon("mActionNodeTool.png"));
+//    connect( mActionDelOverlapping, SIGNAL( triggered() ), this, SLOT(  ) );
+
+    mActionDelSelect = new QAction("删除航摄数据", this);
+    mActionDelSelect->setStatusTip("将选择的略图、POS、相片数据删除，保持一套数据完整性。");
+    mActionDelSelect->setIcon(eqiApplication::getThemeIcon("eqi/other/delSelect.png"));
+    connect( mActionDelSelect, SIGNAL( triggered() ), this, SLOT( delSelect() ) );
+
+    mActionSaveSelect = new QAction("保存航摄数据", this);
+    mActionSaveSelect->setStatusTip("将选择的略图、POS、相片数据保存到指定路径中，保持一套数据完整性。");
+    mActionSaveSelect->setIcon(eqiApplication::getThemeIcon("eqi/other/saveSelect.png"));
+    connect( mActionSaveSelect, SIGNAL( triggered() ), this, SLOT( saveSelect() ) );
+
+    mActionSelectSetting = new QAction("设置", this);
+    mActionSelectSetting->setIcon(eqiApplication::getThemeIcon("propertyicons/settings.svg"));
+    mActionSelectSetting->setStatusTip("删除、保存所选航飞数据的相关设置。");
+    connect( mActionSelectSetting, SIGNAL( triggered() ), this, SLOT( selectSetting() ));
 
     /*--------------------------------------------要素选择、航摄数据处理---------------------------------------------*/
     mActionSelectFeatures = new QAction("选择要素", this);
@@ -647,48 +679,41 @@ void MainWindow::initActions()
     mActionInvertSelection->setIcon(eqiApplication::getThemeIcon("mActionInvertSelection.svg"));
     connect( mActionInvertSelection, SIGNAL( triggered() ), this, SLOT( invertSelection() ) );
 
-    mActionDelSelect = new QAction("删除航摄数据", this);
-    mActionDelSelect->setStatusTip("将选择的略图、POS、相片数据删除，保持一套数据完整性。");
-    mActionDelSelect->setIcon(eqiApplication::getThemeIcon("eqi/other/delSelect.png"));
-    connect( mActionDelSelect, SIGNAL( triggered() ), this, SLOT( delSelect() ) );
-
-    mActionSaveSelect = new QAction("保存航摄数据", this);
-    mActionSaveSelect->setStatusTip("将选择的略图、POS、相片数据保存到指定路径中，保持一套数据完整性。");
-    mActionSaveSelect->setIcon(eqiApplication::getThemeIcon("eqi/other/saveSelect.png"));
-    connect( mActionSaveSelect, SIGNAL( triggered() ), this, SLOT( saveSelect() ) );
-
-    mActionSelectSetting = new QAction("设置", this);
-    mActionSelectSetting->setIcon(eqiApplication::getThemeIcon("propertyicons/settings.svg"));
-    mActionSelectSetting->setStatusTip("删除、保存所选航飞数据的相关设置。");
-    connect( mActionSelectSetting, SIGNAL( triggered() ), this, SLOT( selectSetting() ));
-
-    /*----------------------------------------------坐标转换-------------------------------------------*/
+    /*----------------------------------------------文本坐标转换-------------------------------------------*/
     // 未实现
-    mActionTextTranfrom = new QAction("坐标转换", this);
+    mActionTextTranfrom = new QAction("坐标互转", this);
     mActionTextTranfrom->setIcon(eqiApplication::getThemeIcon("mActionShowPluginManager.svg"));
-    mActionTextTranfrom->setStatusTip(" 坐标转换，仅支持文本格式。 ");
+    mActionTextTranfrom->setStatusTip("地理坐标与投影坐标互转，换带转换。");
 
     // 未实现
-    mActionDegreeMutual = new QAction("度<->度分秒", this);
+    mActionDegreeMutual = new QAction("度与度分秒\n互转", this);
     mActionDegreeMutual->setIcon(eqiApplication::getThemeIcon("mActionShowPluginManager.svg"));
-    mActionDegreeMutual->setStatusTip(" 度与度分秒格式互转。 ");
+    mActionDegreeMutual->setStatusTip("度与度分秒格式互转。");
 
-    /*----------------------------------------------分幅管理-------------------------------------------*/
+    /*----------------------------------------------标准分幅管理-------------------------------------------*/
     // 未实现
-    mActionCreateTK = new QAction("创建分幅图框", this);
+    mActionCreateTK = new QAction("利用图号\n创建图框", this);
     mActionCreateTK->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionPtoTK.svg"));
-    mActionCreateTK->setStatusTip("输入标准分幅图号创建图框。");
+    mActionCreateTK->setStatusTip("输入标准分幅图号批量创建图框。");
 //    connect( mActionCreateTK, SIGNAL( triggered() ), this, SLOT() );
 
-    mActionPtoTK = new QAction("根据坐标\n创建图框", this);
+    mActionPtoTK = new QAction("利用坐标\n创建图框", this);
     mActionPtoTK->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionPtoTK.svg"));
-    mActionPtoTK->setStatusTip("从屏幕选取或手动输入单点坐标制作图框，利用两个角点坐标可按范围制作图框。");
+    mActionPtoTK->setStatusTip("在视图任意区域绘制矩形，将自动生成对应比例尺的标准分幅图框。");
     connect( mActionPtoTK, SIGNAL( triggered() ), this, SLOT( pointToTk()) );
 
-    mActionTKtoXY = new QAction("输出图框\n坐标", this);
+    mActionTKtoXY = new QAction("输出标准\n图框坐标", this);
     mActionTKtoXY->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionPtoTK.svg"));
-    mActionTKtoXY->setStatusTip("选择一个包含标准图号的txt文本，计算并输出图框四个角点的投影坐标，并重新输出到txt文本中。");
+    mActionTKtoXY->setStatusTip("选择一个包含标准图号的txt文本、或直接在视图中选取"
+                                "，计算并输出图框四个角点的地理、投影坐标，输出到txt文本中。");
     connect( mActionTKtoXY, SIGNAL( triggered() ), this, SLOT( TKtoXY() ) );
+
+    // 未实现
+//    mActionExTKtoXY = new QAction("输出外扩\n标准图框坐标", this);
+//    mActionExTKtoXY->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionPtoTK.svg"));
+//    mActionExTKtoXY->setStatusTip("选择一个包含标准图号的txt文本、或直接在视图中选取"
+//                                  "，计算并输出图框四个角点的外扩投影坐标，输出到txt文本中。");
+//    connect( mActionExTKtoXY, SIGNAL( triggered() ), this, SLOT(  ) );
 
     mActionPtoTKSetting = new QAction("坐标参数设置", this);
     mActionPtoTKSetting->setIcon(eqiApplication::getThemeIcon("propertyicons/settings.svg"));
@@ -701,6 +726,13 @@ void MainWindow::initActions()
     mActionAddOgrLayer->setStatusTip("添加矢量图层...");
     mActionAddOgrLayer->setIcon(eqiApplication::getThemeIcon("eqi/1/mActionAddOgrLayer.png"));
     connect( mActionAddOgrLayer, SIGNAL( triggered() ), this, SLOT( addVectorLayer() ) );
+
+    // 未实现
+//    mActionAddOgrRaster = new QAction("添加栅格图层...", this);
+//    mActionAddOgrRaster->setShortcut(tr("Ctrl+Shift+V"));
+//    mActionAddOgrRaster->setStatusTip("添加栅格图层...");
+//    mActionAddOgrRaster->setIcon(eqiApplication::getThemeIcon("eqi/1/mActionAddOgrLayer.png"));
+//    connect( mActionAddOgrRaster, SIGNAL( triggered() ), this, SLOT(  ) );
 
     mActionLayerSaveAs = new QAction("另存为(&S)...", this);
     mActionLayerSaveAs->setStatusTip("另存为");
@@ -743,15 +775,23 @@ void MainWindow::initTabTools()
     m_uDM->addSeparator(); //---
     m_uDM->addAction(mActionPosSetting);
 
-    // 初始化“航摄检查”tab
+    // 初始化“航摄数据预处理”tab
     tab_checkAerialPhoto *m_CAP = new tab_checkAerialPhoto(this);
     m_CAP->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
     m_CAP->addAction(mActionCheckOverlapping);
     m_CAP->addAction(mActionCheckOmega);
     m_CAP->addAction(mActionCheckKappa);
+    m_CAP->addSeparator(); //---
+    m_CAP->addAction(mActionDelOmega);
+//    m_CAP->addAction(mActionDelKappa);
+//    m_CAP->addAction(mActionDelOverlapping);
+    m_CAP->addSeparator(); //---
+    m_CAP->addAction(mActionDelSelect);
+    m_CAP->addAction(mActionSaveSelect);
+    m_CAP->addSeparator(); //---
+    m_CAP->addAction(mActionSelectSetting);
 
-
-    // 初始化“要素选择、编辑”tab
+    // 初始化“要素选择”tab
     tab_selectFeatures *m_SF = new tab_selectFeatures(this);
     m_SF->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
     m_SF->addAction(mActionSelectFeatures);
@@ -761,11 +801,6 @@ void MainWindow::initTabTools()
     m_SF->addAction(mActionDeselectAll);
     m_SF->addAction(mActionSelectAll);
     m_SF->addAction(mActionInvertSelection);
-    m_SF->addSeparator(); //---
-    m_SF->addAction(mActionDelSelect);
-    m_SF->addAction(mActionSaveSelect);
-    m_SF->addSeparator(); //---
-    m_SF->addAction(mActionSelectSetting);
 
     // 初始化“坐标转换”tab
     tab_coordinateTransformation *m_tCTF = new tab_coordinateTransformation(this);
@@ -773,12 +808,13 @@ void MainWindow::initTabTools()
     m_tCTF->addAction(mActionTextTranfrom);
     m_tCTF->addAction(mActionDegreeMutual);
 
-    // 初始化“分幅管理”tab
+    // 初始化“标准分幅管理”tab
     tab_fractalManagement *m_tFM = new tab_fractalManagement(this);
     m_tFM->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
     m_tFM->addAction(mActionCreateTK);
     m_tFM->addAction(mActionPtoTK);
     m_tFM->addAction(mActionTKtoXY);
+//    m_tFM->addAction(mActionExTKtoXY);
     m_tFM->addSeparator(); //---
     m_tFM->addAction(mActionPtoTKSetting);
 
@@ -786,16 +822,17 @@ void MainWindow::initTabTools()
     tab_dataManagement *m_tDM = new tab_dataManagement(this);
     m_tDM->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
     m_tDM->addAction(mActionAddOgrLayer);
+//    m_tDM->addAction(mActionAddOgrRaster);
     m_tDM->addAction(mActionLayerSaveAs);
 
     // 添加tab到窗口
     toolTab = new QTabWidget;
     toolTab->addTab(m_MB, " 地图浏览 ");
     toolTab->addTab(m_uDM, "航摄数据管理");
-    toolTab->addTab(m_CAP, " 航摄检查 ");
+    toolTab->addTab(m_CAP, "航摄数据预处理");
     toolTab->addTab(m_SF, " 要素选择 ");
-    toolTab->addTab(m_tCTF, "　坐标转换　");
-    toolTab->addTab(m_tFM, "　分幅管理　");
+    toolTab->addTab(m_tCTF, "文本坐标转换");
+    toolTab->addTab(m_tFM, "标准分幅管理");
     toolTab->addTab(m_tDM, "　数据管理　");
     ui->mainToolBar->addWidget(toolTab);
 }
@@ -2080,7 +2117,7 @@ void MainWindow::posSketchMap()
 
     QgsMessageLog::logMessage("\n");
     //! 用于保存航飞略图
-    QgsVectorLayer* sketchMapLayer = pPosdp->autoSketchMap();
+    QgsVectorLayer* sketchMapLayer = pPosdp->autoSketchMap();;
     if (!sketchMapLayer)
         return;
     pPPInter = new eqiPPInteractive(this, sketchMapLayer, pPosdp);
@@ -2089,7 +2126,7 @@ void MainWindow::posSketchMap()
 
 void MainWindow::posSketchMapSwitch()
 {
-//    ppInter->testSwitch();
+    pPPInter->pTosSwitch();
     QgsMessageLog::logMessage("test");
 }
 
@@ -2191,6 +2228,16 @@ void MainWindow::checkOmega()
 void MainWindow::checkKappa()
 {
     pAnalysis->checkKappa();
+}
+
+void MainWindow::delOmega()
+{
+
+}
+
+void MainWindow::delKappa()
+{
+
 }
 
 void MainWindow::pointToTk()

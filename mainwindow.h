@@ -171,7 +171,7 @@ private slots:
 
     /************************* 面板 *************************/
 
-    /************ 要素选择、编辑 ************/
+    /************ 要素选择 ************/
     //! 选择要素
     void selectFeatures();
 
@@ -190,14 +190,6 @@ private slots:
     //! 反选要素
     void invertSelection();
 
-    //! 删除选择航飞数据
-    void delSelect();
-
-    //! 保存选择航飞数据
-    void saveSelect();
-
-    //! 设置
-    void selectSetting();
     /************ 无人机数据管理 ************/
     //! 载入曝光点文件
     void openPosFile();
@@ -222,7 +214,7 @@ private slots:
 
     //! 相机设置
     void posSetting();
-    /************ 航摄检查 ************/
+    /************ 航摄数据预处理 ************/
     //! 重叠度检查
     void checkOverlapping();
 
@@ -232,6 +224,20 @@ private slots:
     //! 旋片角检查
     void checkKappa();
 
+    //! 删除倾角超限相片
+    void delOmega();
+
+    //! 删除旋片角超限相片
+    void delKappa();
+
+    //! 删除选择航飞数据
+    void delSelect();
+
+    //! 保存选择航飞数据
+    void saveSelect();
+
+    //! 设置
+    void selectSetting();
     /************ 分幅管理 ************/
     //! 根据坐标创建图框
     void pointToTk();
@@ -278,16 +284,13 @@ private:
     QAction *mActionShowSelectedLayers;
     QAction *mActionHideSelectedLayers;
 
-    //! 要素选择、编辑
+    //! 要素选择
     QAction *mActionSelectFeatures;
     QAction *mActionSelectPolygon;
     QAction *mActionSelectFreehand;
     QAction *mActionDeselectAll;
     QAction *mActionSelectAll;
     QAction *mActionInvertSelection;
-    QAction *mActionDelSelect;
-    QAction *mActionSaveSelect;
-    QAction *mActionSelectSetting;
 
     //! 航摄数据管理动作
     QAction *mActionOpenPosFile;
@@ -301,10 +304,16 @@ private:
     //! 航摄数据联动
     QAction *mActionPPLinkPhoto;
 
-    //! 航摄检查
+    //! 航摄数据预处理
     QAction *mActionCheckOverlapping;
     QAction *mActionCheckOmega;
     QAction *mActionCheckKappa;
+    QAction *mActionDelSelect;
+    QAction *mActionSaveSelect;
+    QAction *mActionSelectSetting;
+    QAction *mActionDelOmega;
+//    QAction *mActionDelKappa;
+//    QAction *mActionDelOverlapping;
 
     //! 坐标转换动作
     QAction *mActionTextTranfrom;
@@ -314,10 +323,12 @@ private:
     QAction *mActionPtoTK;
     QAction *mActionCreateTK;
     QAction *mActionTKtoXY;
+//    QAction *mActionExTKtoXY;
     QAction *mActionPtoTKSetting;
 
     //! 数据管理动作
     QAction *mActionAddOgrLayer;
+//    QAction *mActionAddOgrRaster;
     QAction *mActionLayerSaveAs;
 
     QLabel *mScaleLabel;

@@ -46,8 +46,6 @@ void eqiAnalysisAerialphoto::checkOverlapping()
         QString nextPhoto;
         QStringList lineList;
         QStringList nextlineList;
-        QgsFeature *currentQgsFeature = nullptr;
-        QgsFeature *nextQgsFeature = nullptr;
 
         myOlp.getLinePhoto(lineNumber, lineList);
         if (lineList.isEmpty()) return;
@@ -58,46 +56,13 @@ void eqiAnalysisAerialphoto::checkOverlapping()
         if (i != lineList.constEnd())
         {
             currentPhoto = *i;
-            currentQgsFeature = myOlp.getFeature(currentPhoto);
-            if (!currentQgsFeature)
-            {
-                QgsMessageLog::logMessage(QString("检查重叠度 : \t%1 last图形检索失败.").arg(currentPhoto));
-                continue;
-            }
         }
 
         //! 行带内重叠度比较
         while (++i != lineList.constEnd())
         {
             nextPhoto = *i;
-            nextQgsFeature = myOlp.getFeature(nextPhoto);
-            if (!nextQgsFeature)
-            {
-                QgsMessageLog::logMessage(QString("检查重叠度 : \t%1 current图形检索失败.").arg(nextPhoto));
-                continue;
-            }
-
-            QgsGeometry *currentGeometry = currentQgsFeature->geometry();
-            QgsGeometry *nextGeometry = nextQgsFeature->geometry();
-
-            // 判断两个图形是否有重叠
-            if (currentGeometry->intersects(nextGeometry))
-            {
-                // 计算重叠百分比
-                QgsGeometry *intersectGeometry = currentGeometry->intersection(nextGeometry);
-                double intersectArea = intersectGeometry->area();
-                double currentArea = currentGeometry->area();
-//                double nextArea = nextGeometry->area();
-//                double averageArea = ( intersectArea / currentArea + intersectArea / nextArea ) / 2;
-//                int percentage = (int)(averageArea * 100);
-                int percentage = (int)(intersectArea / currentArea * 100);
-                myOlp.setNextPhotoOl(currentPhoto, nextPhoto, percentage);
-
-//                QgsMessageLog::logMessage(QString("检查重叠度 : \t%1与%2图形重叠度为%3%。")
-//                                          .arg(currentPhoto)
-//                                          .arg(nextPhoto)
-//                                          .arg(percentage));
-            }
+            myOlp.calculateOverlap(currentPhoto, nextPhoto, false);
 
             //! 与下一航带重叠度检查
             myOlp.getLinePhoto(lineNumber+1, nextlineList);
@@ -106,29 +71,11 @@ void eqiAnalysisAerialphoto::checkOverlapping()
             while (i_next != nextlineList.constEnd())
             {
                 QString photoNo = *i_next++;
-                QgsFeature *feature = myOlp.getFeature(photoNo);
-                if (!feature)
-                {
-                    QgsMessageLog::logMessage(QString("检查重叠度 : \t%1 current图形检索失败.").arg(photoNo));
-                    continue;
-                }
-
-                QgsGeometry *geometry = feature->geometry();
-                // 判断两个图形是否有重叠
-                if (currentGeometry->intersects(geometry))
-                {
-                    // 计算重叠百分比
-                    QgsGeometry *intersectGeometry = currentGeometry->intersection(geometry);
-                    double intersectArea = intersectGeometry->area();
-                    double currentArea = currentGeometry->area();
-                    int percentage = (int)(intersectArea / currentArea * 100);
-                    myOlp.setNextLineOl(currentPhoto, photoNo, percentage);
-                    if (percentage > sideways_Ed) break;
-                }
+                int percentage = myOlp.calculateOverlap(currentPhoto, photoNo, true);
+                if (percentage > sideways_Ed) break;
             }
 
             currentPhoto = nextPhoto;
-            currentQgsFeature = nextQgsFeature;
         }
     }
 
@@ -216,7 +163,11 @@ void eqiAnalysisAerialphoto::checkOverlapping()
         QMap<QString, int> mapNext = myOlp.getNextLineOverlapping(number);
         if (mapNext.isEmpty())  // 没有重叠度
         {
-
+            QgsGeometry *errGeometry = myOlp.getFeature(number)->geometry();
+            addOverLappingErrFeature(featureList, errGeometry, number
+                                     , ++index, "航带间0%"
+                                     , "与下航带相片没有重叠度"
+                                     , mySymbol, eqiSymbol::SeriousSrror);
         }
         else
         {
@@ -676,6 +627,7 @@ void OverlappingProcessing::setNextPhotoOl(const QString &currentNumber,
     if (map.contains(currentNumber))
     {
         Ol* ol = map.value(currentNumber);
+        ol->mMapNextPhoto.clear();
         ol->mMapNextPhoto.insert(nextNumber, n);
     }
 }
@@ -733,6 +685,48 @@ QgsFeature *OverlappingProcessing::getFeature(const QString &photoNumber)
 QList<QString> OverlappingProcessing::getAllPhotoNo()
 {
     return map.keys();
+}
+
+int OverlappingProcessing::calculateOverlap(const QString &currentNo, const QString &nextNo, const bool isSideways)
+{
+    QgsFeature *currentQgsFeature = nullptr;
+    QgsFeature *nextQgsFeature = nullptr;
+
+    currentQgsFeature = getFeature(currentNo);
+    if (!currentQgsFeature)
+    {
+        QgsMessageLog::logMessage(QString("检查重叠度 : \t%1 last图形检索失败.").arg(currentNo));
+        return -1;
+    }
+
+    nextQgsFeature = getFeature(nextNo);
+    if (!nextQgsFeature)
+    {
+        QgsMessageLog::logMessage(QString("检查重叠度 : \t%1 current图形检索失败.").arg(nextNo));
+        return -1;
+    }
+
+    QgsGeometry *currentGeometry = currentQgsFeature->geometry();
+    QgsGeometry *nextGeometry = nextQgsFeature->geometry();
+
+    if (currentGeometry->intersects(nextGeometry))
+    {
+        // 计算重叠百分比
+        QgsGeometry *intersectGeometry = currentGeometry->intersection(nextGeometry);
+        double intersectArea = intersectGeometry->area();
+        double currentArea = currentGeometry->area();
+        int percentage = (int)(intersectArea / currentArea * 100);
+        if (isSideways)
+        {
+            setNextLineOl(currentNo, nextNo, percentage);
+        }
+        else
+        {
+            setNextPhotoOl(currentNo, nextNo, percentage);
+        }
+        return percentage;
+    }
+    return -1;
 }
 
 QMap<QString, int> OverlappingProcessing::getNextPhotoOverlapping(const QString &number)

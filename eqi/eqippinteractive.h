@@ -95,7 +95,7 @@ public:
     * @warning          采用符号渲染方式，将图层符号在面状与点状间切换。
     * @return
     */
-//    void pTosSwitch();
+    void pTosSwitch();
 
     /**
     * @brief            删除所选航摄数据
@@ -146,6 +146,7 @@ private:
     QSettings mSetting;
     eqiSymbol *mySymbol;
     QgsVectorLayer* mLayer;
+    QgsVectorLayer* mPosLayer;
     posDataProcessing* mPosdp;
     QString fieldName;
 

@@ -42,6 +42,9 @@ public:
     // 返回所有相片号
     QList< QString > getAllPhotoNo();
 
+    // 计算2张相片的重叠度，同时保存到map中。指定是否是旁向重叠比较
+    int calculateOverlap(const QString &currentNo, const QString &nextNo, const bool isSideways);
+
     // 返回指定相片与下张相片的重叠统计
     QMap<QString, int> getNextPhotoOverlapping(const QString &number);
 
