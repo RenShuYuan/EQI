@@ -103,6 +103,20 @@ void eqiSymbol::delSymbolItem(const QStringList &items)
     currentNode->setExpanded(isExpanded);
 }
 
+void eqiSymbol::delAllSymbolItem()
+{
+    // 获得缺省的符号
+    QgsSymbolV2* mSymbolV2 = nullptr;
+    mSymbolV2 = QgsSymbolV2::defaultSymbol(mLayer->geometryType());
+    QgsSingleSymbolRendererV2* rv2 = new QgsSingleSymbolRendererV2( mSymbolV2 );
+    mLayer->setRendererV2(rv2);
+
+    QgsLayerTreeNode* currentNode =	MainWindow::instance()->layerTreeView()->currentNode();
+    bool isExpanded = currentNode->isExpanded();
+    MainWindow::instance()->layerTreeView()->refreshLayerSymbology(mLayer->id());
+    currentNode->setExpanded(isExpanded);
+}
+
 void eqiSymbol::initLayerCategorizedSymbolRendererV2(const QString &field)
 {
     QgsCategoryList cats;

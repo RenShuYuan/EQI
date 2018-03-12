@@ -43,13 +43,16 @@ public:
     QList< QString > getAllPhotoNo();
 
     // 计算2张相片的重叠度，同时保存到map中。指定是否是旁向重叠比较
-    int calculateOverlap(const QString &currentNo, const QString &nextNo, const bool isSideways);
+    int calculateOverlap(const QString &currentNo, const QString &nextNo);
 
     // 返回指定相片与下张相片的重叠统计
     QMap<QString, int> getNextPhotoOverlapping(const QString &number);
 
     // 返回指定相片与下一航带相片的重叠统计
     QMap<QString, int> getNextLineOverlapping(const QString &number);
+
+    // 删除指定相片
+    void delItem(const QString &photoNumber);
 private:
     struct Ol
     {
@@ -83,12 +86,22 @@ public:
     //! 重叠度检查
     void checkOverlapping();
 
-    //! 倾角检查
+    //! 删除重叠度过大的相片
+    QStringList delOverlapping();
+
+    //! 倾角检查、删除
     void checkOmega();
+
+    //! 删除超限倾角，当isEdge为true时位于边缘处的
+    //! 相片会直接删除
+    QStringList delOmega(const bool isEdge = true);
 
     //! 旋片角检查
     void checkKappa();
 
+    //! 删除超限倾角、旋偏角，当isEdge为true时位于边缘处的
+    //! 相片会直接删除
+    QStringList delKappa(const bool isEdge = true);
 private:
     //! 航带分组
     void airLineGroup();

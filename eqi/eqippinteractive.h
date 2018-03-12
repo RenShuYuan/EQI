@@ -114,6 +114,17 @@ public:
     */
     void saveSelect(const QString& savePath);
 
+    int delMap(const QStringList& delList);
+
+    /**
+    * @brief                删除所选相片
+    * @author               YuanLong
+    * @param tempFolder    字符串为空则直接删除相片，
+    *                       否则将相片移动到指定文件夹中。
+    * @warning
+    * @return
+    */
+    void delPhoto(const QStringList& photoList, const QString& tempFolder);
 signals:
     /**
     * @brief            向主窗口发送信号更新繁忙进度条状态
@@ -126,17 +137,7 @@ signals:
     void delPos(QStringList& photoList);
 
 private:
-    int delMap();
-
-    /**
-    * @brief                删除所选相片
-    * @author               YuanLong
-    * @param tempFolder    字符串为空则直接删除相片，
-    *                       否则将相片移动到指定文件夹中。
-    * @warning
-    * @return
-    */
-    void delPhoto(const QStringList& photoList, const QString& tempFolder);
+    int delDirectMap(const QStringList& delList);
 
     void saveMap(const QString& savePath);
     void savePos(const QString& savePath, const QStringList &photoList);

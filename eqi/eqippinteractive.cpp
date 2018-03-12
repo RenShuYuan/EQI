@@ -152,10 +152,7 @@ void eqiPPInteractive::delSelect(const QString &movePath)
     mPosdp->deletePosRecords(photoNames);
 
     // 删除航飞略图
-    delMap();
-
-    // 更新略图
-    mySymbol->delSymbolItem(photoNames);
+    delDirectMap(photoNames);
 
     // 删除相片
     delPhoto(photoNames, movePath);
@@ -192,7 +189,7 @@ void eqiPPInteractive::saveSelect(const QString &savePath)
     savePhoto(savePath, photoNames);
 }
 
-int eqiPPInteractive::delMap()
+int eqiPPInteractive::delDirectMap(const QStringList& delList)
 {
     int deletedCount = 0;
 
@@ -200,7 +197,39 @@ int eqiPPInteractive::delMap()
     mLayer->deleteSelectedFeatures(&deletedCount);
     mLayer->commitChanges();
 
+    // 更新略图符号系统
+    mySymbol->delSymbolItem(delList);
+
     return deletedCount;
+}
+
+int eqiPPInteractive::delMap(const QStringList &delList)
+{
+    QgsFeature f;
+    QString strExpression;
+    QgsFeatureRequest reQuest;
+    QgsFeatureIds fids;
+
+    foreach (QString no, delList)
+    {
+        strExpression += QString("相片编号='%1' OR ").arg(no);
+    }
+    strExpression = strExpression.left(strExpression.size() - 3);
+    reQuest.setFilterExpression(strExpression);
+    QgsFeatureIterator it = mLayer->getFeatures(reQuest);
+    while (it.nextFeature(f))
+    {
+        fids << f.id();
+    }
+
+    mLayer->startEditing();
+    mLayer->deleteFeatures(fids);
+    mLayer->commitChanges();
+
+    // 更新略图符号系统
+    mySymbol->delSymbolItem(delList);
+
+    return fids.size();
 }
 
 void eqiPPInteractive::delPhoto(const QStringList &photoList, const QString &tempFolder)

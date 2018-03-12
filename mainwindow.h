@@ -29,6 +29,7 @@ class QgsClipboard;
 class QgsMessageLogViewer;
 class QgsMapTool;
 class QgsMapOverviewCanvas;
+class QgsRasterLayer;
 
 class posDataProcessing;
 class eqiPPInteractive;
@@ -90,6 +91,7 @@ public slots:
     void zoomToNext();
     void refreshMapCanvas();
     void loadOGRSublayers( const QString& layertype, const QString& uri, const QStringList& list );
+    void loadGDALSublayers( const QString& uri, const QStringList& list );
 
     //! 连接到图层树桥注册表，首先选择新添加的地图图层
     void autoSelectAddedLayer( QList<QgsMapLayer*> layers );
@@ -102,6 +104,24 @@ private:
     void createCanvasTools();
 //    void initMenus();
 //    void initOverview();
+
+    /** 栅格图层添加到地图（传过来的ptr）.
+    * 它不会强制刷新。
+    */
+   bool addRasterLayer( QgsRasterLayer * theRasterLayer );
+
+    /** 打开一个栅格图层 - 这是通用函数，它接受所有参数 */
+    QgsRasterLayer* addRasterLayerPrivate( const QString & uri, const QString & baseName,
+                                           const QString & providerKey, bool guiWarning,
+                                           bool guiUpdate );
+
+    /** 此方法将验证GDAL层是否包含子层
+    */
+    bool shouldAskUserForGDALSublayers( QgsRasterLayer *layer );
+
+    /** 这种方法将打开对话框，因此用户可以选择的GDAL子层加载
+    */
+    void askUserForGDALSublayers( QgsRasterLayer *layer );
 
     //! 这种方法将打开的对话框，因此用户可以选择的OGR子层加载
     void askUserForOGRSublayers( QgsVectorLayer *layer );
@@ -166,6 +186,14 @@ private slots:
     */
     bool addVectorLayers( const QStringList &theLayerQStringList, const QString &enc, const QString &dataSourceType );
 
+    //! 栅格图层添加到地图（将使用对话框提示用户输入文件名）
+    void addRasterLayer();
+
+    /** 重载版本，需要文件名列表，而不是与一个对话框，提示用户列表私有addRasterLayer（）方法。
+     @returns 如果添加图层成功返回true
+    */
+    bool addRasterLayers( const QStringList &theFileNameQStringList, bool guiWarning = true );
+
     //! 返回活动图层的指针
     QgsMapLayer *activeLayer();
 
@@ -224,6 +252,9 @@ private slots:
     //! 旋片角检查
     void checkKappa();
 
+    //! 删除重叠度超限相片
+    void delOverlapping();
+
     //! 删除倾角超限相片
     void delOmega();
 
@@ -258,6 +289,9 @@ private:
     posDataProcessing *pPosdp;
     eqiPPInteractive* pPPInter;
     eqiAnalysisAerialphoto* pAnalysis;
+
+    //! 含有辅助光栅文件格式适合于FileDialog的文件过滤字符串。内置构造函数.
+    QString mRasterFileFilter;
 
     //! 标志，表示该项目属性对话框是怎么出现
     bool mShowProjectionTab;
@@ -312,8 +346,8 @@ private:
     QAction *mActionSaveSelect;
     QAction *mActionSelectSetting;
     QAction *mActionDelOmega;
-//    QAction *mActionDelKappa;
-//    QAction *mActionDelOverlapping;
+    QAction *mActionDelKappa;
+    QAction *mActionDelOverlapping;
 
     //! 坐标转换动作
     QAction *mActionTextTranfrom;
@@ -323,12 +357,12 @@ private:
     QAction *mActionPtoTK;
     QAction *mActionCreateTK;
     QAction *mActionTKtoXY;
-//    QAction *mActionExTKtoXY;
+    QAction *mActionExTKtoXY;
     QAction *mActionPtoTKSetting;
 
     //! 数据管理动作
     QAction *mActionAddOgrLayer;
-//    QAction *mActionAddOgrRaster;
+    QAction *mActionAddOgrRaster;
     QAction *mActionLayerSaveAs;
 
     QLabel *mScaleLabel;

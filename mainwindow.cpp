@@ -66,6 +66,7 @@
 #include "qgslayertree.h"
 #include "qgscoordinateutils.h"
 #include "qgsrasterlayer.h"
+#include "qgsproviderregistry.h"
 #include "qgsvectordataprovider.h"
 #include "qgsmaplayerregistry.h"
 #include "qgssublayersdialog.h"
@@ -163,6 +164,8 @@ MainWindow::MainWindow(QWidget *parent) :
     connect( pPosdp, SIGNAL( startProcess() ), this, SLOT( canvasRefreshStarted ) );
     connect( pPosdp, SIGNAL( stopProcess() ), this, SLOT( canvasRefreshFinished() ) );
     upDataPosActions();
+
+    mRasterFileFilter = QgsProviderRegistry::instance()->fileRasterFilters();
 }
 
 MainWindow::~MainWindow()
@@ -438,6 +441,29 @@ void MainWindow::loadOGRSublayers(const QString &layertype, const QString &uri, 
     }
 }
 
+void MainWindow::loadGDALSublayers(const QString &uri, const QStringList &list)
+{
+    QString path, name;
+    QgsRasterLayer *subLayer = nullptr;
+
+    // 以相反的顺序添加层，使他们按正确的顺序出现
+    for ( int i = list.size() - 1; i >= 0 ; i-- )
+    {
+        path = list[i];
+        // 通过文件名代替完整路径缩短名称
+        name = path;
+        name.replace( uri, QFileInfo( uri ).completeBaseName() );
+        subLayer = new QgsRasterLayer( path, name );
+        if ( subLayer )
+        {
+            if ( subLayer->isValid() )
+                addRasterLayer( subLayer );
+            else
+                delete subLayer;
+        }
+    }
+}
+
 void MainWindow::autoSelectAddedLayer(QList<QgsMapLayer *> layers)
 {
     if ( !layers.isEmpty() )
@@ -559,7 +585,7 @@ void MainWindow::initActions()
     /*----------------------------------------------无人机数据管理-------------------------------------------*/
     mActionOpenPosFile = new QAction("载入曝光点文件", this);
     mActionOpenPosFile->setStatusTip("载入曝光点文件");
-    mActionOpenPosFile->setIcon(eqiApplication::getThemeIcon("mActionCapturePoint.png"));
+    mActionOpenPosFile->setIcon(eqiApplication::getThemeIcon("eqi/other/OpenPosFile.png"));
     connect( mActionOpenPosFile, SIGNAL( triggered() ), this, SLOT( openPosFile() ) );
 
     mActionPosTransform = new QAction("曝光点坐标转换", this);
@@ -600,7 +626,7 @@ void MainWindow::initActions()
     /*--------------------------------------------航摄数据预处理---------------------------------------------*/
     mActionCheckOverlapping = new QAction("重叠度检查", this);
     mActionCheckOverlapping->setStatusTip("重叠度检查");
-    mActionCheckOverlapping->setIcon(eqiApplication::getThemeIcon("mActionMoveItemsToTop.png"));
+    mActionCheckOverlapping->setIcon(eqiApplication::getThemeIcon("eqi/other/CheckOverlapping.png"));
     connect( mActionCheckOverlapping, SIGNAL( triggered() ), this, SLOT( checkOverlapping() ) );
 
     mActionCheckOmega = new QAction("倾斜角检查", this);
@@ -616,20 +642,18 @@ void MainWindow::initActions()
 
     mActionDelOmega = new QAction("删除倾角\n超限相片", this);
     mActionDelOmega->setStatusTip("在保证重叠度的情况下，自动删除已检查出所有倾角超限的相片。");
-    mActionDelOmega->setIcon(eqiApplication::getThemeIcon("mActionNodeTool.png"));
+    mActionDelOmega->setIcon(eqiApplication::getThemeIcon("mActionInvertSelection.png"));
     connect( mActionDelOmega, SIGNAL( triggered() ), this, SLOT( delOmega() ) );
 
-    // ----->待完成
-//    mActionDelKappa = new QAction("删除旋片角\n超限相片", this);
-//    mActionDelKappa->setStatusTip("在保证重叠度的情况下，自动删除已检查出所有旋片角超限的相片。");
-//    mActionDelKappa->setIcon(eqiApplication::getThemeIcon("mActionNodeTool.png"));
-//    connect( mActionDelKappa, SIGNAL( triggered() ), this, SLOT( delKappa() ) );
+    mActionDelKappa = new QAction("删除旋偏角\n超限相片", this);
+    mActionDelKappa->setStatusTip("在保证重叠度的情况下，自动删除已检查出所有旋偏角超限的相片。");
+    mActionDelKappa->setIcon(eqiApplication::getThemeIcon("mActionNodeTool.png"));
+    connect( mActionDelKappa, SIGNAL( triggered() ), this, SLOT( delKappa() ) );
 
-    // ----->待完成
-//    mActionDelOverlapping = new QAction("删除重叠度\n超限相片", this);
-//    mActionDelOverlapping->setStatusTip("在保证重叠度的情况下，自动删除已检查出所有超过最大重叠度的相片。");
-//    mActionDelOverlapping->setIcon(eqiApplication::getThemeIcon("mActionNodeTool.png"));
-//    connect( mActionDelOverlapping, SIGNAL( triggered() ), this, SLOT(  ) );
+    mActionDelOverlapping = new QAction("删除重叠度\n超限相片", this);
+    mActionDelOverlapping->setStatusTip("在保证重叠度的情况下，自动删除已检查出所有超过最大重叠度的相片。");
+    mActionDelOverlapping->setIcon(eqiApplication::getThemeIcon("eqi/other/CheckOverlapping.png"));
+    connect( mActionDelOverlapping, SIGNAL( triggered() ), this, SLOT( delOverlapping() ) );
 
     mActionDelSelect = new QAction("删除航摄数据", this);
     mActionDelSelect->setStatusTip("将选择的略图、POS、相片数据删除，保持一套数据完整性。");
@@ -692,27 +716,27 @@ void MainWindow::initActions()
 
     /*----------------------------------------------标准分幅管理-------------------------------------------*/
     // 未实现
-    mActionCreateTK = new QAction("利用图号\n创建图框", this);
-    mActionCreateTK->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionPtoTK.svg"));
+    mActionCreateTK = new QAction("输入图号\n创建图框", this);
+    mActionCreateTK->setIcon(eqiApplication::getThemeIcon("eqi/other/CreateTK.png"));
     mActionCreateTK->setStatusTip("输入标准分幅图号批量创建图框。");
 //    connect( mActionCreateTK, SIGNAL( triggered() ), this, SLOT() );
 
-    mActionPtoTK = new QAction("利用坐标\n创建图框", this);
-    mActionPtoTK->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionPtoTK.svg"));
+    mActionPtoTK = new QAction("拾取坐标\n创建图框", this);
+    mActionPtoTK->setIcon(eqiApplication::getThemeIcon("eqi/other/PtoTK.png"));
     mActionPtoTK->setStatusTip("在视图任意区域绘制矩形，将自动生成对应比例尺的标准分幅图框。");
     connect( mActionPtoTK, SIGNAL( triggered() ), this, SLOT( pointToTk()) );
 
     mActionTKtoXY = new QAction("输出标准\n图框坐标", this);
-    mActionTKtoXY->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionPtoTK.svg"));
+    mActionTKtoXY->setIcon(eqiApplication::getThemeIcon("eqi/other/TKtoXY.png"));
     mActionTKtoXY->setStatusTip("选择一个包含标准图号的txt文本、或直接在视图中选取"
                                 "，计算并输出图框四个角点的地理、投影坐标，输出到txt文本中。");
     connect( mActionTKtoXY, SIGNAL( triggered() ), this, SLOT( TKtoXY() ) );
 
     // 未实现
-//    mActionExTKtoXY = new QAction("输出外扩\n标准图框坐标", this);
-//    mActionExTKtoXY->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionPtoTK.svg"));
-//    mActionExTKtoXY->setStatusTip("选择一个包含标准图号的txt文本、或直接在视图中选取"
-//                                  "，计算并输出图框四个角点的外扩投影坐标，输出到txt文本中。");
+    mActionExTKtoXY = new QAction("输出外扩\n标准图框坐标", this);
+    mActionExTKtoXY->setIcon(eqiApplication::getThemeIcon("eqi/other/ExTKtoXY.png"));
+    mActionExTKtoXY->setStatusTip("选择一个包含标准图号的txt文本、或直接在视图中选取"
+                                  "，计算并输出图框四个角点的外扩投影坐标，输出到txt文本中。");
 //    connect( mActionExTKtoXY, SIGNAL( triggered() ), this, SLOT(  ) );
 
     mActionPtoTKSetting = new QAction("坐标参数设置", this);
@@ -727,12 +751,11 @@ void MainWindow::initActions()
     mActionAddOgrLayer->setIcon(eqiApplication::getThemeIcon("eqi/1/mActionAddOgrLayer.png"));
     connect( mActionAddOgrLayer, SIGNAL( triggered() ), this, SLOT( addVectorLayer() ) );
 
-    // 未实现
-//    mActionAddOgrRaster = new QAction("添加栅格图层...", this);
-//    mActionAddOgrRaster->setShortcut(tr("Ctrl+Shift+V"));
-//    mActionAddOgrRaster->setStatusTip("添加栅格图层...");
-//    mActionAddOgrRaster->setIcon(eqiApplication::getThemeIcon("eqi/1/mActionAddOgrLayer.png"));
-//    connect( mActionAddOgrRaster, SIGNAL( triggered() ), this, SLOT(  ) );
+    mActionAddOgrRaster = new QAction("添加栅格图层...", this);
+    mActionAddOgrRaster->setShortcut(tr("Ctrl+Shift+R"));
+    mActionAddOgrRaster->setStatusTip("添加栅格图层...");
+    mActionAddOgrRaster->setIcon(eqiApplication::getThemeIcon("mActionAddRasterLayer.svg"));
+    connect( mActionAddOgrRaster, SIGNAL( triggered() ), this, SLOT( addRasterLayer() ) );
 
     mActionLayerSaveAs = new QAction("另存为(&S)...", this);
     mActionLayerSaveAs->setStatusTip("另存为");
@@ -782,9 +805,9 @@ void MainWindow::initTabTools()
     m_CAP->addAction(mActionCheckOmega);
     m_CAP->addAction(mActionCheckKappa);
     m_CAP->addSeparator(); //---
+    m_CAP->addAction(mActionDelOverlapping);
     m_CAP->addAction(mActionDelOmega);
-//    m_CAP->addAction(mActionDelKappa);
-//    m_CAP->addAction(mActionDelOverlapping);
+    m_CAP->addAction(mActionDelKappa);
     m_CAP->addSeparator(); //---
     m_CAP->addAction(mActionDelSelect);
     m_CAP->addAction(mActionSaveSelect);
@@ -814,7 +837,7 @@ void MainWindow::initTabTools()
     m_tFM->addAction(mActionCreateTK);
     m_tFM->addAction(mActionPtoTK);
     m_tFM->addAction(mActionTKtoXY);
-//    m_tFM->addAction(mActionExTKtoXY);
+    m_tFM->addAction(mActionExTKtoXY);
     m_tFM->addSeparator(); //---
     m_tFM->addAction(mActionPtoTKSetting);
 
@@ -822,7 +845,7 @@ void MainWindow::initTabTools()
     tab_dataManagement *m_tDM = new tab_dataManagement(this);
     m_tDM->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
     m_tDM->addAction(mActionAddOgrLayer);
-//    m_tDM->addAction(mActionAddOgrRaster);
+    m_tDM->addAction(mActionAddOgrRaster);
     m_tDM->addAction(mActionLayerSaveAs);
 
     // 添加tab到窗口
@@ -2049,6 +2072,309 @@ bool MainWindow::addVectorLayers(const QStringList &theLayerQStringList, const Q
     return true;
 }
 
+void MainWindow::addRasterLayer()
+{
+    QStringList selectedFiles;
+    QString e;//只为参数的正确性
+    QString title = "打开GDAL支持的光栅数据源";
+    QgisGui::openFilesRememberingFilter( "lastRasterFileFilter", mRasterFileFilter, selectedFiles, e, title );
+
+    if ( selectedFiles.isEmpty() )
+    {
+        // no files were selected, so just bail
+        return;
+    }
+
+    addRasterLayers( selectedFiles );
+}
+
+bool MainWindow::addRasterLayer(QgsRasterLayer *theRasterLayer)
+{
+    Q_CHECK_PTR( theRasterLayer );
+
+    if ( ! theRasterLayer )
+        return false;
+
+    if ( !theRasterLayer->isValid() )
+    {
+        delete theRasterLayer;
+        return false;
+    }
+
+    // 在层注册表中注册该层
+    QList<QgsMapLayer *> myList;
+    myList << theRasterLayer;
+    QgsMapLayerRegistry::instance()->addMapLayers( myList );
+
+    return true;
+}
+
+QgsRasterLayer *MainWindow::addRasterLayerPrivate(const QString &uri, const QString &baseName
+                                                  , const QString &providerKey, bool guiWarning, bool guiUpdate)
+{
+    if ( guiUpdate )
+    {
+        // 让用户知道我们将有可能用一段时间
+        // QApplication::setOverrideCursor( Qt::WaitCursor );
+        mMapCanvas->freeze( true );
+    }
+
+    QgsDebugMsg( "Creating new raster layer using " + uri
+        + " with baseName of " + baseName );
+
+    QgsRasterLayer *layer = nullptr;
+    // XXX ya know QgsRasterLayer can snip out the basename on its own;
+    // XXX why do we have to pass it in for it?
+    // ET : we may not be getting "normal" files here, so we still need the baseName argument
+    if ( !providerKey.isEmpty() && uri.endsWith( ".adf", Qt::CaseInsensitive ) )
+    {
+        QFileInfo fileInfo( uri );
+        QString dirName = fileInfo.path();
+        layer = new QgsRasterLayer( dirName, QFileInfo( dirName ).completeBaseName(), QString( "gdal" ) );
+    }
+    else if ( providerKey.isEmpty() )
+        layer = new QgsRasterLayer( uri, baseName ); // fi.completeBaseName());
+    else
+        layer = new QgsRasterLayer( uri, baseName, providerKey );
+
+    QgsDebugMsg( "Constructed new layer" );
+
+    QgsError error;
+    QString title;
+    bool ok = false;
+
+    if ( !layer->isValid() )
+    {
+        error = layer->error();
+        title = "无效层";
+
+        if ( shouldAskUserForGDALSublayers( layer ) )
+        {
+            askUserForGDALSublayers( layer );
+            ok = true;
+
+            // 装在第一层不是在这种情况下是有用的。如果他要加载它，用户可以在列表中选择它。
+            delete layer;
+            layer = nullptr;
+        }
+    }
+    else
+    {
+        ok = addRasterLayer( layer );
+        if ( !ok )
+        {
+            error.append( QGS_ERROR_MESSAGE( "错误的添加图层到地图画布", "光栅图层" ) );
+            title = "错误";
+        }
+    }
+
+    if ( !ok )
+    {
+        if ( guiUpdate )
+            mMapCanvas->freeze( false );
+
+        // 如果我们在命令行中加载不显示GUI警告
+        if ( guiWarning )
+        {
+            messageBar()->pushMessage( title, error.message( QgsErrorMessage::Text ),
+                QgsMessageBar::CRITICAL, messageTimeout() );
+        }
+
+        if ( layer )
+        {
+            delete layer;
+            layer = nullptr;
+        }
+    }
+
+    if ( guiUpdate )
+    {
+        // 绘制地图
+        mMapCanvas->freeze( false );
+        mMapCanvas->refresh();
+        // Let render() do its own cursor management
+        //    QApplication::restoreOverrideCursor();
+    }
+
+    return layer;
+}
+
+bool MainWindow::shouldAskUserForGDALSublayers(QgsRasterLayer *layer)
+{
+    // 如果层是空的或光栅无子层，返回false
+    if ( !layer || layer->providerType() != "gdal" || layer->subLayers().size() < 1 )
+        return false;
+
+    QSettings settings;
+    int promptLayers = settings.value( "/qgis/promptForRasterSublayers", 1 ).toInt();
+    // 0 = 始终 - >总是问（若存在子层）
+    // 1 = 如果需要的话 - >询问如果图层没有波段，但有子层
+    // 2 = 从不 - >永不提示，不会加载任何东西
+    // 3 = 加载所有 - >从来不提示，但加载所有子层
+
+    return promptLayers == 0 || promptLayers == 3 || ( promptLayers == 1 && layer->bandCount() == 0 );
+}
+
+void MainWindow::askUserForGDALSublayers(QgsRasterLayer *layer)
+{
+    if ( !layer )
+        return;
+
+    QStringList sublayers = layer->subLayers();
+    QgsDebugMsg( QString( "光栅图层有 %1 个子层" ).arg( layer->subLayers().size() ) );
+
+    if ( sublayers.size() < 1 )
+        return;
+
+    // 如果提示图层=加载所有，加载所有的子层，而不提示
+    QSettings settings;
+    if ( settings.value( "/qgis/promptForRasterSublayers", 1 ).toInt() == 3 )
+    {
+        loadGDALSublayers( layer->source(), sublayers );
+        return;
+    }
+
+    // 我们初始化一个选择对话框并显示它。
+    QgsSublayersDialog chooseSublayersDialog( QgsSublayersDialog::Gdal, "gdal", this );
+
+    QStringList layers;
+    QStringList names;
+    for ( int i = 0; i < sublayers.size(); i++ )
+    {
+        // 简化光栅子的名字 - 应该GDAL提供程序添加一个功能呢？
+        QString name = sublayers[i];
+        QString path = layer->source();
+
+        //如果创建NetCDF/ HDF使用文件名后的所有文字
+        //用于HDF4这将是最好拿到的描述，因为子数据指标不是很实用
+        if ( name.startsWith( "netcdf", Qt::CaseInsensitive ) ||
+            name.startsWith( "hdf", Qt::CaseInsensitive ) )
+            name = name.mid( name.indexOf( path ) + path.length() + 1 );
+        else
+        {
+            // 删除驱动器名和文件名
+            name.remove( name.split( ':' )[0] );
+            name.remove( path );
+        }
+        // remove any : or " left over
+        if ( name.startsWith( ':' ) )
+            name.remove( 0, 1 );
+
+        if ( name.startsWith( '\"' ) )
+            name.remove( 0, 1 );
+
+        if ( name.endsWith( ':' ) )
+            name.chop( 1 );
+
+        if ( name.endsWith( '\"' ) )
+            name.chop( 1 );
+
+        names << name;
+        layers << QString( "%1|%2" ).arg( i ).arg( name );
+    }
+
+    chooseSublayersDialog.populateLayerTable( layers, "|" );
+
+    if ( chooseSublayersDialog.exec() )
+    {
+        // 创造出更多的信息图层名称，包含文件名以及子名字
+        QRegExp rx( "\"(.*)\"" );
+        QString uri, name;
+
+        Q_FOREACH ( int i, chooseSublayersDialog.selectionIndexes() )
+        {
+            if ( rx.indexIn( sublayers[i] ) != -1 )
+            {
+                uri = rx.cap( 1 );
+                name = sublayers[i];
+                name.replace( uri, QFileInfo( uri ).completeBaseName() );
+            }
+            else
+            {
+                name = names[i];
+            }
+
+            QgsRasterLayer *rlayer = new QgsRasterLayer( sublayers[i], name );
+            if ( rlayer && rlayer->isValid() )
+                addRasterLayer( rlayer );
+        }
+    }
+}
+
+bool MainWindow::addRasterLayers(const QStringList &theFileNameQStringList, bool guiWarning)
+{
+    if ( theFileNameQStringList.empty() )
+    {
+        // no files selected so bail out, but
+        // allow mMapCanvas to handle events
+        // first
+        mMapCanvas->freeze( false );
+        return false;
+    }
+
+    mMapCanvas->freeze( true );
+
+    // 这是乱的，因为列表中的某些文件可能是栅格和其他OGR层。
+    // 如果一个或多个图层加载失败，我们将设置返回值为false
+    bool returnValue = true;
+    for ( QStringList::ConstIterator myIterator = theFileNameQStringList.begin();
+        myIterator != theFileNameQStringList.end();
+        ++myIterator )
+    {
+        QString errMsg;
+        bool ok = false;
+
+        // 这个辅助检查该文件名是否看起来是一个有效的光栅文件名。
+        // 如果文件名看起来可能是有效的，但是在处理文件时出现错误，在errMsg返回错误。
+        if ( QgsRasterLayer::isValidRasterFileName( *myIterator, errMsg ) )
+        {
+            QFileInfo myFileInfo( *myIterator );
+
+            // 尝试创建图层
+            QgsRasterLayer *layer = addRasterLayerPrivate( *myIterator, myFileInfo.completeBaseName(),
+                QString(), guiWarning, true );
+            if ( layer && layer->isValid() )
+            {
+                //只允许一次加载一个AI网格文件的一个副本，
+                // 以防止用户选择在1目录中的所有ADFS这实际上代表1覆盖，
+                if ( myFileInfo.fileName().toLower().endsWith( ".adf" ) )
+                {
+                    break;
+                }
+            }
+            // 如果层是无效的addRasterLayerPrivate（）会显示错误
+
+        } // 有效的光栅文件名
+        else
+        {
+            ok = false;
+
+            // 发行消息框警告，除非我们从CMD线加载因为非栅格传递给这个函数，
+            // 然后再加载成功后（见main.cpp中）
+            if ( guiWarning )
+            {
+                QString msg = QString( "%1 不是一个被支持的光栅数据源" ).arg( *myIterator );
+                if ( !errMsg.isEmpty() )
+                    msg += '\n' + errMsg;
+
+                messageBar()->pushMessage( "不被支持的数据源", msg, QgsMessageBar::CRITICAL, messageTimeout() );
+            }
+        }
+        if ( ! ok )
+        {
+            returnValue = false;
+        }
+    }
+
+    mMapCanvas->freeze( false );
+    mMapCanvas->refresh();
+
+    // Let render() do its own cursor management
+    //  QApplication::restoreOverrideCursor();
+
+    return returnValue;
+}
+
 QgsMapLayer *MainWindow::activeLayer()
 {
     return mLayerTreeView ? mLayerTreeView->currentLayer() : nullptr;
@@ -2230,14 +2556,146 @@ void MainWindow::checkKappa()
     pAnalysis->checkKappa();
 }
 
+void MainWindow::delOverlapping()
+{
+    QStringList delList = pAnalysis->delOverlapping();
+    if (delList.isEmpty())
+    {
+        return;
+    }
+    //err
+QgsMessageLog::logMessage(QString("删除航摄数据 : \tdelOverlapping。"));
+    QString delPath;
+    int iDelete = mSettings.value("/eqi/options/selectEdit/delete", DELETE_DIR).toInt();
+
+    if (iDelete == DELETE_DIR) // 移动到临时文件夹中
+    {
+        QString autoPath = mSettings.value("/eqi/pos/lePosFile", "").toString();
+        autoPath = QFileInfo(autoPath).path();
+
+        QDateTime current_date_time = QDateTime::currentDateTime();
+        QString current_date = current_date_time.toString("yyyy-MM-dd");
+        autoPath = QString("%1/自动剔除的错误相片-%3").arg(autoPath).arg(current_date);
+
+        if (!QDir(autoPath).exists())
+        {
+            QDir dir;
+            if ( !dir.mkpath(autoPath) )
+            {
+                QgsMessageLog::logMessage(QString("删除航摄数据 : \t自动创建文件夹失败，请手动指定。"));
+                return;
+            }
+        }
+
+        delPath = autoPath;
+    }
+
+    // 删除POS
+    if (pPosdp->isValid())
+    {
+        pPosdp->deletePosRecords(delList);
+    }
+
+    // 删除航飞略图、删除相片
+    if (pPPInter)
+    {
+        pPPInter->delMap(delList);
+        pPPInter->delPhoto(delList, delPath);
+    }
+}
+
 void MainWindow::delOmega()
 {
+    QStringList delList = pAnalysis->delOmega();
+    if (delList.isEmpty())
+    {
+        return;
+    }
 
+    QString delPath;
+    int iDelete = mSettings.value("/eqi/options/selectEdit/delete", DELETE_DIR).toInt();
+
+    if (iDelete == DELETE_DIR) // 移动到临时文件夹中
+    {
+        QString autoPath = mSettings.value("/eqi/pos/lePosFile", "").toString();
+        autoPath = QFileInfo(autoPath).path();
+
+        QDateTime current_date_time = QDateTime::currentDateTime();
+        QString current_date = current_date_time.toString("yyyy-MM-dd");
+        autoPath = QString("%1/自动剔除的错误相片-%3").arg(autoPath).arg(current_date);
+
+        if (!QDir(autoPath).exists())
+        {
+            QDir dir;
+            if ( !dir.mkpath(autoPath) )
+            {
+                QgsMessageLog::logMessage(QString("删除航摄数据 : \t自动创建文件夹失败，请手动指定。"));
+                return;
+            }
+        }
+
+        delPath = autoPath;
+    }
+
+    // 删除POS
+    if (pPosdp->isValid())
+    {
+        pPosdp->deletePosRecords(delList);
+    }
+
+    // 删除航飞略图、删除相片
+    if (pPPInter)
+    {
+        pPPInter->delMap(delList);
+        pPPInter->delPhoto(delList, delPath);
+    }
 }
 
 void MainWindow::delKappa()
 {
+    QStringList delList = pAnalysis->delKappa();
+    if (delList.isEmpty())
+    {
+        return;
+    }
 
+    QString delPath;
+    int iDelete = mSettings.value("/eqi/options/selectEdit/delete", DELETE_DIR).toInt();
+
+    if (iDelete == DELETE_DIR) // 移动到临时文件夹中
+    {
+        QString autoPath = mSettings.value("/eqi/pos/lePosFile", "").toString();
+        autoPath = QFileInfo(autoPath).path();
+
+        QDateTime current_date_time = QDateTime::currentDateTime();
+        QString current_date = current_date_time.toString("yyyy-MM-dd");
+        autoPath = QString("%1/自动剔除的错误相片-%3").arg(autoPath).arg(current_date);
+
+        if (!QDir(autoPath).exists())
+        {
+            QDir dir;
+            if ( !dir.mkpath(autoPath) )
+            {
+                QgsMessageLog::logMessage(QString("删除航摄数据 : \t自动创建文件夹失败，请手动指定。"));
+                return;
+            }
+        }
+
+        delPath = autoPath;
+    }
+
+    // 删除POS
+    if (pPosdp->isValid())
+    {
+        pPosdp->deletePosRecords(delList);
+    }
+
+    // 删除航飞略图、删除相片
+    if (pPPInter)
+    {
+        pPPInter->delMap(delList);
+        pPPInter->delPhoto(delList, delPath);
+    }
 }
 
 void MainWindow::pointToTk()

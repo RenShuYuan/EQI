@@ -58,6 +58,14 @@ public:
     */
     void delSymbolItem(const QStringList& items);
 
+    /**
+    * @brief			delAllSymbolItem
+    * @author			YuanLong
+    * @Access			public
+    * @Param items     删除所有已分类符号
+    * @Returns			void
+    */
+    void delAllSymbolItem();
 private:
     // 基于指定字段初始化图层的渲染方式为分类渲染
     void initLayerCategorizedSymbolRendererV2(const QString &field);
