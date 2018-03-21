@@ -626,7 +626,7 @@ void posDataProcessing::deletePosRecord(const QString &No )
         it_photoMark->removeAt(index);
 }
 
-void posDataProcessing::deletePosRecords(QStringList &NoList)
+void posDataProcessing::deletePosRecords(const QStringList &NoList)
 {
     if (NoList.isEmpty())
     {

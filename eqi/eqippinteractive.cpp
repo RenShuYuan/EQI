@@ -73,12 +73,10 @@ void eqiPPInteractive::upDataLinkedSymbol()
         isLinked = false;
         return;
     }
-    else
-    {
-        QgsMessageLog::logMessage(QString("动态联动 : \t%1 路径下搜索到%2张相片.")
-                                  .arg(QDir::toNativeSeparators(photoPath))
-                                  .arg(photosList.size()));
-    }
+
+    QgsMessageLog::logMessage(QString("动态联动 : \t%1 路径下搜索到%2张相片.")
+                              .arg(QDir::toNativeSeparators(photoPath))
+                              .arg(photosList.size()));
 
     //matchPosName(list, basePos);
 
@@ -86,11 +84,13 @@ void eqiPPInteractive::upDataLinkedSymbol()
     foreach (QString str, photosList)
         mPhotoMap[QFileInfo(str).baseName()] = str;
 
+    // 检查相片与POS的对应关系
+    const QStringList *posList = mPosdp->noList();
     QMap<QString, QString>::iterator it = mPhotoMap.begin();
     while (it != mPhotoMap.end())
     {
         QString key = it.key();
-        if (!mPosdp->noList()->contains(key))
+        if (!posList->contains(key))
         {
             QgsMessageLog::logMessage(QString("\t\t||--> 相片:%1在曝光点文件中未找到对应记录.").arg(key));
             it = mPhotoMap.erase(it);
@@ -99,6 +99,16 @@ void eqiPPInteractive::upDataLinkedSymbol()
         {
             mySymbol->addChangedItem(key, eqiSymbol::linked);
             ++it;
+        }
+    }
+
+    // 检查POS与相片的对应关系
+    if (posList->size() != mPhotoMap.size())
+    {
+        for (int i = 0; i < posList->size(); ++i)
+        {
+            if (!mPhotoMap.contains(posList->at(i)))
+                QgsMessageLog::logMessage(QString("\t\t||--> POS:%1在相片文件中未找到对应数据.").arg(posList->at(i)));
         }
     }
 
@@ -122,42 +132,6 @@ void eqiPPInteractive::upDataUnLinkedSymbol()
 
     // 更新符号
     mySymbol->updata();
-}
-
-void eqiPPInteractive::pTosSwitch()
-{
-    mLayer = MainWindow::instance()->createrMemoryMap("ss", "point", QStringList() << "field=TH:string(10)" );
-}
-
-void eqiPPInteractive::delSelect(const QString &movePath)
-{
-    if (!islinked() || !isAlllinked())
-    {
-        MainWindow::instance()->messageBar()->pushMessage("修改航摄数据",
-                                                          "在修改航摄数据前，相片需要与曝光点完全对应。",
-                                                          QgsMessageBar::CRITICAL,
-                                                          MainWindow::instance()->messageTimeout());
-        return;
-    }
-
-    // 获得选择的相片编号
-    QStringList photoNames;
-    QgsFeatureList fList =	mLayer->selectedFeatures();
-    foreach (QgsFeature f, fList)
-    {
-        photoNames.append(f.attribute(fieldName).toString());
-    }
-
-    // 删除POS数据
-    mPosdp->deletePosRecords(photoNames);
-
-    // 删除航飞略图
-    delDirectMap(photoNames);
-
-    // 删除相片
-    delPhoto(photoNames, movePath);
-
-    QgsMessageLog::logMessage(QString("删除航摄数据 : \t删除%1条记录。").arg(photoNames.size()));
 }
 
 void eqiPPInteractive::saveSelect(const QString &savePath)
@@ -280,7 +254,7 @@ void eqiPPInteractive::delPhoto(const QStringList &photoList, const QString &tem
         }
         else
         {
-            QgsMessageLog::logMessage(QString("\t\t||--> 删除相片 : mPhotoMap err。").arg(name));
+//            QgsMessageLog::logMessage(QString("\t\t||--> 删除相片 : mPhotoMap err。").arg(name));
         }
     }
 }

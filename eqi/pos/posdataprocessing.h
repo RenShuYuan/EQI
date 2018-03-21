@@ -92,7 +92,7 @@ public:
     * @return
     */
     void deletePosRecord( const QString& No );
-    void deletePosRecords( QStringList& NoList );
+    void deletePosRecords(const QStringList &NoList );
 
 signals:
     void startProcess();

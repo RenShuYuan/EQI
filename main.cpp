@@ -21,7 +21,7 @@ int main(int argc, char *argv[])
     QCoreApplication::setApplicationName( "EQI" );
 
     QgsApplication a(argc, argv, true);
-//    a.setWindowIcon( QIcon( "plane.ico" ) );
+    a.setWindowIcon( QIcon( "plane.ico" ) );
     QgsApplication::setDefaultSvgPaths( QStringList( QDir::currentPath()+"/Resources/images/svg" ) );
     QgsApplication::setPrefixPath( QDir::currentPath(), true );
     QgsApplication::init(QDir::currentPath()+"/Resources");

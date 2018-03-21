@@ -53,6 +53,13 @@ public:
 
     // 删除指定相片
     void delItem(const QString &photoNumber);
+
+
+    // 更新航线编号，如删除航带间相片后
+    void updataLineNumber();
+
+    // 更新保存的相片编号，如删除相片后
+    void updataPhotoNumber();
 private:
     struct Ol
     {
@@ -81,6 +88,7 @@ class eqiAnalysisAerialphoto : public QObject
 {
     Q_OBJECT
 public:
+    explicit eqiAnalysisAerialphoto(QObject *parent);
     explicit eqiAnalysisAerialphoto(QObject *parent, QgsVectorLayer* layer, posDataProcessing *posdp);
 
     //! 重叠度检查
@@ -102,6 +110,9 @@ public:
     //! 删除超限倾角、旋偏角，当isEdge为true时位于边缘处的
     //! 相片会直接删除
     QStringList delKappa(const bool isEdge = true);
+public slots:
+    void updataChackValue();
+
 private:
     //! 航带分组
     void airLineGroup();
@@ -133,8 +144,39 @@ private:
     QgsVectorLayer* mLayer_Overlapping;
     posDataProcessing* mPosdp;
 
+    // 重叠度限差
+    int heading_Max;
+    int heading_Gen;
+    int heading_Min;
+    int sideways_Max;
+    int sideways_Gen;
+    int sideways_Min;
+
+    // 倾斜角度限差
+    double omega_angle_General;
+    double omega_angle_Max;
+    double omega_angle_Average;
+
+    // Kappa角度限差
+    double kappa_angle_General;
+    double kappa_angle_Max;
+    double kappa_angle_Line;
+
+    // 错误类型定义
+    QString errTpye_nextPhotoNoOverlap;
+    QString errTpye_nextPhotoMinOverlap;
+    QString errTpye_nextPhotoGeneralOverlap;
+    QString errTpye_nextPhotoMaxOverlap;
+    QString errTpye_nextLineNoOverlap;
+    QString errTpye_nextLineMinOverlap;
+    QString errTpye_nextLineGeneralOverlap;
+    QString errTpye_nextLineMaxOverlap;
+
     bool isGroup;
     OverlappingProcessing myOlp;
+
+    // 用于分类的字段名称
+    QString mField;
 };
 
 #endif // EQIANALYSISAERIALPHOTO_H

@@ -2,6 +2,8 @@
 #include "ui_dialog_possetting.h"
 #include "qgsprojectionselectionwidget.h"
 
+#include <QDebug>
+
 dialog_posSetting::dialog_posSetting(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::dialog_posSetting)
@@ -42,6 +44,8 @@ dialog_posSetting::dialog_posSetting(QWidget *parent) :
     ui->checkBox_2->setChecked(blchk);
     blchk = mSettings.value("/eqi/options/imagePreprocessing/chkLinkPhoto", true).toBool();
     ui->checkBox_3->setChecked(blchk);
+    blchk = mSettings.value("/eqi/options/imagePreprocessing/chkPosExport", true).toBool();
+    ui->checkBox_4->setChecked(blchk);
     QString strPhotoName = mSettings.value("/eqi/options/imagePreprocessing/lePhotoFolder", "photo").toString();
     ui->lineEdit_6->setText(strPhotoName);
     ui->label_6->setEnabled(ui->checkBox_3->isChecked());
@@ -49,6 +53,10 @@ dialog_posSetting::dialog_posSetting(QWidget *parent) :
 
     connect(ui->checkBox_3, SIGNAL(toggled (bool) ), ui->label_6, SLOT( setEnabled (bool) ));
     connect(ui->checkBox_3, SIGNAL(toggled (bool) ), ui->lineEdit_6, SLOT( setEnabled (bool) ));
+
+    // 航摄略图显示参数 初始化
+    double scale = mSettings.value("/eqi/options/imagePreprocessing/dspScale", 0.1).toDouble();
+    ui->doubleSpinBox->setValue(scale);
 }
 
 dialog_posSetting::~dialog_posSetting()
@@ -73,7 +81,10 @@ void dialog_posSetting::on_buttonBox_accepted()
     mSettings.setValue("/eqi/options/imagePreprocessing/chkTransform", ui->checkBox->isChecked());
     mSettings.setValue("/eqi/options/imagePreprocessing/chkSketchMap", ui->checkBox_2->isChecked());
     mSettings.setValue("/eqi/options/imagePreprocessing/chkLinkPhoto", ui->checkBox_3->isChecked());
+    mSettings.setValue("/eqi/options/imagePreprocessing/chkPosExport", ui->checkBox_4->isChecked());
     mSettings.setValue("/eqi/options/imagePreprocessing/lePhotoFolder", ui->lineEdit_6->text());
 
     mSettings.setValue( "/eqi/prjTransform/projectDefaultCrs", mLayerDefaultCrs.authid() );
+
+    mSettings.setValue("/eqi/options/imagePreprocessing/dspScale", ui->doubleSpinBox->value());
 }

@@ -77,5 +77,13 @@ QStringList eqiApplication::searchFiles( const QString &path, QStringList &filte
 		QFileInfo file_info = dir_iterator.fileInfo();
 		list.append(file_info.filePath());
 	}
-	return list;
+    return list;
+}
+
+void eqiApplication::setStyle(const QString &style)
+{
+    QFile qss(style);
+    qss.open(QFile::ReadOnly);
+    qApp->setStyleSheet(qss.readAll());
+    qss.close();
 }

@@ -6,6 +6,7 @@
 #include "eqi/pos/posdataprocessing.h"
 #include "eqi/eqippinteractive.h"
 #include "eqi/eqianalysisaerialphoto.h"
+#include "eqi/eqisymbol.h"
 #include "ui_mainwindow.h"
 #include "ui/toolTab/tab_mapbrowsing.h"
 #include "ui/toolTab/tab_coordinatetransformation.h"
@@ -45,6 +46,7 @@
 #include <QCursor>
 #include <QMenu>
 #include <QFileDialog>
+#include <QTransform>
 
 // QGis
 #include "qgsscalecombobox.h"
@@ -93,6 +95,9 @@ MainWindow::MainWindow(QWidget *parent) :
     , mShowProjectionTab( false )
     , pPosdp( nullptr )
     , pPPInter( nullptr )
+    , pAnalysis(nullptr)
+    , sketchMapLayer(nullptr)
+    , isSmSmall(false)
 {
     if ( smInstance )
     {
@@ -166,6 +171,8 @@ MainWindow::MainWindow(QWidget *parent) :
     upDataPosActions();
 
     mRasterFileFilter = QgsProviderRegistry::instance()->fileRasterFilters();
+
+//    eqiApplication::setStyle("F:/Develop/1.Programming/Qt/EQI/Resources/360safe.qss");
 }
 
 MainWindow::~MainWindow()
@@ -313,6 +320,57 @@ QgsVectorLayer *MainWindow::createrMemoryMap(const QString &layerName, const QSt
     // 添加到地图
     QgsMapLayerRegistry::instance()->addMapLayer(newLayer);
     return newLayer;
+}
+
+void MainWindow::deleteAerialPhotographyData(const QStringList &delList)
+{
+    if (delList.isEmpty())
+        return;
+
+    QString delPath;
+    int iDelete = mSettings.value("/eqi/options/selectEdit/delete", DELETE_DIR).toInt();
+
+    if (iDelete == DELETE_DIR) // 移动到临时文件夹中
+    {
+        QString autoPath = mSettings.value("/eqi/pos/lePosFile", "").toString();
+        autoPath = QFileInfo(autoPath).path();
+
+        QDateTime current_date_time = QDateTime::currentDateTime();
+        QString current_date = current_date_time.toString("yyyy-MM-dd");
+        autoPath = QString("%1/删除的相片-%3").arg(autoPath).arg(current_date);
+
+        if (!QDir(autoPath).exists())
+        {
+            QDir dir;
+            if ( !dir.mkpath(autoPath) )
+            {
+                QgsMessageLog::logMessage(QString("删除航摄数据 : \t自动创建文件夹失败，请手动指定。"));
+                return;
+            }
+        }
+
+        delPath = autoPath;
+    }
+
+    // 删除POS
+    if (pPosdp->isValid())
+        pPosdp->deletePosRecords(delList);
+    else
+        QgsMessageLog::logMessage("删除POS记录：没有载入POS文件，已忽略。");
+
+    // 删除航飞略图
+    if (sketchMapLayer && sketchMapLayer->isValid())
+        deleteSketchMap(delList);
+    else
+        QgsMessageLog::logMessage("删除航摄略图：无效的航摄略图，已忽略。");
+
+    // 删除相片
+    if (pPPInter && pPPInter->isAlllinked())
+        pPPInter->delPhoto(delList, delPath);
+    else
+        QgsMessageLog::logMessage("删除相片：POS与相片没有建立联动关系，或POS与相片未完全对应，已忽略。");
+
+    QgsMessageLog::logMessage(QString("删除航摄数据：%1项。").arg(delList.size()));
 }
 
 void MainWindow::pan()
@@ -598,10 +656,10 @@ void MainWindow::initActions()
     mActionPosSketchMap->setIcon(eqiApplication::getThemeIcon("mActionCapturePolygon.png"));
     connect( mActionPosSketchMap, SIGNAL( triggered() ), this, SLOT( posSketchMap() ) );
 
-    mActionPosSketchMapSwitch = new QAction("显示曝光点", this);
-    mActionPosSketchMapSwitch->setStatusTip("切换显示曝光点与航飞略图。");
-    mActionPosSketchMapSwitch->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionSketchMapsurface.png"));
-    connect( mActionPosSketchMapSwitch, SIGNAL( triggered() ), this, SLOT( posSketchMapSwitch() ) );
+    mActionSketchMapSwitch = new QAction("切换航摄略图", this);
+    mActionSketchMapSwitch->setStatusTip("切换显示航摄略图显示范围。");
+    mActionSketchMapSwitch->setIcon(eqiApplication::getThemeIcon("eqi/other/SketchMapSwitch.png"));
+    connect( mActionSketchMapSwitch, SIGNAL( triggered() ), this, SLOT( pSwitchSketchMap() ) );
 
     mActionPPLinkPhoto = new QAction("PP动态联动", this);
     mActionPPLinkPhoto->setStatusTip("创建POS文件与photo相片之间的联动关系。");
@@ -765,87 +823,156 @@ void MainWindow::initActions()
 
 void MainWindow::initTabTools()
 {
+    // 格式化tooltab需要的
+    QSize size(30, 30);
+
+    QLabel *label = new QLabel(this);
+    label->setFixedWidth (15);
+
     // 初始化“地图浏览”tab
     tab_mapBrowsing *m_MB = new tab_mapBrowsing(this);
-    m_MB->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    m_MB->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    m_MB->setIconSize(size);
+    m_MB->setFixedHeight(60);
+    m_MB->addWidget(new QLabel(label));
     m_MB->addAction(mActionPan);
+    m_MB->addWidget(new QLabel(label));
     m_MB->addAction(mActionZoomIn);
+    m_MB->addWidget(new QLabel(label));
     m_MB->addAction(mActionZoomOut);
+    m_MB->addWidget(new QLabel(label));
     m_MB->addAction(mActionZoomLast);
+    m_MB->addWidget(new QLabel(label));
     m_MB->addAction(mActionZoomNext);
+    m_MB->addWidget(new QLabel(label));
     m_MB->addSeparator(); //---
+    m_MB->addWidget(new QLabel(label));
     m_MB->addAction(mActionZoomFullExtent);
+    m_MB->addWidget(new QLabel(label));
     m_MB->addAction(mActionZoomToLayer);
+    m_MB->addWidget(new QLabel(label));
     m_MB->addAction(mActionPanToSelected);
+    m_MB->addWidget(new QLabel(label));
     m_MB->addAction(mActionZoomToSelected);
+    m_MB->addWidget(new QLabel(label));
     m_MB->addAction(mActionZoomActualSize);
+    m_MB->addWidget(new QLabel(label));
     m_MB->addSeparator(); //---
+    m_MB->addWidget(new QLabel(label));
     m_MB->addAction(mActionDraw);
+    m_MB->addWidget(new QLabel(label));
     m_MB->addAction(mActionIdentify);
 
     // 初始化“无人机数据管理”tab
     tab_uavDataManagement *m_uDM = new tab_uavDataManagement(this);
-    m_uDM->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    m_uDM->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    m_uDM->setIconSize(size);
+    m_uDM->addWidget(new QLabel(label));
     m_uDM->addAction(mActionOpenPosFile);
+    m_uDM->addWidget(new QLabel(label));
     m_uDM->addAction(mActionPosTransform);
+    m_uDM->addWidget(new QLabel(label));
     m_uDM->addAction(mActionPosSketchMap);
+    m_uDM->addWidget(new QLabel(label));
     m_uDM->addAction(mActionPPLinkPhoto);
+    m_uDM->addWidget(new QLabel(label));
     m_uDM->addAction(mActionPosExport);
+    m_uDM->addWidget(new QLabel(label));
     m_uDM->addSeparator(); //---
+    m_uDM->addWidget(new QLabel(label));
     m_uDM->addAction(mActionPosOneButton);
+    m_uDM->addWidget(new QLabel(label));
     m_uDM->addSeparator(); //---
-    m_uDM->addAction(mActionPosSketchMapSwitch);
+    m_uDM->addWidget(new QLabel(label));
+    m_uDM->addAction(mActionSketchMapSwitch);
+    m_uDM->addWidget(new QLabel(label));
     m_uDM->addSeparator(); //---
+    m_uDM->addWidget(new QLabel(label));
     m_uDM->addAction(mActionPosSetting);
 
     // 初始化“航摄数据预处理”tab
     tab_checkAerialPhoto *m_CAP = new tab_checkAerialPhoto(this);
-    m_CAP->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    m_CAP->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    m_CAP->setIconSize(size);
+    m_CAP->addWidget(new QLabel(label));
     m_CAP->addAction(mActionCheckOverlapping);
+    m_CAP->addWidget(new QLabel(label));
     m_CAP->addAction(mActionCheckOmega);
+    m_CAP->addWidget(new QLabel(label));
     m_CAP->addAction(mActionCheckKappa);
+    m_CAP->addWidget(new QLabel(label));
     m_CAP->addSeparator(); //---
+    m_CAP->addWidget(new QLabel(label));
     m_CAP->addAction(mActionDelOverlapping);
+    m_CAP->addWidget(new QLabel(label));
     m_CAP->addAction(mActionDelOmega);
+    m_CAP->addWidget(new QLabel(label));
     m_CAP->addAction(mActionDelKappa);
+    m_CAP->addWidget(new QLabel(label));
     m_CAP->addSeparator(); //---
+    m_CAP->addWidget(new QLabel(label));
     m_CAP->addAction(mActionDelSelect);
+    m_CAP->addWidget(new QLabel(label));
     m_CAP->addAction(mActionSaveSelect);
+    m_CAP->addWidget(new QLabel(label));
     m_CAP->addSeparator(); //---
+    m_CAP->addWidget(new QLabel(label));
     m_CAP->addAction(mActionSelectSetting);
 
     // 初始化“要素选择”tab
     tab_selectFeatures *m_SF = new tab_selectFeatures(this);
-    m_SF->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    m_SF->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    m_SF->setIconSize(size);
+    m_SF->addWidget(new QLabel(label));
     m_SF->addAction(mActionSelectFeatures);
+    m_SF->addWidget(new QLabel(label));
     m_SF->addAction(mActionSelectPolygon);
+    m_SF->addWidget(new QLabel(label));
     m_SF->addAction(mActionSelectFreehand);
+    m_SF->addWidget(new QLabel(label));
     m_SF->addSeparator(); //---
+    m_SF->addWidget(new QLabel(label));
     m_SF->addAction(mActionDeselectAll);
+    m_SF->addWidget(new QLabel(label));
     m_SF->addAction(mActionSelectAll);
+    m_SF->addWidget(new QLabel(label));
     m_SF->addAction(mActionInvertSelection);
 
     // 初始化“坐标转换”tab
     tab_coordinateTransformation *m_tCTF = new tab_coordinateTransformation(this);
-    m_tCTF->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    m_tCTF->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    m_tCTF->setIconSize(size);
+    m_tCTF->addWidget(new QLabel(label));
     m_tCTF->addAction(mActionTextTranfrom);
+    m_tCTF->addWidget(new QLabel(label));
     m_tCTF->addAction(mActionDegreeMutual);
 
     // 初始化“标准分幅管理”tab
     tab_fractalManagement *m_tFM = new tab_fractalManagement(this);
-    m_tFM->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    m_tFM->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    m_tFM->setIconSize(size);
+    m_tFM->addWidget(new QLabel(label));
     m_tFM->addAction(mActionCreateTK);
+    m_tFM->addWidget(new QLabel(label));
     m_tFM->addAction(mActionPtoTK);
+    m_tFM->addWidget(new QLabel(label));
     m_tFM->addAction(mActionTKtoXY);
+    m_tFM->addWidget(new QLabel(label));
     m_tFM->addAction(mActionExTKtoXY);
+    m_tFM->addWidget(new QLabel(label));
     m_tFM->addSeparator(); //---
+    m_tFM->addWidget(new QLabel(label));
     m_tFM->addAction(mActionPtoTKSetting);
 
     // 初始化“数据管理”tab
     tab_dataManagement *m_tDM = new tab_dataManagement(this);
-    m_tDM->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    m_tDM->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    m_tDM->setIconSize(size);
+    m_tDM->addWidget(new QLabel(label));
     m_tDM->addAction(mActionAddOgrLayer);
+    m_tDM->addWidget(new QLabel(label));
     m_tDM->addAction(mActionAddOgrRaster);
+    m_tDM->addWidget(new QLabel(label));
     m_tDM->addAction(mActionLayerSaveAs);
 
     // 添加tab到窗口
@@ -1342,6 +1469,73 @@ void MainWindow::upDataPosActions()
     }
 }
 
+int MainWindow::deleteSketchMap(const QStringList &delList)
+{
+    if (!sketchMapLayer && !sketchMapLayer->isValid())
+    {
+        return 0;
+    }
+
+    QgsFeature f;
+    QString strExpression;
+    QgsFeatureRequest reQuest;
+    QgsFeatureIds fids;
+
+    foreach (QString no, delList)
+    {
+        strExpression += QString("相片编号='%1' OR ").arg(no);
+    }
+    strExpression = strExpression.left(strExpression.size() - 3);
+    reQuest.setFilterExpression(strExpression);
+    QgsFeatureIterator it = sketchMapLayer->getFeatures(reQuest);
+    while (it.nextFeature(f))
+    {
+        fids << f.id();
+    }
+
+    sketchMapLayer->startEditing();
+    sketchMapLayer->deleteFeatures(fids);
+    sketchMapLayer->commitChanges();
+
+    // 更新略图符号系统
+    eqiSymbol *mySymbol = new eqiSymbol(this, sketchMapLayer, "相片编号");
+    mySymbol->delSymbolItem(delList);
+
+    return fids.size();
+}
+
+void MainWindow::pSwitchSketchMap()
+{
+    QgsFeature f;
+    QgsFeatureIterator it = sketchMapLayer->getFeatures();
+
+    double scale = mSettings.value("/eqi/options/imagePreprocessing/dspScale", 0.1).toDouble();
+
+    mapCanvas()->freeze();
+    sketchMapLayer->startEditing();
+    while (it.nextFeature(f))
+    {
+        QgsGeometry *geo = f.geometry();
+        QgsPoint point = geo->centroid()->asPoint();
+        QTransform t = QTransform::fromTranslate( point.x(), point.y() );
+
+        if (isSmSmall)
+            t.scale(1/scale, 1/scale);
+        else
+            t.scale(scale, scale);
+
+        t.translate( -point.x(), -point.y() );
+        geo->transform(t);
+        sketchMapLayer->changeGeometry(f.id(), geo);
+
+    }
+    sketchMapLayer->commitChanges();
+    mapCanvas()->freeze(false);
+    MainWindow::instance()->refreshMapCanvas();
+
+    isSmSmall = !isSmSmall;
+}
+
 //void MainWindow::initMenus()
 //{
 //    // Panel and Toolbar Submenus
@@ -1607,36 +1801,15 @@ void MainWindow::invertSelection()
 
 void MainWindow::delSelect()
 {
-    QString delPath;
-    int iDelete = mSettings.value("/eqi/options/selectEdit/delete", DELETE_DIR).toInt();
+    // 获得选择的相片编号
+    QStringList delList;
+    QgsFeatureList fList =	sketchMapLayer->selectedFeatures();
+    foreach (QgsFeature f, fList)
+        delList.append(f.attribute("相片编号").toString());
+    if (delList.size() == 0)
+        return;
 
-    if (iDelete == DELETE_DIR) // 移动到临时文件夹中
-    {
-        QString autoPath = mSettings.value("/eqi/pos/lePosFile", "").toString();
-        autoPath = QFileInfo(autoPath).path();
-
-        QDateTime current_date_time = QDateTime::currentDateTime();
-        QString current_date = current_date_time.toString("yyyy-MM-dd");
-        autoPath = QString("%1/删除的相片-%3").arg(autoPath).arg(current_date);
-
-        if (!QDir(autoPath).exists())
-        {
-            QDir dir;
-            if ( !dir.mkpath(autoPath) )
-            {
-                QgsMessageLog::logMessage(QString("删除航摄数据 : \t自动创建文件夹失败，请手动指定。"));
-                return;
-            }
-        }
-
-        delPath = autoPath;
-    }
-
-    if (pPPInter)
-    {
-        QgsMessageLog::logMessage("\n");
-        pPPInter->delSelect(delPath);
-    }
+    deleteAerialPhotographyData(delList);
 }
 
 void MainWindow::saveSelect()
@@ -1707,6 +1880,12 @@ void MainWindow::saveSelect()
 void MainWindow::selectSetting()
 {
     dialog_selectSetting *selectDialog = new dialog_selectSetting(this);
+
+    if (pAnalysis)
+    {
+        connect( selectDialog, SIGNAL( accepted() ), pAnalysis, SLOT( updataChackValue() ) );
+    }
+
     selectDialog->exec();
 }
 
@@ -2442,18 +2621,13 @@ void MainWindow::posSketchMap()
     if (!pPosdp->isValid()) return;
 
     QgsMessageLog::logMessage("\n");
+
     //! 用于保存航飞略图
-    QgsVectorLayer* sketchMapLayer = pPosdp->autoSketchMap();;
+    sketchMapLayer = pPosdp->autoSketchMap();;
     if (!sketchMapLayer)
         return;
     pPPInter = new eqiPPInteractive(this, sketchMapLayer, pPosdp);
     pAnalysis = new eqiAnalysisAerialphoto(this, sketchMapLayer, pPosdp);
-}
-
-void MainWindow::posSketchMapSwitch()
-{
-    pPPInter->pTosSwitch();
-    QgsMessageLog::logMessage("test");
 }
 
 void MainWindow::posLinkPhoto()
@@ -2478,7 +2652,7 @@ void MainWindow::posLinkPhoto()
         messageBar()->pushMessage( "动态联动", "成功断开联动关系.",QgsMessageBar::SUCCESS, messageTimeout() );
 
         mActionPPLinkPhoto->setText("PP动态联动");
-        mActionPPLinkPhoto->setIcon(eqiApplication::getThemeIcon("mActionlink.svg"));
+        mActionPPLinkPhoto->setIcon(eqiApplication::getThemeIcon("mActionLink.svg"));
     }
     else
     {
@@ -2526,6 +2700,12 @@ void MainWindow::posOneButton()
     {
         posLinkPhoto();
     }
+
+    // 导出POS数据
+    if (mSettings.value("/eqi/options/imagePreprocessing/chkPosExport", true).toBool())
+    {
+        posExport();
+    }
 }
 
 void MainWindow::posExport()
@@ -2560,142 +2740,27 @@ void MainWindow::delOverlapping()
 {
     QStringList delList = pAnalysis->delOverlapping();
     if (delList.isEmpty())
-    {
         return;
-    }
-    //err
-QgsMessageLog::logMessage(QString("删除航摄数据 : \tdelOverlapping。"));
-    QString delPath;
-    int iDelete = mSettings.value("/eqi/options/selectEdit/delete", DELETE_DIR).toInt();
 
-    if (iDelete == DELETE_DIR) // 移动到临时文件夹中
-    {
-        QString autoPath = mSettings.value("/eqi/pos/lePosFile", "").toString();
-        autoPath = QFileInfo(autoPath).path();
-
-        QDateTime current_date_time = QDateTime::currentDateTime();
-        QString current_date = current_date_time.toString("yyyy-MM-dd");
-        autoPath = QString("%1/自动剔除的错误相片-%3").arg(autoPath).arg(current_date);
-
-        if (!QDir(autoPath).exists())
-        {
-            QDir dir;
-            if ( !dir.mkpath(autoPath) )
-            {
-                QgsMessageLog::logMessage(QString("删除航摄数据 : \t自动创建文件夹失败，请手动指定。"));
-                return;
-            }
-        }
-
-        delPath = autoPath;
-    }
-
-    // 删除POS
-    if (pPosdp->isValid())
-    {
-        pPosdp->deletePosRecords(delList);
-    }
-
-    // 删除航飞略图、删除相片
-    if (pPPInter)
-    {
-        pPPInter->delMap(delList);
-        pPPInter->delPhoto(delList, delPath);
-    }
+    deleteAerialPhotographyData(delList);
 }
 
 void MainWindow::delOmega()
 {
     QStringList delList = pAnalysis->delOmega();
     if (delList.isEmpty())
-    {
         return;
-    }
 
-    QString delPath;
-    int iDelete = mSettings.value("/eqi/options/selectEdit/delete", DELETE_DIR).toInt();
-
-    if (iDelete == DELETE_DIR) // 移动到临时文件夹中
-    {
-        QString autoPath = mSettings.value("/eqi/pos/lePosFile", "").toString();
-        autoPath = QFileInfo(autoPath).path();
-
-        QDateTime current_date_time = QDateTime::currentDateTime();
-        QString current_date = current_date_time.toString("yyyy-MM-dd");
-        autoPath = QString("%1/自动剔除的错误相片-%3").arg(autoPath).arg(current_date);
-
-        if (!QDir(autoPath).exists())
-        {
-            QDir dir;
-            if ( !dir.mkpath(autoPath) )
-            {
-                QgsMessageLog::logMessage(QString("删除航摄数据 : \t自动创建文件夹失败，请手动指定。"));
-                return;
-            }
-        }
-
-        delPath = autoPath;
-    }
-
-    // 删除POS
-    if (pPosdp->isValid())
-    {
-        pPosdp->deletePosRecords(delList);
-    }
-
-    // 删除航飞略图、删除相片
-    if (pPPInter)
-    {
-        pPPInter->delMap(delList);
-        pPPInter->delPhoto(delList, delPath);
-    }
+    deleteAerialPhotographyData(delList);
 }
 
 void MainWindow::delKappa()
 {
     QStringList delList = pAnalysis->delKappa();
     if (delList.isEmpty())
-    {
         return;
-    }
 
-    QString delPath;
-    int iDelete = mSettings.value("/eqi/options/selectEdit/delete", DELETE_DIR).toInt();
-
-    if (iDelete == DELETE_DIR) // 移动到临时文件夹中
-    {
-        QString autoPath = mSettings.value("/eqi/pos/lePosFile", "").toString();
-        autoPath = QFileInfo(autoPath).path();
-
-        QDateTime current_date_time = QDateTime::currentDateTime();
-        QString current_date = current_date_time.toString("yyyy-MM-dd");
-        autoPath = QString("%1/自动剔除的错误相片-%3").arg(autoPath).arg(current_date);
-
-        if (!QDir(autoPath).exists())
-        {
-            QDir dir;
-            if ( !dir.mkpath(autoPath) )
-            {
-                QgsMessageLog::logMessage(QString("删除航摄数据 : \t自动创建文件夹失败，请手动指定。"));
-                return;
-            }
-        }
-
-        delPath = autoPath;
-    }
-
-    // 删除POS
-    if (pPosdp->isValid())
-    {
-        pPosdp->deletePosRecords(delList);
-    }
-
-    // 删除航飞略图、删除相片
-    if (pPPInter)
-    {
-        pPPInter->delMap(delList);
-        pPPInter->delPhoto(delList, delPath);
-    }
+    deleteAerialPhotographyData(delList);
 }
 
 void MainWindow::pointToTk()

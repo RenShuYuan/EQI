@@ -119,14 +119,22 @@ void eqiSymbol::delAllSymbolItem()
 
 void eqiSymbol::initLayerCategorizedSymbolRendererV2(const QString &field)
 {
+    QStringList list;
     QgsCategoryList cats;
     QgsFeature f;
     QgsFeatureIterator it = mLayer->getFeatures();
+
     while (it.nextFeature(f))
     {
-        cats << QgsRendererCategoryV2(f.attribute(field),
-                                      customizeSymbolV2(eqiSymbol::unlinked),
-                                      f.attribute(field).toString());
+        if (!list.contains(f.attribute(field).toString()))
+        {
+            list << f.attribute(field).toString();
+        }
+    }
+
+    foreach (QString value, list)
+    {
+        cats << QgsRendererCategoryV2(QVariant(value), customizeSymbolV2(eqiSymbol::unlinked), value);
     }
 
     mLayer->setRendererV2( new QgsCategorizedSymbolRendererV2(field, cats) );

@@ -6,6 +6,7 @@
 #include "qgsrasteridentifyresult.h"
 
 #include <QDir>
+#include <QDebug>
 
 eqiInquireDemValue::eqiInquireDemValue(QObject *parent) : QObject(parent)
 {
@@ -158,8 +159,14 @@ eqiInquireDemValue::ErrorType eqiInquireDemValue::pointTransform(const QList< Qg
                                                 GEO_EPSG_CRS_AUTHID ).toString();
         mSourceCrs.createFromOgcWmsCrs( myDefaultCrs );
 
+        // debug
+        qDebug() << "然后调用“设置”中的参数.mSourceCrs=" << mSourceCrs.description();
+
         if (mSourceCrs.isValid())
         {
+            // debug
+            qDebug() << "将mSourceCrs=sourceCrs。";
+
             sourceCrs = mSourceCrs;
         }
         else
@@ -187,6 +194,9 @@ eqiInquireDemValue::ErrorType eqiInquireDemValue::pointTransform(const QList< Qg
     }
     else if (eqiProjectionTransformation::isSourceCGCS2000Prj(sourceCrs.postgisSrid()))
     {
+        // debug
+        qDebug() << "目标坐标系为2000投影坐标系。";
+
         mTargetCrs = eqiProjectionTransformation::getGCS(sourceCrs);
         if (!mTargetCrs.isValid())
         {

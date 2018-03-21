@@ -90,22 +90,6 @@ public:
 //    void matchPosName();
 
     /**
-    * @brief            切换图层符号
-    * @author           YuanLong
-    * @warning          采用符号渲染方式，将图层符号在面状与点状间切换。
-    * @return
-    */
-    void pTosSwitch();
-
-    /**
-    * @brief            删除所选航摄数据
-    * @author           YuanLong
-    * @warning          将选中的相片、曝光点数据、以及略图删除。
-    * @return
-    */
-    void delSelect(const QString& movePath);
-
-    /**
     * @brief            保存所选航摄数据
     * @author           YuanLong
     * @param savePath  保存相片的文件夹路径

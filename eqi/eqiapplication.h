@@ -3,6 +3,10 @@
 
 #include <QObject>
 #include <QString>
+#include <QSettings>
+
+#include "qgspoint.h"
+#include "qgsgeometry.h"
 
 class QIcon;
 class QWidget;
@@ -27,6 +31,8 @@ public:
 	* @return			返回搜索到的文件列表
 	*/
 	static QStringList searchFiles( const QString &path, QStringList &filters );
+
+    static void setStyle(const QString &style);
 };
 
 #endif

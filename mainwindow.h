@@ -77,6 +77,9 @@ public:
     QgsLayerTreeMapCanvasBridge *layerTreeCanvasBridge() { return mLayerTreeCanvasBridge; }
 //    QgsMapOverviewCanvas* mapOverviewCanvas() { return mOverviewCanvas; }
 
+    // 删除航摄数据，包括POS、略图、相片
+    void deleteAerialPhotographyData(const QStringList& delList);
+
 public slots:
 //    QMenu *panelMenu() { return mPanelMenu; }
     void pan();
@@ -129,6 +132,11 @@ private:
     void saveAsVectorFileGeneral( QgsVectorLayer* vlayer = nullptr, bool symbologyOption = true );
 
     void upDataPosActions();
+
+    //! 删除航摄略图中指定相片
+    int deleteSketchMap(const QStringList &delList);
+
+    QgsPoint vectorScale();
 
 private slots:
     void showRotation();
@@ -228,9 +236,6 @@ private slots:
     //! 创建航飞略图
     void posSketchMap();
 
-    //! 切换显示略图
-    void posSketchMapSwitch();
-
     //! 创建PP动态联动
     void posLinkPhoto();
 
@@ -239,6 +244,14 @@ private slots:
 
     //! 导出曝光点文件
     void posExport();
+
+    /**
+    * @brief            切换航摄略图显示范围
+    * @author           YuanLong
+    * @warning          在正常范围与按比例缩小范围中切换。
+    * @return
+    */
+    void pSwitchSketchMap();
 
     //! 相机设置
     void posSetting();
@@ -290,6 +303,12 @@ private:
     eqiPPInteractive* pPPInter;
     eqiAnalysisAerialphoto* pAnalysis;
 
+    // 保存航摄略图的显示状态
+    bool isSmSmall;
+
+    //! 用于保存航飞略图
+    QgsVectorLayer* sketchMapLayer;
+
     //! 含有辅助光栅文件格式适合于FileDialog的文件过滤字符串。内置构造函数.
     QString mRasterFileFilter;
 
@@ -330,7 +349,7 @@ private:
     QAction *mActionOpenPosFile;
     QAction *mActionPosTransform;
     QAction *mActionPosSketchMap;
-    QAction *mActionPosSketchMapSwitch;
+    QAction *mActionSketchMapSwitch;
     QAction *mActionPosOneButton;
     QAction *mActionPosExport;
     QAction *mActionPosSetting;
