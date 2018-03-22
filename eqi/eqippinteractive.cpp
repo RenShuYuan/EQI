@@ -93,23 +93,19 @@ void eqiPPInteractive::upDataLinkedSymbol()
         if (!posList->contains(key))
         {
             QgsMessageLog::logMessage(QString("\t\t||--> 相片:%1在曝光点文件中未找到对应记录.").arg(key));
-            it = mPhotoMap.erase(it);
         }
         else
         {
             mySymbol->addChangedItem(key, eqiSymbol::linked);
-            ++it;
         }
+        ++it;
     }
 
     // 检查POS与相片的对应关系
-    if (posList->size() != mPhotoMap.size())
+    for (int i = 0; i < posList->size(); ++i)
     {
-        for (int i = 0; i < posList->size(); ++i)
-        {
-            if (!mPhotoMap.contains(posList->at(i)))
-                QgsMessageLog::logMessage(QString("\t\t||--> POS:%1在相片文件中未找到对应数据.").arg(posList->at(i)));
-        }
+        if (!mPhotoMap.contains(posList->at(i)))
+            QgsMessageLog::logMessage(QString("\t\t||--> POS:%1在相片文件中未找到对应数据.").arg(posList->at(i)));
     }
 
     isLinked = true;
@@ -259,6 +255,44 @@ void eqiPPInteractive::delPhoto(const QStringList &photoList, const QString &tem
     }
 }
 
+QStringList eqiPPInteractive::modifyPos()
+{
+    QStringList willDel;
+
+    if (!isLinked) return willDel;
+
+    const QStringList *posList = mPosdp->noList();
+    for (int i = 0; i != posList->size(); ++i)
+    {
+        if (!mPhotoMap.contains(posList->at(i)))
+        {
+            willDel << posList->at(i);
+        }
+    }
+    return willDel;
+}
+
+QStringList eqiPPInteractive::modifyPhoto()
+{
+    QStringList willDel;
+
+    if (!isLinked) return willDel;
+
+    const QStringList *posList = mPosdp->noList();
+    QMap<QString, QString>::iterator it = mPhotoMap.begin();
+    while (it != mPhotoMap.end())
+    {
+        QString key = it.key();
+        if (!posList->contains(key))
+        {
+            willDel << key;
+        }
+        ++it;
+    }
+
+    return willDel;
+}
+
 void eqiPPInteractive::saveMap(const QString &savePath)
 {
     // 定义略图名称
@@ -391,20 +425,13 @@ bool eqiPPInteractive::isValid()
 
 bool eqiPPInteractive::isAlllinked()
 {
-    QMap<QString, QString>::iterator it = mPhotoMap.begin();
-    if (mPhotoMap.size() != mPosdp->noList()->size())
+    const QStringList *posList = mPosdp->noList();
+    for (int i = 0; i != posList->size(); ++i)
     {
-        return false;
-    }
-    while (it != mPhotoMap.end())
-    {
-        QString key = it.key();
-        if (!mPosdp->noList()->contains(key))
+        if (!mPhotoMap.contains(posList->at(i)))
         {
             return false;
-            break;
         }
-        ++it;
     }
     return true;
 }

@@ -77,11 +77,15 @@ public:
     QgsLayerTreeMapCanvasBridge *layerTreeCanvasBridge() { return mLayerTreeCanvasBridge; }
 //    QgsMapOverviewCanvas* mapOverviewCanvas() { return mOverviewCanvas; }
 
+    //! 显示图层属性
+    void showLayerProperties( QgsMapLayer *ml );
+
     // 删除航摄数据，包括POS、略图、相片
     void deleteAerialPhotographyData(const QStringList& delList);
 
 public slots:
 //    QMenu *panelMenu() { return mPanelMenu; }
+    void about();
     void pan();
     void panToSelected();
     void zoomIn();
@@ -96,6 +100,9 @@ public slots:
     void loadOGRSublayers( const QString& layertype, const QString& uri, const QStringList& list );
     void loadGDALSublayers( const QString& uri, const QStringList& list );
 
+    //! 开启或关闭取决于当前地图图层类型的行动。从图例调用的时候，当前图例项已经改变
+    void activateDeactivateLayerRelatedActions( QgsMapLayer *layer );
+
     //! 连接到图层树桥注册表，首先选择新添加的地图图层
     void autoSelectAddedLayer( QList<QgsMapLayer*> layers );
     void activeLayerChanged( QgsMapLayer *layer );
@@ -105,6 +112,7 @@ private:
     void initStatusBar();
     void initLayerTreeView();
     void createCanvasTools();
+    void setupConnections();
 //    void initMenus();
 //    void initOverview();
 
@@ -164,6 +172,9 @@ private slots:
     void canvasRefreshStarted();
     void canvasRefreshFinished();
     void showProgress( int theProgress, int theTotalSteps );
+
+    //! 显示当前地图的比例尺(slot)
+    void showScale( double theScale );
 
     //! 处理用户输入的比例尺(slot)
     void userScale();
@@ -253,6 +264,9 @@ private slots:
     */
     void pSwitchSketchMap();
 
+    //! 切换显示航摄略图的编号
+    void switchPosLabel();
+
     //! 相机设置
     void posSetting();
     /************ 航摄数据预处理 ************/
@@ -280,6 +294,12 @@ private slots:
     //! 保存选择航飞数据
     void saveSelect();
 
+    //! 修改POS文件
+    void modifyPos();
+
+    //! 修改相片数据
+    void modifyPhoto();
+
     //! 设置
     void selectSetting();
     /************ 分幅管理 ************/
@@ -306,6 +326,9 @@ private:
     // 保存航摄略图的显示状态
     bool isSmSmall;
 
+    // 保存航摄略图的标注状态
+    bool isPosLabel;
+
     //! 用于保存航飞略图
     QgsVectorLayer* sketchMapLayer;
 
@@ -329,6 +352,7 @@ private:
     QAction *mActionDraw;
     QAction *mActionIdentify;
 
+
     //! 图层管理动作
     QAction *mActionFilterLegend;
     QAction *mActionRemoveLayer;
@@ -350,6 +374,7 @@ private:
     QAction *mActionPosTransform;
     QAction *mActionPosSketchMap;
     QAction *mActionSketchMapSwitch;
+    QAction *mActionPosLabelSwitch;
     QAction *mActionPosOneButton;
     QAction *mActionPosExport;
     QAction *mActionPosSetting;
@@ -367,6 +392,8 @@ private:
     QAction *mActionDelOmega;
     QAction *mActionDelKappa;
     QAction *mActionDelOverlapping;
+    QAction *mActionModifyPos;
+    QAction *mActionModifyPhoto;
 
     //! 坐标转换动作
     QAction *mActionTextTranfrom;
@@ -397,6 +424,8 @@ private:
 //    QDockWidget *mOverviewDock;
 //    QCursor *mOverviewMapCursor;
 //    QMenu *mPanelMenu;
+
+    QAction *mActionAbout;
 
     // QGis
     QgsMapCanvas *mMapCanvas;

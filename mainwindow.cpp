@@ -20,6 +20,7 @@
 #include "ui/dialog/dialog_prjtransformsetting.h"
 #include "ui/dialog/dialog_possetting.h"
 #include "ui/dialog/dialog_selectsetting.h"
+#include "ui/dialog/dialog_about.h"
 #include "qgis/app/qgsstatusbarcoordinateswidget.h"
 #include "qgis/app/qgsapplayertreeviewmenuprovider.h"
 #include "qgis/app/qgsclipboard.h"
@@ -32,6 +33,9 @@
 #include "qgis/app/qgsmaptoolselectrectangle.h"
 #include "qgis/app/qgsmaptoolselectpolygon.h"
 #include "qgis/app/qgsmaptoolselectfreehand.h"
+#include "qgis/app/qgsmaptoolidentifyaction.h"
+#include "qgis/app/qgsrasterlayerproperties.h"
+#include "qgis/app/qgsvectorlayerproperties.h"
 
 // Qt
 #include <QAction>
@@ -76,6 +80,7 @@
 #include "qgsmessageviewer.h"
 #include "qgsmaptoolzoom.h"
 #include "qgsmaptoolpan.h"
+#include "qgspallabeling.h"
 
 MainWindow *MainWindow::smInstance = nullptr;
 
@@ -98,6 +103,7 @@ MainWindow::MainWindow(QWidget *parent) :
     , pAnalysis(nullptr)
     , sketchMapLayer(nullptr)
     , isSmSmall(false)
+    , isPosLabel(false)
 {
     if ( smInstance )
     {
@@ -171,6 +177,8 @@ MainWindow::MainWindow(QWidget *parent) :
     upDataPosActions();
 
     mRasterFileFilter = QgsProviderRegistry::instance()->fileRasterFilters();
+
+    setupConnections();
 
 //    eqiApplication::setStyle("F:/Develop/1.Programming/Qt/EQI/Resources/360safe.qss");
 }
@@ -322,6 +330,54 @@ QgsVectorLayer *MainWindow::createrMemoryMap(const QString &layerName, const QSt
     return newLayer;
 }
 
+void MainWindow::showLayerProperties(QgsMapLayer *ml)
+{
+    if ( !ml )
+      return;
+
+    if ( !QgsProject::instance()->layerIsEmbedded( ml->id() ).isEmpty() )
+    {
+      return; //不显示嵌入层的属性
+    }
+
+    if ( ml->type() == QgsMapLayer::RasterLayer )
+    {
+      QgsRasterLayerProperties *rlp = new QgsRasterLayerProperties( ml, mMapCanvas, this );
+
+      rlp->exec();
+      delete rlp; // delete since dialog cannot be reused without updating code
+    }
+    else if ( ml->type() == QgsMapLayer::VectorLayer ) // VECTOR
+    {
+      QgsVectorLayer* vlayer = qobject_cast<QgsVectorLayer *>( ml );
+
+      QgsVectorLayerProperties *vlp = new QgsVectorLayerProperties( vlayer, this );
+
+      if ( vlp->exec() )
+      {
+        activateDeactivateLayerRelatedActions( ml );
+      }
+      delete vlp; // delete since dialog cannot be reused without updating code
+    }
+    //else if ( ml->type() == QgsMapLayer::PluginLayer )//////////////////////////////////////////////////////////////////////////
+    //{
+    //  QgsPluginLayer* pl = qobject_cast<QgsPluginLayer *>( ml );
+    //  if ( !pl )
+    //    return;
+
+    //  QgsPluginLayerType* plt = QgsPluginLayerRegistry::instance()->pluginLayerType( pl->pluginLayerType() );
+    //  if ( !plt )
+    //    return;
+
+    //  if ( !plt->showLayerProperties( pl ) )
+    //  {
+    //    messageBar()->pushMessage( tr( "Warning" ),
+    //                               tr( "This layer doesn't have a properties dialog." ),
+    //                               QgsMessageBar::INFO, messageTimeout() );
+    //  }
+    //}
+}
+
 void MainWindow::deleteAerialPhotographyData(const QStringList &delList)
 {
     if (delList.isEmpty())
@@ -371,6 +427,13 @@ void MainWindow::deleteAerialPhotographyData(const QStringList &delList)
         QgsMessageLog::logMessage("删除相片：POS与相片没有建立联动关系，或POS与相片未完全对应，已忽略。");
 
     QgsMessageLog::logMessage(QString("删除航摄数据：%1项。").arg(delList.size()));
+}
+
+void MainWindow::about()
+{
+    dialog_about *about = new dialog_about(nullptr);
+    about->setWindowModality(Qt::ApplicationModal);
+    about->show();
 }
 
 void MainWindow::pan()
@@ -522,6 +585,410 @@ void MainWindow::loadGDALSublayers(const QString &uri, const QStringList &list)
     }
 }
 
+void MainWindow::activateDeactivateLayerRelatedActions(QgsMapLayer *layer)
+{
+
+    //bool enableMove = false, enableRotate = false, enablePin = false, enableShowHide = false, enableChange = false;
+
+    //// 获得已注册的所有图层
+    //QMap<QString, QgsMapLayer*> layers = QgsMapLayerRegistry::instance()->mapLayers();
+    //for ( QMap<QString, QgsMapLayer*>::iterator it = layers.begin(); it != layers.end(); ++it )
+    //{
+    //	// 如果是矢量图层
+    //	QgsVectorLayer *vlayer = qobject_cast<QgsVectorLayer *>( it.value() );
+    //	if ( !vlayer || !vlayer->isEditable() ||
+    //		( !vlayer->diagramsEnabled() && !vlayer->labelsEnabled() ) )
+    //		continue;
+
+    //	int colX, colY, colShow, colAng;
+    //	enablePin =
+    //		enablePin ||
+    //		( qobject_cast<QgsMapToolPinLabels*>( mMapTools.mPinLabels ) &&
+    //		qobject_cast<QgsMapToolPinLabels*>( mMapTools.mPinLabels )->layerCanPin( vlayer, colX, colY ) );
+
+    //	enableShowHide =
+    //		enableShowHide ||
+    //		( qobject_cast<QgsMapToolShowHideLabels*>( mMapTools.mShowHideLabels ) &&
+    //		qobject_cast<QgsMapToolShowHideLabels*>( mMapTools.mShowHideLabels )->layerCanShowHide( vlayer, colShow ) );
+
+    //	enableMove =
+    //		enableMove ||
+    //		( qobject_cast<QgsMapToolMoveLabel*>( mMapTools.mMoveLabel ) &&
+    //		( qobject_cast<QgsMapToolMoveLabel*>( mMapTools.mMoveLabel )->labelMoveable( vlayer, colX, colY )
+    //		|| qobject_cast<QgsMapToolMoveLabel*>( mMapTools.mMoveLabel )->diagramMoveable( vlayer, colX, colY ) )
+    //		);
+
+    //	enableRotate =
+    //		enableRotate ||
+    //		( qobject_cast<QgsMapToolRotateLabel*>( mMapTools.mRotateLabel ) &&
+    //		qobject_cast<QgsMapToolRotateLabel*>( mMapTools.mRotateLabel )->layerIsRotatable( vlayer, colAng ) );
+
+    //	enableChange = true;
+
+    //	if ( enablePin && enableShowHide && enableMove && enableRotate && enableChange )
+    //		break;
+    //}
+
+    //mActionPinLabels->setEnabled( enablePin );
+    //mActionShowHideLabels->setEnabled( enableShowHide );
+    //mActionMoveLabel->setEnabled( enableMove );
+    //mActionRotateLabel->setEnabled( enableRotate );
+    //mActionChangeLabelProperties->setEnabled( enableChange );
+
+    //mMenuPasteAs->setEnabled( clipboard() && !clipboard()->empty() );
+    //mActionPasteAsNewVector->setEnabled( clipboard() && !clipboard()->empty() );
+    //mActionPasteAsNewMemoryVector->setEnabled( clipboard() && !clipboard()->empty() );
+
+    //updateLayerModifiedActions();
+
+    if ( !layer )
+    {
+        mActionSelectFeatures->setEnabled( false );
+        mActionSelectPolygon->setEnabled( false );
+        mActionSelectFreehand->setEnabled( false );
+//        mActionSelectRadius->setEnabled( false );
+        mActionIdentify->setEnabled( QSettings().value( "/Map/identifyMode", 0 ).toInt() != 0 );
+//        mActionSelectByExpression->setEnabled( false );
+//        mActionLabeling->setEnabled( false );
+//        mActionOpenTable->setEnabled( false );
+        mActionSelectAll->setEnabled( false );
+        mActionInvertSelection->setEnabled( false );
+//        mActionOpenFieldCalc->setEnabled( false );
+//        mActionToggleEditing->setEnabled( false );
+//        mActionToggleEditing->setChecked( false );
+//        mActionSaveLayerEdits->setEnabled( false );
+//        mActionSaveLayerDefinition->setEnabled( false );
+        mActionLayerSaveAs->setEnabled( false );
+//        mActionLayerProperties->setEnabled( false );
+//        mActionLayerSubsetString->setEnabled( false );
+//        mActionAddToOverview->setEnabled( false );
+//        mActionFeatureAction->setEnabled( false );
+//        mActionAddFeature->setEnabled( false );
+//        mActionCircularStringCurvePoint->setEnabled( false );
+//        mActionCircularStringRadius->setEnabled( false );
+//        mActionMoveFeature->setEnabled( false );
+//        mActionRotateFeature->setEnabled( false );
+//        mActionOffsetCurve->setEnabled( false );
+//        mActionNodeTool->setEnabled( false );
+//        mActionDeleteSelected->setEnabled( false );
+//        mActionCutFeatures->setEnabled( false );
+//        mActionCopyFeatures->setEnabled( false );
+//        mActionPasteFeatures->setEnabled( false );
+//        mActionCopyStyle->setEnabled( false );
+//        mActionPasteStyle->setEnabled( false );
+
+//        mUndoWidget->dockContents()->setEnabled( false );
+//        mActionUndo->setEnabled( false );
+//        mActionRedo->setEnabled( false );
+//        mActionSimplifyFeature->setEnabled( false );
+//        mActionAddRing->setEnabled( false );
+//        mActionFillRing->setEnabled( false );
+//        mActionAddPart->setEnabled( false );
+//        mActionDeleteRing->setEnabled( false );
+//        mActionDeletePart->setEnabled( false );
+//        mActionReshapeFeatures->setEnabled( false );
+//        mActionOffsetCurve->setEnabled( false );
+//        mActionSplitFeatures->setEnabled( false );
+//        mActionSplitParts->setEnabled( false );
+//        mActionMergeFeatures->setEnabled( false );
+//        mActionMergeFeatureAttributes->setEnabled( false );
+//        mActionRotatePointSymbols->setEnabled( false );
+//        mActionEnableTracing->setEnabled( false );
+
+//        mActionPinLabels->setEnabled( false );
+//        mActionShowHideLabels->setEnabled( false );
+//        mActionMoveLabel->setEnabled( false );
+//        mActionRotateLabel->setEnabled( false );
+//        mActionChangeLabelProperties->setEnabled( false );
+
+//        mActionLocalHistogramStretch->setEnabled( false );
+//        mActionFullHistogramStretch->setEnabled( false );
+//        mActionLocalCumulativeCutStretch->setEnabled( false );
+//        mActionFullCumulativeCutStretch->setEnabled( false );
+//        mActionIncreaseBrightness->setEnabled( false );
+//        mActionDecreaseBrightness->setEnabled( false );
+//        mActionIncreaseContrast->setEnabled( false );
+//        mActionDecreaseContrast->setEnabled( false );
+        mActionZoomActualSize->setEnabled( false );
+        mActionZoomToLayer->setEnabled( false );
+        return;
+    }
+
+//    mActionLayerProperties->setEnabled( QgsProject::instance()->layerIsEmbedded( layer->id() ).isEmpty() );
+//    mActionAddToOverview->setEnabled( true );
+    mActionZoomToLayer->setEnabled( true );
+
+//    mActionCopyStyle->setEnabled( true );
+//    mActionPasteStyle->setEnabled( clipboard()->hasFormat( QGSCLIPBOARD_STYLE_MIME ) );
+
+    /***********Vector layers****************/
+    if ( layer->type() == QgsMapLayer::VectorLayer )
+    {
+        QgsVectorLayer* vlayer = qobject_cast<QgsVectorLayer *>( layer );
+        QgsVectorDataProvider* dprovider = vlayer->dataProvider();
+
+//        bool isEditable = vlayer->isEditable();
+//        bool layerHasSelection = vlayer->selectedFeatureCount() > 0;
+//        bool layerHasActions = vlayer->actions()->size() || !QgsMapLayerActionRegistry::instance()->mapLayerActions( vlayer ).isEmpty();
+
+//        mActionLocalHistogramStretch->setEnabled( false );
+//        mActionFullHistogramStretch->setEnabled( false );
+//        mActionLocalCumulativeCutStretch->setEnabled( false );
+//        mActionFullCumulativeCutStretch->setEnabled( false );
+//        mActionIncreaseBrightness->setEnabled( false );
+//        mActionDecreaseBrightness->setEnabled( false );
+//        mActionIncreaseContrast->setEnabled( false );
+//        mActionDecreaseContrast->setEnabled( false );
+        mActionZoomActualSize->setEnabled( false );
+//        mActionLabeling->setEnabled( true );
+
+        mActionSelectFeatures->setEnabled( true );
+        mActionSelectPolygon->setEnabled( true );
+        //mActionSelectFreehand->setEnabled( true );
+        //mActionSelectRadius->setEnabled( true );
+        mActionIdentify->setEnabled( true );
+        //mActionSelectByExpression->setEnabled( true );
+//        mActionOpenTable->setEnabled( true );
+        mActionSelectAll->setEnabled( true );
+        mActionInvertSelection->setEnabled( true );
+        //mActionSaveLayerDefinition->setEnabled( true );
+        //mActionLayerSaveAs->setEnabled( true );
+        //mActionCopyFeatures->setEnabled( layerHasSelection );
+        //mActionFeatureAction->setEnabled( layerHasActions );
+
+        //if ( !isEditable && mMapCanvas && mMapCanvas->mapTool()
+        //	&& mMapCanvas->mapTool()->isEditTool() && !mSaveRollbackInProgress )
+        //{
+        //	mMapCanvas->setMapTool( mNonEditMapTool );
+        //}
+
+        //if ( dprovider )
+        //{
+        //	bool canChangeAttributes = dprovider->capabilities() & QgsVectorDataProvider::ChangeAttributeValues;
+        //	bool canDeleteFeatures = dprovider->capabilities() & QgsVectorDataProvider::DeleteFeatures;
+        //	bool canAddFeatures = dprovider->capabilities() & QgsVectorDataProvider::AddFeatures;
+        //	bool canSupportEditing = dprovider->capabilities() & QgsVectorDataProvider::EditingCapabilities;
+        //	bool canChangeGeometry = dprovider->capabilities() & QgsVectorDataProvider::ChangeGeometries;
+
+        //	mActionLayerSubsetString->setEnabled( !isEditable && dprovider->supportsSubsetString() );
+
+        //	mActionToggleEditing->setEnabled( canSupportEditing && !vlayer->isReadOnly() );
+        //	mActionToggleEditing->setChecked( canSupportEditing && isEditable );
+        //	mActionSaveLayerEdits->setEnabled( canSupportEditing && isEditable && vlayer->isModified() );
+        //	mUndoWidget->dockContents()->setEnabled( canSupportEditing && isEditable );
+        //	mActionUndo->setEnabled( canSupportEditing );
+        //	mActionRedo->setEnabled( canSupportEditing );
+
+        //	//start editing/stop editing
+        //	if ( canSupportEditing )
+        //	{
+        //		updateUndoActions();
+        //	}
+
+        //	mActionPasteFeatures->setEnabled( isEditable && canAddFeatures && !clipboard()->empty() );
+
+        //	mActionAddFeature->setEnabled( isEditable && canAddFeatures );
+        //	mActionCircularStringCurvePoint->setEnabled( isEditable && ( canAddFeatures || canChangeGeometry ) && vlayer->geometryType() != QGis::Point );
+        //	mActionCircularStringRadius->setEnabled( isEditable && ( canAddFeatures || canChangeGeometry ) );
+
+        //	//does provider allow deleting of features?
+        //	mActionDeleteSelected->setEnabled( isEditable && canDeleteFeatures && layerHasSelection );
+        //	mActionCutFeatures->setEnabled( isEditable && canDeleteFeatures && layerHasSelection );
+
+        //	//merge tool needs editable layer and provider with the capability of adding and deleting features
+        //	if ( isEditable && canChangeAttributes )
+        //	{
+        //		mActionMergeFeatures->setEnabled( layerHasSelection && canDeleteFeatures && canAddFeatures );
+        //		mActionMergeFeatureAttributes->setEnabled( layerHasSelection );
+        //	}
+        //	else
+        //	{
+        //		mActionMergeFeatures->setEnabled( false );
+        //		mActionMergeFeatureAttributes->setEnabled( false );
+        //	}
+
+        //	bool isMultiPart = QGis::isMultiType( vlayer->wkbType() ) || !dprovider->doesStrictFeatureTypeCheck();
+
+        //	// moving enabled if geometry changes are supported
+        //	mActionAddPart->setEnabled( isEditable && canChangeGeometry );
+        //	mActionDeletePart->setEnabled( isEditable && canChangeGeometry );
+        //	mActionMoveFeature->setEnabled( isEditable && canChangeGeometry );
+        //	mActionRotateFeature->setEnabled( isEditable && canChangeGeometry );
+        //	mActionNodeTool->setEnabled( isEditable && canChangeGeometry );
+
+        //	mActionEnableTracing->setEnabled( isEditable && canAddFeatures &&
+        //		( vlayer->geometryType() == QGis::Line || vlayer->geometryType() == QGis::Polygon ) );
+
+        //	if ( vlayer->geometryType() == QGis::Point )
+        //	{
+        //		mActionAddFeature->setIcon( QgsApplication::getThemeIcon( "/mActionCapturePoint.svg" ) );
+
+        //		mActionAddRing->setEnabled( false );
+        //		mActionFillRing->setEnabled( false );
+        //		mActionReshapeFeatures->setEnabled( false );
+        //		mActionSplitFeatures->setEnabled( false );
+        //		mActionSplitParts->setEnabled( false );
+        //		mActionSimplifyFeature->setEnabled( false );
+        //		mActionDeleteRing->setEnabled( false );
+        //		mActionRotatePointSymbols->setEnabled( false );
+        //		mActionOffsetCurve->setEnabled( false );
+
+        //		if ( isEditable && canChangeAttributes )
+        //		{
+        //			if ( QgsMapToolRotatePointSymbols::layerIsRotatable( vlayer ) )
+        //			{
+        //				mActionRotatePointSymbols->setEnabled( true );
+        //			}
+        //		}
+        //	}
+        //	else if ( vlayer->geometryType() == QGis::Line )
+        //	{
+        //		mActionAddFeature->setIcon( QgsApplication::getThemeIcon( "/mActionCaptureLine.svg" ) );
+
+        //		mActionReshapeFeatures->setEnabled( isEditable && canChangeGeometry );
+        //		mActionSplitFeatures->setEnabled( isEditable && canAddFeatures );
+        //		mActionSplitParts->setEnabled( isEditable && canChangeGeometry && isMultiPart );
+        //		mActionSimplifyFeature->setEnabled( isEditable && canChangeGeometry );
+        //		mActionOffsetCurve->setEnabled( isEditable && canAddFeatures && canChangeAttributes );
+
+        //		mActionAddRing->setEnabled( false );
+        //		mActionFillRing->setEnabled( false );
+        //		mActionDeleteRing->setEnabled( false );
+        //	}
+        //	else if ( vlayer->geometryType() == QGis::Polygon )
+        //	{
+        //		mActionAddFeature->setIcon( QgsApplication::getThemeIcon( "/mActionCapturePolygon.svg" ) );
+
+        //		mActionAddRing->setEnabled( isEditable && canChangeGeometry );
+        //		mActionFillRing->setEnabled( isEditable && canChangeGeometry );
+        //		mActionReshapeFeatures->setEnabled( isEditable && canChangeGeometry );
+        //		mActionSplitFeatures->setEnabled( isEditable && canAddFeatures );
+        //		mActionSplitParts->setEnabled( isEditable && canChangeGeometry && isMultiPart );
+        //		mActionSimplifyFeature->setEnabled( isEditable && canChangeGeometry );
+        //		mActionDeleteRing->setEnabled( isEditable && canChangeGeometry );
+        //		mActionOffsetCurve->setEnabled( false );
+        //	}
+        //	else if ( vlayer->geometryType() == QGis::NoGeometry )
+        //	{
+        //		mActionAddFeature->setIcon( QgsApplication::getThemeIcon( "/mActionNewTableRow.png" ) );
+        //	}
+
+        //	mActionOpenFieldCalc->setEnabled( true );
+
+        //	return;
+        //}
+        //else
+        //{
+        //	mUndoWidget->dockContents()->setEnabled( false );
+        //	mActionUndo->setEnabled( false );
+        //	mActionRedo->setEnabled( false );
+        //}
+
+//        mActionLayerSubsetString->setEnabled( false );
+    } //end vector layer block
+    /*************Raster layers*************/
+    else if ( layer->type() == QgsMapLayer::RasterLayer )
+    {
+//        const QgsRasterLayer *rlayer = qobject_cast<const QgsRasterLayer *>( layer );
+//        if ( rlayer->dataProvider()->dataType( 1 ) != QGis::ARGB32
+//            && rlayer->dataProvider()->dataType( 1 ) != QGis::ARGB32_Premultiplied )
+//        {
+//            if ( rlayer->dataProvider()->capabilities() & QgsRasterDataProvider::Size )
+//            {
+//                mActionFullHistogramStretch->setEnabled( true );
+//            }
+//            else
+//            {
+//                // it would hang up reading the data for WMS for example
+//                mActionFullHistogramStretch->setEnabled( false );
+//            }
+//            mActionLocalHistogramStretch->setEnabled( true );
+//        }
+//        else
+//        {
+//            mActionLocalHistogramStretch->setEnabled( false );
+//            mActionFullHistogramStretch->setEnabled( false );
+//        }
+
+//        mActionLocalCumulativeCutStretch->setEnabled( true );
+//        mActionFullCumulativeCutStretch->setEnabled( true );
+//        mActionIncreaseBrightness->setEnabled( true );
+//        mActionDecreaseBrightness->setEnabled( true );
+//        mActionIncreaseContrast->setEnabled( true );
+//        mActionDecreaseContrast->setEnabled( true );
+
+//        mActionLayerSubsetString->setEnabled( false );
+        //mActionFeatureAction->setEnabled( false );
+        mActionSelectFeatures->setEnabled( false );
+        mActionSelectPolygon->setEnabled( false );
+        //mActionSelectFreehand->setEnabled( false );
+        //mActionSelectRadius->setEnabled( false );
+        mActionZoomActualSize->setEnabled( true );
+//        mActionOpenTable->setEnabled( false );
+        mActionSelectAll->setEnabled( false );
+        mActionInvertSelection->setEnabled( false );
+        //mActionSelectByExpression->setEnabled( false );
+        //mActionOpenFieldCalc->setEnabled( false );
+//        mActionToggleEditing->setEnabled( false );
+//        mActionToggleEditing->setChecked( false );
+        //mActionSaveLayerEdits->setEnabled( false );
+        //mUndoWidget->dockContents()->setEnabled( false );
+        //mActionUndo->setEnabled( false );
+        //mActionRedo->setEnabled( false );
+        //mActionSaveLayerDefinition->setEnabled( true );
+        //mActionLayerSaveAs->setEnabled( true );
+        //mActionAddFeature->setEnabled( false );
+        //mActionCircularStringCurvePoint->setEnabled( false );
+        //mActionCircularStringRadius->setEnabled( false );
+        //mActionDeleteSelected->setEnabled( false );
+        //mActionAddRing->setEnabled( false );
+        //mActionFillRing->setEnabled( false );
+        //mActionAddPart->setEnabled( false );
+        //mActionNodeTool->setEnabled( false );
+        //mActionMoveFeature->setEnabled( false );
+        //mActionRotateFeature->setEnabled( false );
+        //mActionOffsetCurve->setEnabled( false );
+        //mActionCopyFeatures->setEnabled( false );
+        //mActionCutFeatures->setEnabled( false );
+        //mActionPasteFeatures->setEnabled( false );
+        //mActionRotatePointSymbols->setEnabled( false );
+        //mActionDeletePart->setEnabled( false );
+        //mActionDeleteRing->setEnabled( false );
+        //mActionSimplifyFeature->setEnabled( false );
+        //mActionReshapeFeatures->setEnabled( false );
+        //mActionSplitFeatures->setEnabled( false );
+        //mActionSplitParts->setEnabled( false );
+//        mActionLabeling->setEnabled( false );
+
+        //NOTE: 此项检查不会真正增加任何保护，因为它是所谓的负载不是在层选择/激活
+        //If you load a layer with a provider and idenitfy ability then load another without, the tool would be disabled for both
+
+        //启用识别工具（GDAL数据集画没有提供）
+        //但关闭，如果数据提供程序存在，并没有识别能力
+        mActionIdentify->setEnabled( true );
+
+        QSettings settings;
+        int identifyMode = settings.value( "/Map/identifyMode", 0 ).toInt();
+        if ( identifyMode == 0 )
+        {
+            const QgsRasterLayer *rlayer = qobject_cast<const QgsRasterLayer *>( layer );
+            const QgsRasterDataProvider* dprovider = rlayer->dataProvider();
+            if ( dprovider )
+            {
+                // 并提供允许识别地图工具?
+                if ( dprovider->capabilities() & QgsRasterDataProvider::Identify )
+                {
+                    mActionIdentify->setEnabled( true );
+                }
+                else
+                {
+                    mActionIdentify->setEnabled( false );
+                }
+            }
+        }
+    }
+}
+
 void MainWindow::autoSelectAddedLayer(QList<QgsMapLayer *> layers)
 {
     if ( !layers.isEmpty() )
@@ -611,6 +1078,17 @@ void MainWindow::initActions()
     mActionIdentify->setIcon(eqiApplication::getThemeIcon("mActionIdentify.svg"));
     connect( mActionIdentify, SIGNAL( triggered() ), this, SLOT( identify() ) );
 
+//    mActionMeasure = new QAction("测量距离", this);
+//    mActionMeasure->setShortcut(tr("Ctrl+Shift+M"));
+//    mActionMeasure->setStatusTip("测量距离");
+//    mActionMeasure->setIcon(eqiApplication::getThemeIcon("mActionMeasure.png"));
+//    connect( mActionMeasure, SIGNAL( triggered() ), this, SLOT( measure() ) );
+
+//    mActionMeasureArea = new QAction("测量面积", this);
+//    mActionMeasureArea->setShortcut(tr("Ctrl+Shift+J"));
+//    mActionMeasureArea->setStatusTip("测量面积");
+//    mActionMeasureArea->setIcon(eqiApplication::getThemeIcon("mActionMeasureArea.png"));
+//    connect( mActionMeasureArea, SIGNAL( triggered() ), this, SLOT( measureArea() ) );
     /*--------------------------------------------图层操作---------------------------------------------*/
     mActionRemoveLayer = new QAction("移除图层/组", this);
     mActionRemoveLayer->setShortcut(tr("Ctrl+D"));
@@ -660,6 +1138,11 @@ void MainWindow::initActions()
     mActionSketchMapSwitch->setStatusTip("切换显示航摄略图显示范围。");
     mActionSketchMapSwitch->setIcon(eqiApplication::getThemeIcon("eqi/other/SketchMapSwitch.png"));
     connect( mActionSketchMapSwitch, SIGNAL( triggered() ), this, SLOT( pSwitchSketchMap() ) );
+
+    mActionPosLabelSwitch = new QAction("切换略图编号", this);
+    mActionPosLabelSwitch->setStatusTip("切换显示航摄略图POS编号。");
+    mActionPosLabelSwitch->setIcon(eqiApplication::getThemeIcon("eqi/other/disabledPosLabel.png"));
+    connect( mActionPosLabelSwitch, SIGNAL( triggered() ), this, SLOT( switchPosLabel() ) );
 
     mActionPPLinkPhoto = new QAction("PP动态联动", this);
     mActionPPLinkPhoto->setStatusTip("创建POS文件与photo相片之间的联动关系。");
@@ -722,6 +1205,16 @@ void MainWindow::initActions()
     mActionSaveSelect->setStatusTip("将选择的略图、POS、相片数据保存到指定路径中，保持一套数据完整性。");
     mActionSaveSelect->setIcon(eqiApplication::getThemeIcon("eqi/other/saveSelect.png"));
     connect( mActionSaveSelect, SIGNAL( triggered() ), this, SLOT( saveSelect() ) );
+
+    mActionModifyPos = new QAction("修改POS文件", this);
+    mActionModifyPos->setStatusTip("将POS文件内容按照相片修改为一致。");
+    mActionModifyPos->setIcon(eqiApplication::getThemeIcon("eqi/other/modifyPos.png"));
+    connect( mActionModifyPos, SIGNAL( triggered() ), this, SLOT( modifyPos() ) );
+
+    mActionModifyPhoto = new QAction("修改相片文件", this);
+    mActionModifyPhoto->setStatusTip("将相片文件夹内容按照POS文件修改为一致。");
+    mActionModifyPhoto->setIcon(eqiApplication::getThemeIcon("eqi/other/modifyPhoto.png"));
+    connect( mActionModifyPhoto, SIGNAL( triggered() ), this, SLOT( modifyPhoto() ) );
 
     mActionSelectSetting = new QAction("设置", this);
     mActionSelectSetting->setIcon(eqiApplication::getThemeIcon("propertyicons/settings.svg"));
@@ -806,7 +1299,7 @@ void MainWindow::initActions()
     mActionAddOgrLayer = new QAction("添加矢量图层...", this);
     mActionAddOgrLayer->setShortcut(tr("Ctrl+Shift+V"));
     mActionAddOgrLayer->setStatusTip("添加矢量图层...");
-    mActionAddOgrLayer->setIcon(eqiApplication::getThemeIcon("eqi/1/mActionAddOgrLayer.png"));
+    mActionAddOgrLayer->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionAddOgrLayer.png"));
     connect( mActionAddOgrLayer, SIGNAL( triggered() ), this, SLOT( addVectorLayer() ) );
 
     mActionAddOgrRaster = new QAction("添加栅格图层...", this);
@@ -817,14 +1310,19 @@ void MainWindow::initActions()
 
     mActionLayerSaveAs = new QAction("另存为(&S)...", this);
     mActionLayerSaveAs->setStatusTip("另存为");
-    mActionLayerSaveAs->setIcon(eqiApplication::getThemeIcon("eqi/1/mActionLayerSaveAs.png"));
+    mActionLayerSaveAs->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionLayerSaveAs.png"));
     connect( mActionLayerSaveAs, SIGNAL( triggered() ), this, SLOT( saveAsFile() ) );
+
+    mActionAbout = new QAction("关于", this);
+    mActionAbout->setStatusTip("关于");
+    mActionAbout->setIcon(eqiApplication::getThemeIcon("eqi/other/about.png"));
+    connect( mActionAbout, SIGNAL( triggered() ), this, SLOT( about() ) );
 }
 
 void MainWindow::initTabTools()
 {
     // 格式化tooltab需要的
-    QSize size(30, 30);
+    QSize size(40, 40);
 
     QLabel *label = new QLabel(this);
     label->setFixedWidth (15);
@@ -863,6 +1361,11 @@ void MainWindow::initTabTools()
     m_MB->addWidget(new QLabel(label));
     m_MB->addAction(mActionIdentify);
 
+    QWidget *spacer_MB = new QWidget(this);
+    spacer_MB->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_MB->addWidget(spacer_MB);
+    m_MB->addAction(mActionAbout);
+
     // 初始化“无人机数据管理”tab
     tab_uavDataManagement *m_uDM = new tab_uavDataManagement(this);
     m_uDM->setToolButtonStyle(Qt::ToolButtonIconOnly);
@@ -886,9 +1389,16 @@ void MainWindow::initTabTools()
     m_uDM->addWidget(new QLabel(label));
     m_uDM->addAction(mActionSketchMapSwitch);
     m_uDM->addWidget(new QLabel(label));
+    m_uDM->addAction(mActionPosLabelSwitch);
+    m_uDM->addWidget(new QLabel(label));
     m_uDM->addSeparator(); //---
     m_uDM->addWidget(new QLabel(label));
     m_uDM->addAction(mActionPosSetting);
+
+    QWidget *spacer_uDM = new QWidget(this);
+    spacer_uDM->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_uDM->addWidget(spacer_uDM);
+    m_uDM->addAction(mActionAbout);
 
     // 初始化“航摄数据预处理”tab
     tab_checkAerialPhoto *m_CAP = new tab_checkAerialPhoto(this);
@@ -917,7 +1427,18 @@ void MainWindow::initTabTools()
     m_CAP->addWidget(new QLabel(label));
     m_CAP->addSeparator(); //---
     m_CAP->addWidget(new QLabel(label));
+    m_CAP->addAction(mActionModifyPos);
+    m_CAP->addWidget(new QLabel(label));
+    m_CAP->addAction(mActionModifyPhoto);
+    m_CAP->addWidget(new QLabel(label));
+    m_CAP->addSeparator(); //---
+    m_CAP->addWidget(new QLabel(label));
     m_CAP->addAction(mActionSelectSetting);
+
+    QWidget *spacer_CAP = new QWidget(this);
+    spacer_CAP->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_CAP->addWidget(spacer_CAP);
+    m_CAP->addAction(mActionAbout);
 
     // 初始化“要素选择”tab
     tab_selectFeatures *m_SF = new tab_selectFeatures(this);
@@ -938,6 +1459,11 @@ void MainWindow::initTabTools()
     m_SF->addWidget(new QLabel(label));
     m_SF->addAction(mActionInvertSelection);
 
+    QWidget *spacer_SF = new QWidget(this);
+    spacer_SF->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_SF->addWidget(spacer_SF);
+    m_SF->addAction(mActionAbout);
+
     // 初始化“坐标转换”tab
     tab_coordinateTransformation *m_tCTF = new tab_coordinateTransformation(this);
     m_tCTF->setToolButtonStyle(Qt::ToolButtonIconOnly);
@@ -946,6 +1472,11 @@ void MainWindow::initTabTools()
     m_tCTF->addAction(mActionTextTranfrom);
     m_tCTF->addWidget(new QLabel(label));
     m_tCTF->addAction(mActionDegreeMutual);
+
+    QWidget *spacer_tCTF = new QWidget(this);
+    spacer_tCTF->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_tCTF->addWidget(spacer_tCTF);
+    m_tCTF->addAction(mActionAbout);
 
     // 初始化“标准分幅管理”tab
     tab_fractalManagement *m_tFM = new tab_fractalManagement(this);
@@ -964,6 +1495,11 @@ void MainWindow::initTabTools()
     m_tFM->addWidget(new QLabel(label));
     m_tFM->addAction(mActionPtoTKSetting);
 
+    QWidget *spacer_tFM = new QWidget(this);
+    spacer_tFM->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_tFM->addWidget(spacer_tFM);
+    m_tFM->addAction(mActionAbout);
+
     // 初始化“数据管理”tab
     tab_dataManagement *m_tDM = new tab_dataManagement(this);
     m_tDM->setToolButtonStyle(Qt::ToolButtonIconOnly);
@@ -974,6 +1510,11 @@ void MainWindow::initTabTools()
     m_tDM->addAction(mActionAddOgrRaster);
     m_tDM->addWidget(new QLabel(label));
     m_tDM->addAction(mActionLayerSaveAs);
+
+    QWidget *spacer_tDM = new QWidget(this);
+    spacer_tDM->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_tDM->addWidget(spacer_tDM);
+    m_tDM->addAction(mActionAbout);
 
     // 添加tab到窗口
     toolTab = new QTabWidget;
@@ -1029,7 +1570,6 @@ void MainWindow::initStatusBar()
 
     ui->statusBar->addPermanentWidget( mScaleEdit, 0 );
     connect( mScaleEdit, SIGNAL( scaleChanged() ), this, SLOT( userScale() ) );
-
 
     if ( QgsMapCanvas::rotationEnabled() )
     {
@@ -1217,8 +1757,8 @@ void MainWindow::createCanvasTools()
     mMapTools.mZoomOut->setAction( mActionZoomOut );
     mMapTools.mPan = new QgsMapToolPan( mMapCanvas );
     mMapTools.mPan->setAction( mActionPan );
-//    mMapTools.mIdentify = new QgsMapToolIdentifyAction( mMapCanvas );
-//    mMapTools.mIdentify->setAction( mActionIdentify );
+    mMapTools.mIdentify = new QgsMapToolIdentifyAction( mMapCanvas );
+    mMapTools.mIdentify->setAction( mActionIdentify );
     //connect( mMapTools.mIdentify, SIGNAL( copyToClipboard( QgsFeatureStore & ) ),
     //	this, SLOT( copyFeatures( QgsFeatureStore & ) ) );
     //mMapTools.mFeatureAction = new QgsMapToolFeatureAction( mMapCanvas );
@@ -1302,6 +1842,115 @@ void MainWindow::createCanvasTools()
 //	mMapTools.mChangeLabelProperties->setAction( mActionChangeLabelProperties );
     //ensure that non edit tool is initialized or we will get crashes in some situations
     mNonEditMapTool = mMapTools.mPan;
+}
+
+void MainWindow::setupConnections()
+{
+    // connect the "cleanup" slot
+    //connect( qApp, SIGNAL( aboutToQuit() ), this, SLOT( saveWindowState() ) );
+
+    // 当鼠标移到窗口（在状态栏中显示参照坐标系）
+    connect( mMapCanvas, SIGNAL( xyCoordinates( const QgsPoint & ) ),
+        this, SLOT( saveLastMousePosition( const QgsPoint & ) ) );
+    connect( mMapCanvas, SIGNAL( extentsChanged() ),
+        this, SLOT( extentChanged() ) );
+    connect( mMapCanvas, SIGNAL( scaleChanged( double ) ),
+        this, SLOT( showScale( double ) ) );
+    connect( mMapCanvas, SIGNAL( rotationChanged( double ) ),
+        this, SLOT( showRotation() ) );
+    connect( mMapCanvas, SIGNAL( scaleChanged( double ) ),
+        this, SLOT( updateMouseCoordinatePrecision() ) );
+    //connect( mMapCanvas, SIGNAL( mapToolSet( QgsMapTool *, QgsMapTool * ) ),
+    //	this, SLOT( mapToolChanged( QgsMapTool *, QgsMapTool * ) ) );
+    connect( mMapCanvas, SIGNAL( selectionChanged( QgsMapLayer * ) ),
+        this, SLOT( selectionChanged( QgsMapLayer * ) ) );
+    connect( mMapCanvas, SIGNAL( extentsChanged() ),
+        this, SLOT( markDirty() ) );
+    connect( mMapCanvas, SIGNAL( layersChanged() ),
+        this, SLOT( markDirty() ) );	//通知一个项目有变化
+
+    connect( mMapCanvas, SIGNAL( zoomLastStatusChanged( bool ) ),
+        mActionZoomLast, SLOT( setEnabled( bool ) ) );
+    connect( mMapCanvas, SIGNAL( zoomNextStatusChanged( bool ) ),
+        mActionZoomNext, SLOT( setEnabled( bool ) ) );
+    connect( mRenderSuppressionCBox, SIGNAL( toggled( bool ) ),
+        mMapCanvas, SLOT( setRenderFlag( bool ) ) );
+
+    //connect( mMapCanvas, SIGNAL( destinationCrsChanged() ),
+    //	this, SLOT( reprojectAnnotations() ) );
+
+    // connect 地图画布按键事件，所以我们可以检查，如果选择的要素集合必须被删除
+    connect( mMapCanvas, SIGNAL( keyPressed( QKeyEvent * ) ),
+        this, SLOT( mapCanvas_keyPressed( QKeyEvent * ) ) );
+
+    //// connect 渲染器
+    connect( mMapCanvas, SIGNAL( hasCrsTransformEnabledChanged( bool ) ),
+        this, SLOT( hasCrsTransformEnabled( bool ) ) );
+    connect( mMapCanvas, SIGNAL( destinationCrsChanged() ),
+        this, SLOT( destinationCrsChanged() ) );
+
+    // connect legend signals
+    connect( mLayerTreeView, SIGNAL( currentLayerChanged( QgsMapLayer * ) ),
+        this, SLOT( activateDeactivateLayerRelatedActions( QgsMapLayer * ) ) );
+    connect( mLayerTreeView->selectionModel(), SIGNAL( selectionChanged( QItemSelection, QItemSelection ) ),
+        this, SLOT( legendLayerSelectionChanged() ) );
+    connect( mLayerTreeView->layerTreeModel()->rootGroup(), SIGNAL( addedChildren( QgsLayerTreeNode*, int, int ) ),
+        this, SLOT( markDirty() ) );
+    connect( mLayerTreeView->layerTreeModel()->rootGroup(), SIGNAL( addedChildren( QgsLayerTreeNode*, int, int ) ),
+        this, SLOT( updateNewLayerInsertionPoint() ) );
+    connect( mLayerTreeView->layerTreeModel()->rootGroup(), SIGNAL( removedChildren( QgsLayerTreeNode*, int, int ) ),
+        this, SLOT( markDirty() ) );
+    connect( mLayerTreeView->layerTreeModel()->rootGroup(), SIGNAL( removedChildren( QgsLayerTreeNode*, int, int ) ),
+        this, SLOT( updateNewLayerInsertionPoint() ) );
+    connect( mLayerTreeView->layerTreeModel()->rootGroup(), SIGNAL( visibilityChanged( QgsLayerTreeNode*, Qt::CheckState ) ),
+        this, SLOT( markDirty() ) );
+    connect( mLayerTreeView->layerTreeModel()->rootGroup(), SIGNAL( customPropertyChanged( QgsLayerTreeNode*, QString ) ),
+        this, SLOT( markDirty() ) );
+
+    // connect 图层注册
+    connect( QgsMapLayerRegistry::instance(), SIGNAL( layersAdded( QList<QgsMapLayer *> ) ),
+        this, SLOT( layersWereAdded( QList<QgsMapLayer *> ) ) );
+    connect( QgsMapLayerRegistry::instance(),
+        SIGNAL( layersWillBeRemoved( QStringList ) ),
+        this, SLOT( removingLayers( QStringList ) ) );
+
+    //// connect initialization signal
+    //connect( this, SIGNAL( initializationCompleted() ),
+    //	this, SLOT( fileOpenAfterLaunch() ) );
+
+    //// Connect warning dialog from project reading
+    //connect( QgsProject::instance(), SIGNAL( oldProjectVersionWarning( QString ) ),
+    //	this, SLOT( oldProjectVersionWarning( QString ) ) );
+    //connect( QgsProject::instance(), SIGNAL( layerLoaded( int, int ) ),
+    //	this, SLOT( showProgress( int, int ) ) );
+    //connect( QgsProject::instance(), SIGNAL( loadingLayer( QString ) ),
+    //	this, SLOT( showStatusMessage( QString ) ) );
+    //connect( QgsProject::instance(), SIGNAL( readProject( const QDomDocument & ) ),
+    //	this, SLOT( readProject( const QDomDocument & ) ) );
+    //connect( QgsProject::instance(), SIGNAL( writeProject( QDomDocument & ) ),
+    //	this, SLOT( writeProject( QDomDocument & ) ) );
+    //connect( QgsProject::instance(), SIGNAL( writeProject( QDomDocument& ) ),
+    //	this, SLOT( writeAnnotationItemsToProject( QDomDocument& ) ) );
+
+    //connect( QgsProject::instance(), SIGNAL( readProject( const QDomDocument & ) ), this, SLOT( loadComposersFromProject( const QDomDocument& ) ) );
+    //connect( QgsProject::instance(), SIGNAL( readProject( const QDomDocument & ) ), this, SLOT( loadAnnotationItemsFromProject( const QDomDocument& ) ) );
+
+    //connect( this, SIGNAL( projectRead() ),
+    //	this, SLOT( fileOpenedOKAfterLaunch() ) );
+
+    //// connect preview modes actions
+    //connect( mActionPreviewModeOff, SIGNAL( triggered() ), this, SLOT( disablePreviewMode() ) );
+    //connect( mActionPreviewModeGrayscale, SIGNAL( triggered() ), this, SLOT( activateGrayscalePreview() ) );
+    //connect( mActionPreviewModeMono, SIGNAL( triggered() ), this, SLOT( activateMonoPreview() ) );
+    //connect( mActionPreviewProtanope, SIGNAL( triggered() ), this, SLOT( activateProtanopePreview() ) );
+    //connect( mActionPreviewDeuteranope, SIGNAL( triggered() ), this, SLOT( activateDeuteranopePreview() ) );
+
+    //// handle deprecated labels in project for QGIS 2.0
+    //connect( this, SIGNAL( newProject() ),
+    //	this, SLOT( checkForDeprecatedLabelsInProject() ) );
+    //connect( this, SIGNAL( projectRead() ),
+    //	this, SLOT( checkForDeprecatedLabelsInProject() ) );
+
 }
 
 void MainWindow::askUserForOGRSublayers(QgsVectorLayer *layer)
@@ -1534,6 +2183,45 @@ void MainWindow::pSwitchSketchMap()
     MainWindow::instance()->refreshMapCanvas();
 
     isSmSmall = !isSmSmall;
+}
+
+void MainWindow::switchPosLabel()
+{
+    if (!sketchMapLayer && !sketchMapLayer->isValid()) return;
+
+    if (isPosLabel)
+    {
+        QgsPalLayerSettings layerSettings;
+        layerSettings.enabled = false;
+        layerSettings.writeToLayer(sketchMapLayer);
+        mMapCanvas->refresh();
+        isPosLabel = !isPosLabel;
+        mActionPosLabelSwitch->setIcon(eqiApplication::getThemeIcon("eqi/other/disabledPosLabel.png"));
+    }
+    else
+    {
+        // 定义一个QgsPalLayerSettings变量，并启用他的属性设置
+        QgsPalLayerSettings layerSettings;
+        layerSettings.enabled = true;
+
+        // 设置显示字段
+        layerSettings.fieldName = "相片编号";
+        // 设置位置参考的中心点
+        layerSettings.centroidWhole = true;
+        // 设置字体颜色
+        layerSettings.textColor = QColor( 0, 0, 0 );
+        // 设置字体和大小
+        layerSettings.textFont = QFont( "微软雅黑", 12 );
+        // 阴影的角度, 阴影与Label的距离
+        layerSettings.shadowDraw = true;
+        layerSettings.shadowOffsetAngle = 135;
+        layerSettings.shadowOffsetDist = 1;
+
+        layerSettings.writeToLayer(sketchMapLayer);
+        mMapCanvas->refresh();
+        isPosLabel = !isPosLabel;
+        mActionPosLabelSwitch->setIcon(eqiApplication::getThemeIcon("eqi/other/diskplayText.png"));
+    }
 }
 
 //void MainWindow::initMenus()
@@ -1877,6 +2565,86 @@ void MainWindow::saveSelect()
     }
 }
 
+void MainWindow::modifyPos()
+{
+    if (!pPPInter)
+    {
+        QgsMessageLog::logMessage("需要先创建POS与相片的联动关系。");
+        return;
+    }
+
+    QStringList willdel = pPPInter->modifyPos();
+    if (willdel.isEmpty())
+    {
+        QgsMessageLog::logMessage("没有找到需要删除的POS记录。");
+        return;
+    }
+
+    // 删除POS
+    if (pPosdp->isValid())
+        pPosdp->deletePosRecords(willdel);
+    else
+        QgsMessageLog::logMessage("删除POS记录：没有载入POS文件，已忽略。");
+
+    // 删除航飞略图
+    if (sketchMapLayer && sketchMapLayer->isValid())
+    {
+        deleteSketchMap(willdel);
+        QgsMessageLog::logMessage(QString("共删除%1项POS记录。").arg(willdel.size()));
+    }
+    else
+        QgsMessageLog::logMessage("删除航摄略图：无效的航摄略图，已忽略。");
+}
+
+void MainWindow::modifyPhoto()
+{
+    if (!pPPInter)
+    {
+        QgsMessageLog::logMessage("需要先创建POS与相片的联动关系。");
+        return;
+    }
+    QStringList willdel = pPPInter->modifyPhoto();
+    if (willdel.isEmpty())
+    {
+        QgsMessageLog::logMessage("没有找到需要删除的相片文件。");
+        return;
+    }
+
+    QString delPath;
+    int iDelete = mSettings.value("/eqi/options/selectEdit/delete", DELETE_DIR).toInt();
+
+    if (iDelete == DELETE_DIR) // 移动到临时文件夹中
+    {
+        QString autoPath = mSettings.value("/eqi/pos/lePosFile", "").toString();
+        autoPath = QFileInfo(autoPath).path();
+
+        QDateTime current_date_time = QDateTime::currentDateTime();
+        QString current_date = current_date_time.toString("yyyy-MM-dd");
+        autoPath = QString("%1/删除的相片-%3").arg(autoPath).arg(current_date);
+
+        if (!QDir(autoPath).exists())
+        {
+            QDir dir;
+            if ( !dir.mkpath(autoPath) )
+            {
+                QgsMessageLog::logMessage(QString("删除航摄数据 : \t自动创建文件夹失败，请手动指定。"));
+                return;
+            }
+        }
+
+        delPath = autoPath;
+    }
+
+    // 删除相片
+    if (pPPInter && pPPInter->isAlllinked())
+    {
+        pPPInter->delPhoto(willdel, delPath);
+        QgsMessageLog::logMessage(QString("共删除航摄相片：%1张。").arg(willdel.size()));
+    }
+    else
+        QgsMessageLog::logMessage("删除相片：POS与相片没有建立联动关系，或POS与相片未完全对应，已忽略。");
+}
+
 void MainWindow::selectSetting()
 {
     dialog_selectSetting *selectDialog = new dialog_selectSetting(this);
@@ -2014,6 +2782,17 @@ void MainWindow::showProgress(int theProgress, int theTotalSteps)
                 qApp->processEvents();
             }
         }
+    }
+}
+
+void MainWindow::showScale(double theScale)
+{
+    mScaleEdit->setScale( 1.0 / theScale );
+
+    // 更新标签大小
+    if ( mScaleEdit->width() > mScaleEdit->minimumWidth() )
+    {
+        mScaleEdit->setMinimumWidth( mScaleEdit->width() );
     }
 }
 

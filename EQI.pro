@@ -113,7 +113,15 @@ SOURCES += \
     qgis/app/qgsmaptoolselectrectangle.cpp \
     ui/dialog/dialog_selectsetting.cpp \
     ui/toolTab/tab_checkaerialphoto.cpp \
-    eqi/eqianalysisaerialphoto.cpp
+    eqi/eqianalysisaerialphoto.cpp \
+    ui/dialog/dialog_about.cpp \
+    qgis/app/qgsmaptoolidentifyaction.cpp \
+    qgis/app/qgsidentifyresultsdialog.cpp \
+    qgis/app/qgsrasterlayerproperties.cpp \
+    qgis/app/qgsvectorlayerproperties.cpp \
+    qgis/app/qgsjoindialog.cpp \
+    qgis/app/qgsattributeactiondialog.cpp \
+    qgis/app/qgsdiagramproperties.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -154,7 +162,16 @@ HEADERS += \
     qgis/app/qgsmaptoolselectrectangle.h \
     ui/dialog/dialog_selectsetting.h \
     ui/toolTab/tab_checkaerialphoto.h \
-    eqi/eqianalysisaerialphoto.h
+    eqi/eqianalysisaerialphoto.h \
+    ui/dialog/dialog_about.h \
+    qgis/app/qgsmaptoolidentifyaction.h \
+    qgis/app/qgsidentifyresultsdialog.h \
+    qgis/app/qgsrasterlayerproperties.h \
+    qgis/app/qgsvectorlayerproperties.h \
+    qgis/app/qgsjoindialog.h \
+    qgis/app/qgsattributeactiondialog.h \
+    qgis/plugins/qgsapplydialog.h \
+    qgis/app/qgsdiagramproperties.h
 
 FORMS += \
         mainwindow.ui \
@@ -176,7 +193,10 @@ FORMS += \
     ui/dialog/dialog_possetting.ui \
     ui/toolTab/tab_selectfeatures.ui \
     ui/dialog/dialog_selectsetting.ui \
-    ui/toolTab/tab_checkaerialphoto.ui
+    ui/toolTab/tab_checkaerialphoto.ui \
+    ui/dialog/dialog_about.ui \
+    ui/qgis/qgsjoindialogbase.ui \
+    ui/qgis/qgsattributeactiondialogbase.ui
 
 RESOURCES += \
     Resources/images/images.qrc

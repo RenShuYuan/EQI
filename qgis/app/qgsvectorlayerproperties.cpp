@@ -19,11 +19,11 @@
 #include <memory>
 #include <limits>
 
-#include "qgisapp.h"
+#include "mainwindow.h"
 #include "qgsjoindialog.h"
 #include "qgsapplication.h"
 #include "qgsattributeactiondialog.h"
-#include "qgsapplydialog.h"
+#include "qgis/plugins/qgsapplydialog.h"
 #include "qgscontexthelp.h"
 #include "qgscoordinatetransform.h"
 #include "qgsdiagramproperties.h"
@@ -132,7 +132,7 @@ QgsVectorLayerProperties::QgsVectorLayerProperties(
     // Create the Labeling dialog tab
     layout = new QVBoxLayout( labelingFrame );
     layout->setMargin( 0 );
-    labelingDialog = new QgsLabelingWidget( layer, QgisApp::instance()->mapCanvas(), labelingFrame );
+    labelingDialog = new QgsLabelingWidget( layer, MainWindow::instance()->mapCanvas(), labelingFrame );
     labelingDialog->layout()->setContentsMargins( -1, 0, -1, 0 );
     layout->addWidget( labelingDialog );
     labelingFrame->setLayout( layout );
@@ -194,7 +194,7 @@ QgsVectorLayerProperties::QgsVectorLayerProperties(
   mFieldsFrame->layout()->addWidget( mFieldsPropertiesDialog );
 
   connect( mFieldsPropertiesDialog, SIGNAL( toggleEditing() ), this, SLOT( toggleEditing() ) );
-  connect( this, SIGNAL( toggleEditing( QgsMapLayer* ) ), QgisApp::instance(), SLOT( toggleEditing( QgsMapLayer* ) ) );
+  connect( this, SIGNAL( toggleEditing( QgsMapLayer* ) ), MainWindow::instance(), SLOT( toggleEditing( QgsMapLayer* ) ) );
 
   syncToLayer();
 
@@ -352,7 +352,7 @@ void QgsVectorLayerProperties::insertExpression()
   context << QgsExpressionContextUtils::globalScope()
   << QgsExpressionContextUtils::projectScope()
   << QgsExpressionContextUtils::atlasScope( nullptr )
-  << QgsExpressionContextUtils::mapSettingsScope( QgisApp::instance()->mapCanvas()->mapSettings() )
+  << QgsExpressionContextUtils::mapSettingsScope( MainWindow::instance()->mapCanvas()->mapSettings() )
   << QgsExpressionContextUtils::layerScope( layer );
 
   QgsExpressionBuilderDialog dlg( layer, selText.replace( QChar::ParagraphSeparator, '\n' ), this, "generic", context );
@@ -416,7 +416,7 @@ void QgsVectorLayerProperties::syncToLayer( void )
   // set up the scale based layer visibility stuff....
   mScaleRangeWidget->setScaleRange( 1.0 / layer->maximumScale(), 1.0 / layer->minimumScale() ); // caution: layer uses scale denoms, widget uses true scales
   mScaleVisibilityGroupBox->setChecked( layer->hasScaleBasedVisibility() );
-  mScaleRangeWidget->setMapCanvas( QgisApp::instance()->mapCanvas() );
+  mScaleRangeWidget->setMapCanvas( MainWindow::instance()->mapCanvas() );
 
   // get simplify drawing configuration
   const QgsVectorSimplifyMethod& simplifyMethod = layer->simplifyMethod();
@@ -1262,7 +1262,7 @@ void QgsVectorLayerProperties::updateSymbologyPage()
   if ( layer->rendererV2() )
   {
     mRendererDialog = new QgsRendererV2PropertiesDialog( layer, QgsStyleV2::defaultStyle(), true );
-    mRendererDialog->setMapCanvas( QgisApp::instance()->mapCanvas() );
+    mRendererDialog->setMapCanvas( MainWindow::instance()->mapCanvas() );
 
     connect( mRendererDialog, SIGNAL( layerVariablesChanged() ), this, SLOT( updateVariableEditor() ) );
 

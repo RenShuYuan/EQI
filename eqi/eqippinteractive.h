@@ -109,6 +109,9 @@ public:
     * @return
     */
     void delPhoto(const QStringList& photoList, const QString& tempFolder);
+
+    QStringList modifyPos();
+    QStringList modifyPhoto();
 signals:
     /**
     * @brief            向主窗口发送信号更新繁忙进度条状态
