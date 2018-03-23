@@ -106,6 +106,9 @@ public slots:
     //! 连接到图层树桥注册表，首先选择新添加的地图图层
     void autoSelectAddedLayer( QList<QgsMapLayer*> layers );
     void activeLayerChanged( QgsMapLayer *layer );
+
+    //! mark project dirty
+    void markDirty();
 private:
     void initActions();
     void initTabTools();

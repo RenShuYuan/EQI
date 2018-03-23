@@ -46,7 +46,7 @@
 #include "qgsrasterpyramid.h"
 #include "qgsrasterrange.h"
 #include "qgsrasterrenderer.h"
-#include "qgis/core/raster/qgsrasterrendererregistry.h"
+#include "qgsrasterrendererregistry.h"
 #include "qgsrastertransparency.h"
 #include "qgssinglebandgrayrendererwidget.h"
 #include "qgssinglebandpseudocolorrendererwidget.h"

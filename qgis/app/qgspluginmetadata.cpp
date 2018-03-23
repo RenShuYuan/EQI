@@ -1,10 +1,10 @@
 /***************************************************************************
-                          qgsogrhelperfunctions.h
-    helper functions to create ogr uris for database and protocol drivers
+                    qgspluginmetadata.cpp  -  Metadata class for
+                    describing a loaded plugin.
                              -------------------
-    begin                : Mon Jan 2 2009
-    copyright            : (C) 2009 by Godofredo Contreras Nava
-    email                : frdcn at hotmail.com
+    begin                : Fri Feb 6 2004
+    copyright            : (C) 2004 by Gary E.Sherman
+    email                : sherman at mrcc.com
  ***************************************************************************/
 
 /***************************************************************************
@@ -16,10 +16,29 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <QString>
+#include "../plugins/qgisplugin.h"
+#include "qgspluginmetadata.h"
+QgsPluginMetadata::QgsPluginMetadata( const QString& _libraryPath,
+                                      const QString& _name,
+                                      QgisPlugin * _plugin ):
+    m_name( _name ),
+    libraryPath( _libraryPath ),
+    m_plugin( _plugin )
+{
 
-/* Create database uri from connection parameters */
-QString createDatabaseURI( const QString& connectionType, const QString& host, const QString& database, QString port, const QString& user, const QString& password );
+}
 
-/* Create protocol uri from connection parameters */
-QString createProtocolURI( const QString& type, const QString& url );
+QString QgsPluginMetadata::name() const
+{
+  return m_name;
+}
+
+QString QgsPluginMetadata::library() const
+{
+  return libraryPath;
+}
+
+QgisPlugin *QgsPluginMetadata::plugin()
+{
+  return m_plugin;
+}

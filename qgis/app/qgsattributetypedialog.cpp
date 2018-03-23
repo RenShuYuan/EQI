@@ -21,7 +21,7 @@
 #include "qgsmaplayerregistry.h"
 #include "qgsmapcanvas.h"
 #include "qgsexpressionbuilderdialog.h"
-#include "uav/uavmain.h"
+#include "mainwindow.h"
 #include "qgsproject.h"
 #include "qgslogger.h"
 #include "qgseditorwidgetfactory.h"

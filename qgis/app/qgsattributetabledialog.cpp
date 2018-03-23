@@ -22,17 +22,20 @@
 #include "qgsattributetablefiltermodel.h"
 #include "qgsattributetableview.h"
 
-#include <qgsapplication.h>
+#include "eqi/eqiapplication.h"
 #include <qgsvectordataprovider.h>
 #include <qgsvectorlayer.h>
 #include <qgsexpression.h>
 
-#include "uav/uavcore.h"
-#include "uav/uavmain.h"
+#include "mainwindow.h"
+#include "qgsaddattrdialog.h"
+#include "qgsdelattrdialog.h"
 #include "qgssearchquerybuilder.h"
 #include "qgslogger.h"
 #include "qgsmapcanvas.h"
 #include "qgsproject.h"
+#include "qgsfieldcalculator.h"
+#include "qgsfeatureaction.h"
 #include "qgsattributeaction.h"
 #include "qgsexpressionbuilderdialog.h"
 #include "qgsmessagebar.h"
@@ -41,11 +44,6 @@
 #include "qgsrubberband.h"
 #include "qgsfield.h"
 #include "qgseditorwidgetregistry.h"
-
-#include "app/qgsaddattrdialog.h"
-#include "app/qgsdelattrdialog.h"
-#include "app/qgsfieldcalculator.h"
-#include "app/qgsfeatureaction.h"
 
 static QgsExpressionContext _getExpressionContext( const void* context )
 {
@@ -73,186 +71,183 @@ QgsAttributeTableDialog::QgsAttributeTableDialog( QgsVectorLayer *theLayer, QWid
 {
   setupUi( this );
 
-  // 选择固定的颜色失去焦点（视窗）
-  setStyleSheet( UavMain::instance()->styleSheet() );
+  // Fix selection color on loosing focus (Windows)
+  setStyleSheet( MainWindow::instance()->styleSheet() );
 
   setAttribute( Qt::WA_DeleteOnClose );
 
-  //QSettings settings;
+  QSettings settings;
 
-  //// 初始化窗口形状
-  //restoreGeometry( settings.value( "/Windows/BetterAttributeTable/geometry" ).toByteArray() );
+  // Initialize the window geometry
+  restoreGeometry( settings.value( "/Windows/BetterAttributeTable/geometry" ).toByteArray() );
 
-  //QgsAttributeEditorContext context;
+  QgsAttributeEditorContext context;
 
-  //myDa = new QgsDistanceArea();
+  myDa = new QgsDistanceArea();
 
-  //myDa->setSourceCrs( mLayer->crs() );
-  //myDa->setEllipsoidalMode( UAVplatform::instance()->mapCanvas()->mapSettings().hasCrsTransformEnabled() );
-  //myDa->setEllipsoid( QgsProject::instance()->readEntry( "Measure", "/Ellipsoid", GEO_NONE ) );
+  myDa->setSourceCrs( mLayer->crs() );
+  myDa->setEllipsoidalMode( MainWindow::instance()->mapCanvas()->mapSettings().hasCrsTransformEnabled() );
+  myDa->setEllipsoid( QgsProject::instance()->readEntry( "Measure", "/Ellipsoid", GEO_NONE ) );
 
-  //context.setDistanceArea( *myDa );
-  //context.setVectorLayerTools( UAVplatform::instance()->vectorLayerTools() );//////////////////////////////////////////////////////////////////////////
+  context.setDistanceArea( *myDa );
+//  yuanlong
+//  context.setVectorLayerTools( MainWindow::instance()->vectorLayerTools() );
 
-  //QgsFeatureRequest r;
-  //if ( mLayer->geometryType() != QGis::NoGeometry &&
-  //     settings.value( "/qgis/attributeTableBehaviour", QgsAttributeTableFilterModel::ShowAll ).toInt() == QgsAttributeTableFilterModel::ShowVisible )
-  //{
-  //  QgsMapCanvas *mc = UAVplatform::instance()->mapCanvas();
-  //  QgsRectangle extent( mc->mapSettings().mapToLayerCoordinates( theLayer, mc->extent() ) );
-  //  r.setFilterRect( extent );
+  QgsFeatureRequest r;
+  if ( mLayer->geometryType() != QGis::NoGeometry &&
+       settings.value( "/qgis/attributeTableBehaviour", QgsAttributeTableFilterModel::ShowAll ).toInt() == QgsAttributeTableFilterModel::ShowVisible )
+  {
+    QgsMapCanvas *mc = MainWindow::instance()->mapCanvas();
+    QgsRectangle extent( mc->mapSettings().mapToLayerCoordinates( theLayer, mc->extent() ) );
+    r.setFilterRect( extent );
 
-  //  QgsGeometry *g = QgsGeometry::fromRect( extent );
-  //  mRubberBand = new QgsRubberBand( mc, QGis::Polygon );
-  //  mRubberBand->setToGeometry( g, theLayer );
-  //  delete g;
+    QgsGeometry *g = QgsGeometry::fromRect( extent );
+    mRubberBand = new QgsRubberBand( mc, QGis::Polygon );
+    mRubberBand->setToGeometry( g, theLayer );
+    delete g;
 
-  //  mActionShowAllFilter->setText( tr( "Show All Features In Initial Canvas Extent" ) );
-  //}
+    mActionShowAllFilter->setText( tr( "Show All Features In Initial Canvas Extent" ) );
+  }
 
-  //// 初始化双重视图
-  //mMainView->init( mLayer, UAVplatform::instance()->mapCanvas(), r, context );
+  // Initialize dual view
+  mMainView->init( mLayer, MainWindow::instance()->mapCanvas(), r, context );
 
-  //// 初始化过滤器GUI元素
-  //mFilterActionMapper = new QSignalMapper( this );
-  //mFilterColumnsMenu = new QMenu( this );
-  //mActionFilterColumnsMenu->setMenu( mFilterColumnsMenu );
-  //mApplyFilterButton->setDefaultAction( mActionApplyFilter );
+  // Initialize filter gui elements
+  mFilterActionMapper = new QSignalMapper( this );
+  mFilterColumnsMenu = new QMenu( this );
+  mActionFilterColumnsMenu->setMenu( mFilterColumnsMenu );
+  mApplyFilterButton->setDefaultAction( mActionApplyFilter );
 
-  //// 在几个地方设置过滤器图标
-  //QIcon filterIcon = core::getThemeIcon( "mActionFilter2.svg" );
-  //mActionShowAllFilter->setIcon( filterIcon );
-  //mActionAdvancedFilter->setIcon( filterIcon );
-  //mActionSelectedFilter->setIcon( filterIcon );
-  //mActionVisibleFilter->setIcon( filterIcon );
-  //mActionEditedFilter->setIcon( filterIcon );
+  // Set filter icon in a couple of places
+  QIcon filterIcon = eqiApplication::getThemeIcon( "/mActionFilter2.svg" );
+  mActionShowAllFilter->setIcon( filterIcon );
+  mActionAdvancedFilter->setIcon( filterIcon );
+  mActionSelectedFilter->setIcon( filterIcon );
+  mActionVisibleFilter->setIcon( filterIcon );
+  mActionEditedFilter->setIcon( filterIcon );
 
-  // Connect 过滤器 signals
-  //connect( mActionAdvancedFilter, SIGNAL( triggered() ), SLOT( filterExpressionBuilder() ) );
-  //connect( mActionShowAllFilter, SIGNAL( triggered() ), SLOT( filterShowAll() ) );
-  //connect( mActionSelectedFilter, SIGNAL( triggered() ), SLOT( filterSelected() ) );
-  //connect( mActionVisibleFilter, SIGNAL( triggered() ), SLOT( filterVisible() ) );
-  //connect( mActionEditedFilter, SIGNAL( triggered() ), SLOT( filterEdited() ) );
-  //connect( mFilterActionMapper, SIGNAL( mapped( QObject* ) ), SLOT( filterColumnChanged( QObject* ) ) );
-  //connect( mFilterQuery, SIGNAL( returnPressed() ), SLOT( filterQueryAccepted() ) );
-  //connect( mActionApplyFilter, SIGNAL( triggered() ), SLOT( filterQueryAccepted() ) );
-  //connect( mSetStyles, SIGNAL( pressed() ), SLOT( openConditionalStyles() ) );
+  // Connect filter signals
+  connect( mActionAdvancedFilter, SIGNAL( triggered() ), SLOT( filterExpressionBuilder() ) );
+  connect( mActionShowAllFilter, SIGNAL( triggered() ), SLOT( filterShowAll() ) );
+  connect( mActionSelectedFilter, SIGNAL( triggered() ), SLOT( filterSelected() ) );
+  connect( mActionVisibleFilter, SIGNAL( triggered() ), SLOT( filterVisible() ) );
+  connect( mActionEditedFilter, SIGNAL( triggered() ), SLOT( filterEdited() ) );
+  connect( mFilterActionMapper, SIGNAL( mapped( QObject* ) ), SLOT( filterColumnChanged( QObject* ) ) );
+  connect( mFilterQuery, SIGNAL( returnPressed() ), SLOT( filterQueryAccepted() ) );
+  connect( mActionApplyFilter, SIGNAL( triggered() ), SLOT( filterQueryAccepted() ) );
+  connect( mSetStyles, SIGNAL( pressed() ), SLOT( openConditionalStyles() ) );
 
-  // 从图层到表格信息
-  //connect( mLayer, SIGNAL( editingStarted() ), this, SLOT( editingToggled() ) );
-  //connect( mLayer, SIGNAL( editingStopped() ), this, SLOT( editingToggled() ) );
-  //connect( mLayer, SIGNAL( layerDeleted() ), this, SLOT( close() ) );
-  //connect( mLayer, SIGNAL( selectionChanged() ), this, SLOT( updateTitle() ) );
-  //connect( mLayer, SIGNAL( featureAdded( QgsFeatureId ) ), this, SLOT( updateTitle() ) );
-  //connect( mLayer, SIGNAL( featuresDeleted( QgsFeatureIds ) ), this, SLOT( updateTitle() ) );
-  //connect( mLayer, SIGNAL( attributeAdded( int ) ), this, SLOT( columnBoxInit() ) );
-  //connect( mLayer, SIGNAL( attributeDeleted( int ) ), this, SLOT( columnBoxInit() ) );
+  // info from layer to table
+  connect( mLayer, SIGNAL( editingStarted() ), this, SLOT( editingToggled() ) );
+  connect( mLayer, SIGNAL( editingStopped() ), this, SLOT( editingToggled() ) );
+  connect( mLayer, SIGNAL( layerDeleted() ), this, SLOT( close() ) );
+  connect( mLayer, SIGNAL( selectionChanged() ), this, SLOT( updateTitle() ) );
+  connect( mLayer, SIGNAL( featureAdded( QgsFeatureId ) ), this, SLOT( updateTitle() ) );
+  connect( mLayer, SIGNAL( featuresDeleted( QgsFeatureIds ) ), this, SLOT( updateTitle() ) );
+  connect( mLayer, SIGNAL( attributeAdded( int ) ), this, SLOT( columnBoxInit() ) );
+  connect( mLayer, SIGNAL( attributeDeleted( int ) ), this, SLOT( columnBoxInit() ) );
 
-  // connect 表格信息到窗口
-  //connect( mMainView, SIGNAL( filterChanged() ), this, SLOT( updateTitle() ) );
+  // connect table info to window
+  connect( mMainView, SIGNAL( filterChanged() ), this, SLOT( updateTitle() ) );
 
-  // 表格信息到应用程序
-  //connect( this, SIGNAL( saveEdits( QgsMapLayer * ) ), UAVplatform::instance(), SLOT( saveEdits( QgsMapLayer * ) ) );
+  // info from table to application
+  connect( this, SIGNAL( saveEdits( QgsMapLayer * ) ), MainWindow::instance(), SLOT( saveEdits( QgsMapLayer * ) ) );
 
-  //bool myDockFlag = settings.value( "/qgis/dockAttributeTable", false ).toBool();
-  //if ( myDockFlag )
-  //{
-  //  mDock = new QgsAttributeTableDock( tr( "%1 (%n Feature(s))", "feature count", mMainView->featureCount() ).arg( mLayer->name() ), UAVplatform::instance() );
-  //  mDock->setAllowedAreas( Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea );
-  //  mDock->setWidget( this );
-  //  connect( this, SIGNAL( destroyed() ), mDock, SLOT( close() ) );
-  //  UAVplatform::instance()->addDockWidget( Qt::BottomDockWidgetArea, mDock );
-  //}
+  bool myDockFlag = settings.value( "/qgis/dockAttributeTable", false ).toBool();
+  if ( myDockFlag )
+  {
+    mDock = new QgsAttributeTableDock( tr( "%1 (%n Feature(s))", "feature count", mMainView->featureCount() ).arg( mLayer->name() ), MainWindow::instance() );
+    mDock->setAllowedAreas( Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea );
+    mDock->setWidget( this );
+    connect( this, SIGNAL( destroyed() ), mDock, SLOT( close() ) );
+    MainWindow::instance()->addDockWidget( Qt::BottomDockWidgetArea, mDock );
+  }
 
-  //columnBoxInit();
-  //updateTitle();
+  columnBoxInit();
+  updateTitle();
 
-  mRemoveSelectionButton->setIcon( uavCore::getThemeIcon( "mActionUnselectAttributes.png" ) );
-  mSelectAllButton->setIcon( uavCore::getThemeIcon( "mActionSelectAll.svg" ) );
-  mSelectedToTopButton->setIcon( uavCore::getThemeIcon( "mActionSelectedToTop.png" ) );
-  mCopySelectedRowsButton->setIcon( uavCore::getThemeIcon( "mActionCopySelected.png" ) );
-  mZoomMapToSelectedRowsButton->setIcon( uavCore::getThemeIcon( "mActionZoomToSelected.svg" ) );
-  mPanMapToSelectedRowsButton->setIcon( uavCore::getThemeIcon( "mActionPanToSelected.svg" ) );
-  mInvertSelectionButton->setIcon( uavCore::getThemeIcon( "mActionInvertSelection.svg" ) );
-  mToggleEditingButton->setIcon( uavCore::getThemeIcon( "mActionToggleEditing.svg" ) );
-  mSaveEditsButton->setIcon( uavCore::getThemeIcon( "mActionSaveEdits.svg" ) );
-  mDeleteSelectedButton->setIcon( uavCore::getThemeIcon( "mActionDeleteSelected.svg" ) );
-  mOpenFieldCalculator->setIcon( uavCore::getThemeIcon( "mActionCalculateField.png" ) );
-  mAddAttribute->setIcon( uavCore::getThemeIcon( "mActionNewAttribute.png" ) );
-  mRemoveAttribute->setIcon( uavCore::getThemeIcon( "mActionDeleteAttribute.png" ) );
-  mTableViewButton->setIcon( uavCore::getThemeIcon( "mActionOpenTable.svg" ) );
-  mAttributeViewButton->setIcon( uavCore::getThemeIcon( "mActionPropertyItem.png" ) );
-  mExpressionSelectButton->setIcon( uavCore::getThemeIcon( "mIconExpressionSelect.svg" ) );
-  mAddFeature->setIcon( uavCore::getThemeIcon( "mActionNewTableRow.png" ) );
-  mReloadButton->setIcon( uavCore::getThemeIcon( "mActionDraw.svg" ) );
-  mPasteFeatures->setIcon( uavCore::getThemeIcon( "mActionEditPaste.png" ) );
-  mSetStyles->setIcon( uavCore::getThemeIcon( "rendererCategorizedSymbol.png" ) );
-  mTableViewButton->setIcon( uavCore::getThemeIcon( "mActionOpenTable.png" ) );
+  mRemoveSelectionButton->setIcon( eqiApplication::getThemeIcon( "/mActionUnselectAttributes.png" ) );
+  mSelectAllButton->setIcon( eqiApplication::getThemeIcon( "/mActionSelectAll.svg" ) );
+  mSelectedToTopButton->setIcon( eqiApplication::getThemeIcon( "/mActionSelectedToTop.png" ) );
+  mCopySelectedRowsButton->setIcon( eqiApplication::getThemeIcon( "/mActionCopySelected.png" ) );
+  mZoomMapToSelectedRowsButton->setIcon( eqiApplication::getThemeIcon( "/mActionZoomToSelected.svg" ) );
+  mPanMapToSelectedRowsButton->setIcon( eqiApplication::getThemeIcon( "/mActionPanToSelected.svg" ) );
+  mInvertSelectionButton->setIcon( eqiApplication::getThemeIcon( "/mActionInvertSelection.svg" ) );
+  mToggleEditingButton->setIcon( eqiApplication::getThemeIcon( "/mActionToggleEditing.svg" ) );
+  mSaveEditsButton->setIcon( eqiApplication::getThemeIcon( "/mActionSaveEdits.svg" ) );
+  mDeleteSelectedButton->setIcon( eqiApplication::getThemeIcon( "/mActionDeleteSelected.svg" ) );
+  mOpenFieldCalculator->setIcon( eqiApplication::getThemeIcon( "/mActionCalculateField.png" ) );
+  mAddAttribute->setIcon( eqiApplication::getThemeIcon( "/mActionNewAttribute.png" ) );
+  mRemoveAttribute->setIcon( eqiApplication::getThemeIcon( "/mActionDeleteAttribute.png" ) );
+  mTableViewButton->setIcon( eqiApplication::getThemeIcon( "/mActionOpenTable.svg" ) );
+  mAttributeViewButton->setIcon( eqiApplication::getThemeIcon( "/mActionPropertyItem.png" ) );
+  mExpressionSelectButton->setIcon( eqiApplication::getThemeIcon( "/mIconExpressionSelect.svg" ) );
+  mAddFeature->setIcon( eqiApplication::getThemeIcon( "/mActionNewTableRow.png" ) );
 
-  // 切换编辑
-  //bool canChangeAttributes = mLayer->dataProvider()->capabilities() & QgsVectorDataProvider::ChangeAttributeValues;
-  //bool canDeleteFeatures = mLayer->dataProvider()->capabilities() & QgsVectorDataProvider::DeleteFeatures;
-  //bool canAddAttributes = mLayer->dataProvider()->capabilities() & QgsVectorDataProvider::AddAttributes;
-  //bool canDeleteAttributes = mLayer->dataProvider()->capabilities() & QgsVectorDataProvider::DeleteAttributes;
-  //bool canAddFeatures = mLayer->dataProvider()->capabilities() & QgsVectorDataProvider::AddFeatures;
+  // toggle editing
+  bool canChangeAttributes = mLayer->dataProvider()->capabilities() & QgsVectorDataProvider::ChangeAttributeValues;
+  bool canDeleteFeatures = mLayer->dataProvider()->capabilities() & QgsVectorDataProvider::DeleteFeatures;
+  bool canAddAttributes = mLayer->dataProvider()->capabilities() & QgsVectorDataProvider::AddAttributes;
+  bool canDeleteAttributes = mLayer->dataProvider()->capabilities() & QgsVectorDataProvider::DeleteAttributes;
+  bool canAddFeatures = mLayer->dataProvider()->capabilities() & QgsVectorDataProvider::AddFeatures;
 
-  //mToggleEditingButton->blockSignals( true );
-  //mToggleEditingButton->setCheckable( true );
-  //mToggleEditingButton->setChecked( mLayer->isEditable() );
-  //mToggleEditingButton->setEnabled(( canChangeAttributes || canDeleteFeatures || canAddAttributes || canDeleteAttributes || canAddFeatures ) && !mLayer->isReadOnly() );
-  //mToggleEditingButton->blockSignals( false );
+  mToggleEditingButton->blockSignals( true );
+  mToggleEditingButton->setCheckable( true );
+  mToggleEditingButton->setChecked( mLayer->isEditable() );
+  mToggleEditingButton->setEnabled(( canChangeAttributes || canDeleteFeatures || canAddAttributes || canDeleteAttributes || canAddFeatures ) && !mLayer->isReadOnly() );
+  mToggleEditingButton->blockSignals( false );
 
-  //mSaveEditsButton->setEnabled( mToggleEditingButton->isEnabled() && mLayer->isEditable() );
-  //mReloadButton->setEnabled( ! mLayer->isEditable() );
-  //mAddAttribute->setEnabled(( canChangeAttributes || canAddAttributes ) && mLayer->isEditable() );
-  //mDeleteSelectedButton->setEnabled( canDeleteFeatures && mLayer->isEditable() );
-  //mAddFeature->setEnabled( canAddFeatures && mLayer->isEditable() );
-  //mAddFeature->setHidden( !canAddFeatures );
+  mSaveEditsButton->setEnabled( mToggleEditingButton->isEnabled() && mLayer->isEditable() );
+  mReloadButton->setEnabled( ! mLayer->isEditable() );
+  mAddAttribute->setEnabled(( canChangeAttributes || canAddAttributes ) && mLayer->isEditable() );
+  mDeleteSelectedButton->setEnabled( canDeleteFeatures && mLayer->isEditable() );
+  mAddFeature->setEnabled( canAddFeatures && mLayer->isEditable() );
+  mAddFeature->setHidden( !canAddFeatures );
 
-  //mMainViewButtonGroup->setId( mTableViewButton, QgsDualView::AttributeTable );
-  //mMainViewButtonGroup->setId( mAttributeViewButton, QgsDualView::AttributeEditor );
+  mMainViewButtonGroup->setId( mTableViewButton, QgsDualView::AttributeTable );
+  mMainViewButtonGroup->setId( mAttributeViewButton, QgsDualView::AttributeEditor );
 
-  // 加载默认的属性表过滤器
-  //QgsAttributeTableFilterModel::FilterMode defaultFilterMode = ( QgsAttributeTableFilterModel::FilterMode ) settings.value( "/qgis/attributeTableBehaviour", QgsAttributeTableFilterModel::ShowAll ).toInt();
+  // Load default attribute table filter
+  QgsAttributeTableFilterModel::FilterMode defaultFilterMode = ( QgsAttributeTableFilterModel::FilterMode ) settings.value( "/qgis/attributeTableBehaviour", QgsAttributeTableFilterModel::ShowAll ).toInt();
 
-  //switch ( defaultFilterMode )
-  //{
-  //  case QgsAttributeTableFilterModel::ShowVisible:
-  //    filterVisible();
-  //    break;
+  switch ( defaultFilterMode )
+  {
+    case QgsAttributeTableFilterModel::ShowVisible:
+      filterVisible();
+      break;
 
-  //  case QgsAttributeTableFilterModel::ShowSelected:
-  //    filterSelected();
-  //    break;
+    case QgsAttributeTableFilterModel::ShowSelected:
+      filterSelected();
+      break;
 
-  //  case QgsAttributeTableFilterModel::ShowAll:
-  //  default:
-  //    filterShowAll();
-  //    break;
-  //}
+    case QgsAttributeTableFilterModel::ShowAll:
+    default:
+      filterShowAll();
+      break;
+  }
 
-  //mUpdateExpressionText->registerGetExpressionContextCallback( &_getExpressionContext, mLayer );
+  mUpdateExpressionText->registerGetExpressionContextCallback( &_getExpressionContext, mLayer );
 
-  //mFieldModel = new QgsFieldModel( this );
-  //mFieldModel->setLayer( mLayer );
-  //mFieldCombo->setModel( mFieldModel );
-  //connect( mRunFieldCalc, SIGNAL( clicked() ), this, SLOT( updateFieldFromExpression() ) );
-  //connect( mRunFieldCalcSelected, SIGNAL( clicked() ), this, SLOT( updateFieldFromExpressionSelected() ) );
-  //// NW TODO Fix in 2.6 - Doesn't work with field model for some reason.
-  //connect( mUpdateExpressionText, SIGNAL( returnPressed() ), this, SLOT( updateFieldFromExpression() ) );
-  //connect( mUpdateExpressionText, SIGNAL( fieldChanged( QString, bool ) ), this, SLOT( updateButtonStatus( QString, bool ) ) );
-  //mUpdateExpressionText->setLayer( mLayer );
-  //mUpdateExpressionText->setLeftHandButtonStyle( true );
+  mFieldModel = new QgsFieldModel( this );
+  mFieldModel->setLayer( mLayer );
+  mFieldCombo->setModel( mFieldModel );
+  connect( mRunFieldCalc, SIGNAL( clicked() ), this, SLOT( updateFieldFromExpression() ) );
+  connect( mRunFieldCalcSelected, SIGNAL( clicked() ), this, SLOT( updateFieldFromExpressionSelected() ) );
+  // NW TODO Fix in 2.6 - Doesn't work with field model for some reason.
+//  connect( mUpdateExpressionText, SIGNAL( returnPressed() ), this, SLOT( updateFieldFromExpression() ) );
+  connect( mUpdateExpressionText, SIGNAL( fieldChanged( QString, bool ) ), this, SLOT( updateButtonStatus( QString, bool ) ) );
+  mUpdateExpressionText->setLayer( mLayer );
+  mUpdateExpressionText->setLeftHandButtonStyle( true );
 
-  //mMainView->setView( QgsDualView::AttributeTable );
+  mMainView->setView( QgsDualView::AttributeTable );
 
-  //editingToggled();
+  editingToggled();
 }
 
 QgsAttributeTableDialog::~QgsAttributeTableDialog()
 {
-	//delete myDa;
-	//delete mRubberBand;
+  delete myDa;
+  delete mRubberBand;
 }
 
 void QgsAttributeTableDialog::updateTitle()
@@ -298,7 +293,8 @@ void QgsAttributeTableDialog::keyPressEvent( QKeyEvent* event )
 
   if (( event->key() == Qt::Key_Backspace || event->key() == Qt::Key_Delete ) && mDeleteSelectedButton->isEnabled() )
   {
-    //UAVplatform::instance()->deleteSelected( mLayer, this );//////////////////////////////////////////////////////////////////////////
+//      yuanlong
+//    MainWindow::instance()->deleteSelected( mLayer, this );
   }
 }
 
@@ -488,7 +484,7 @@ void QgsAttributeTableDialog::filterExpressionBuilder()
 
   QgsDistanceArea myDa;
   myDa.setSourceCrs( mLayer->crs().srsid() );
-  myDa.setEllipsoidalMode( UavMain::instance()->mapCanvas()->mapSettings().hasCrsTransformEnabled() );
+  myDa.setEllipsoidalMode( MainWindow::instance()->mapCanvas()->mapSettings().hasCrsTransformEnabled() );
   myDa.setEllipsoid( QgsProject::instance()->readEntry( "Measure", "/Ellipsoid", GEO_NONE ) );
   dlg.setGeomCalculator( myDa );
 
@@ -572,9 +568,10 @@ void QgsAttributeTableDialog::on_mOpenFieldCalculator_clicked()
   }
 }
 
-void QgsAttributeTableDialog::on_mSaveEditsButton_clicked()//////////////////////////////////////////////////////////////////////////
+void QgsAttributeTableDialog::on_mSaveEditsButton_clicked()
 {
-  //UAVplatform::instance()->saveEdits( mLayer, true, true );
+//    yuanlong
+//  MainWindow::instance()->saveEdits( mLayer, true, true );
 }
 
 void QgsAttributeTableDialog::on_mReloadButton_clicked()
@@ -606,23 +603,25 @@ void QgsAttributeTableDialog::on_mExpressionSelectButton_clicked()
 
 void QgsAttributeTableDialog::on_mCopySelectedRowsButton_clicked()
 {
-  //UAVplatform::instance()->editCopy( mLayer );//////////////////////////////////////////////////////////////////////////
+//    yuanlong
+//  MainWindow::instance()->editCopy( mLayer );
 }
 
 void QgsAttributeTableDialog::on_mPasteFeatures_clicked()
 {
-  //UAVplatform::instance()->editPaste( mLayer );//////////////////////////////////////////////////////////////////////////
+//    yuanlong
+//  MainWindow::instance()->editPaste( mLayer );
 }
 
 
 void QgsAttributeTableDialog::on_mZoomMapToSelectedRowsButton_clicked()
 {
-  UavMain::instance()->mapCanvas()->zoomToSelected( mLayer );
+  MainWindow::instance()->mapCanvas()->zoomToSelected( mLayer );
 }
 
 void QgsAttributeTableDialog::on_mPanMapToSelectedRowsButton_clicked()
 {
-  UavMain::instance()->mapCanvas()->panToSelected( mLayer );
+  MainWindow::instance()->mapCanvas()->panToSelected( mLayer );
 }
 
 void QgsAttributeTableDialog::on_mInvertSelectionButton_clicked()
@@ -642,7 +641,8 @@ void QgsAttributeTableDialog::on_mSelectAllButton_clicked()
 
 void QgsAttributeTableDialog::on_mDeleteSelectedButton_clicked()
 {
-  //UAVplatform::instance()->deleteSelected( mLayer, this );//////////////////////////////////////////////////////////////////////////
+//    yuanlong
+//  MainWindow::instance()->deleteSelected( mLayer, this );
 }
 
 void QgsAttributeTableDialog::on_mMainView_currentChanged( int viewMode )
@@ -650,15 +650,16 @@ void QgsAttributeTableDialog::on_mMainView_currentChanged( int viewMode )
   mMainViewButtonGroup->button( viewMode )->click();
 }
 
-void QgsAttributeTableDialog::on_mToggleEditingButton_toggled()//////////////////////////////////////////////////////////////////////////
+void QgsAttributeTableDialog::on_mToggleEditingButton_toggled()
 {
   if ( !mLayer )
     return;
-  //if ( !UAVplatform::instance()->toggleEditing( mLayer ) )
-  //{
-  //  // restore gui state if toggling was canceled or layer commit/rollback failed
-  //  editingToggled();
-  //}
+//  yuanlong
+//  if ( !MainWindow::instance()->toggleEditing( mLayer ) )
+//  {
+//    // restore gui state if toggling was canceled or layer commit/rollback failed
+//    editingToggled();
+//  }
 }
 
 void QgsAttributeTableDialog::editingToggled()
@@ -737,7 +738,7 @@ void QgsAttributeTableDialog::on_mRemoveAttribute_clicked()
     }
     else
     {
-      UavMain::instance()->messageBar()->pushMessage( tr( "Attribute error" ), tr( "The attribute(s) could not be deleted" ), QgsMessageBar::WARNING, UavMain::instance()->messageTimeout() );
+      MainWindow::instance()->messageBar()->pushMessage( tr( "Attribute error" ), tr( "The attribute(s) could not be deleted" ), QgsMessageBar::WARNING, MainWindow::instance()->messageTimeout() );
       mLayer->destroyEditCommand();
     }
     // update model - a field has been added or updated
@@ -798,14 +799,14 @@ void QgsAttributeTableDialog::setFilterExpression( const QString& filterString )
   QgsDistanceArea myDa;
 
   myDa.setSourceCrs( mLayer->crs().srsid() );
-  myDa.setEllipsoidalMode( UavMain::instance()->mapCanvas()->mapSettings().hasCrsTransformEnabled() );
+  myDa.setEllipsoidalMode( MainWindow::instance()->mapCanvas()->mapSettings().hasCrsTransformEnabled() );
   myDa.setEllipsoid( QgsProject::instance()->readEntry( "Measure", "/Ellipsoid", GEO_NONE ) );
 
   // parse search string and build parsed tree
   QgsExpression filterExpression( filterString );
   if ( filterExpression.hasParserError() )
   {
-    UavMain::instance()->messageBar()->pushMessage( tr( "Parsing error" ), filterExpression.parserErrorString(), QgsMessageBar::WARNING, UavMain::instance()->messageTimeout() );
+    MainWindow::instance()->messageBar()->pushMessage( tr( "Parsing error" ), filterExpression.parserErrorString(), QgsMessageBar::WARNING, MainWindow::instance()->messageTimeout() );
     return;
   }
 
@@ -816,7 +817,7 @@ void QgsAttributeTableDialog::setFilterExpression( const QString& filterString )
 
   if ( !filterExpression.prepare( &context ) )
   {
-    UavMain::instance()->messageBar()->pushMessage( tr( "Evaluation error" ), filterExpression.evalErrorString(), QgsMessageBar::WARNING, UavMain::instance()->messageTimeout() );
+    MainWindow::instance()->messageBar()->pushMessage( tr( "Evaluation error" ), filterExpression.evalErrorString(), QgsMessageBar::WARNING, MainWindow::instance()->messageTimeout() );
   }
 
   bool fetchGeom = filterExpression.needsGeometry();
@@ -855,7 +856,7 @@ void QgsAttributeTableDialog::setFilterExpression( const QString& filterString )
 
   if ( filterExpression.hasEvalError() )
   {
-    UavMain::instance()->messageBar()->pushMessage( tr( "Error filtering" ), filterExpression.evalErrorString(), QgsMessageBar::WARNING, UavMain::instance()->messageTimeout() );
+    MainWindow::instance()->messageBar()->pushMessage( tr( "Error filtering" ), filterExpression.evalErrorString(), QgsMessageBar::WARNING, MainWindow::instance()->messageTimeout() );
     return;
   }
   mMainView->setFilterMode( QgsAttributeTableFilterModel::ShowFilteredList );

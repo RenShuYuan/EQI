@@ -58,7 +58,8 @@ QgsAttributeDialog *QgsFeatureAction::newDialog( bool cloneFeature )
   myDa.setEllipsoid( QgsProject::instance()->readEntry( "Measure", "/Ellipsoid", GEO_NONE ) );
 
   context.setDistanceArea( myDa );
-  context.setVectorLayerTools( MainWindow::instance()->vectorLayerTools() );
+//    yuanlong
+  //  context.setVectorLayerTools( MainWindow::instance()->vectorLayerTools() );
 
   QgsAttributeDialog *dialog = new QgsAttributeDialog( mLayer, f, cloneFeature, nullptr, true, context );
 

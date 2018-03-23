@@ -62,6 +62,7 @@
 #include <QCheckBox>
 #include <QHeaderView>
 #include <QColorDialog>
+#include <QMenu>
 
 #include "qgsrendererv2propertiesdialog.h"
 #include "qgsstylev2.h"

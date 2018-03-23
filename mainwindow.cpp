@@ -1009,6 +1009,12 @@ void MainWindow::activeLayerChanged(QgsMapLayer *layer)
         mMapCanvas->setCurrentLayer( layer );
 }
 
+void MainWindow::markDirty()
+{
+    // notify the project that there was a change
+    QgsProject::instance()->dirty( true );
+}
+
 void MainWindow::initActions()
 {
     /*--------------------------------------------地图浏览---------------------------------------------*/
