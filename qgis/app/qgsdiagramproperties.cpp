@@ -1,4 +1,4 @@
-/***************************************************************************
+﻿/***************************************************************************
   qgsdiagramproperties.cpp
   Adjust the properties for diagrams
   -------------------
@@ -15,16 +15,16 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "core/diagram/qgshistogramdiagram.h"
-#include "core/diagram/qgspiediagram.h"
-#include "core/diagram/qgstextdiagram.h"
+#include "qgshistogramdiagram.h"
+#include "qgspiediagram.h"
+#include "qgstextdiagram.h"
 
-#include "uav/uavmain.h"
+#include "mainwindow.h"
 #include "qgsproject.h"
 #include "qgsapplication.h"
 #include "qgsdiagramproperties.h"
 #include "qgsdiagramrendererv2.h"
-#include "app/qgslabelengineconfigdialog.h"
+#include "qgis/app/qgslabelengineconfigdialog.h"
 #include "qgsmessagebar.h"
 #include "qgsvectorlayerproperties.h"
 #include "qgsvectordataprovider.h"
@@ -42,7 +42,7 @@ static QgsExpressionContext _getExpressionContext( const void* context )
   expContext << QgsExpressionContextUtils::globalScope()
   << QgsExpressionContextUtils::projectScope()
   << QgsExpressionContextUtils::atlasScope( nullptr )
-  << QgsExpressionContextUtils::mapSettingsScope( UavMain::instance()->mapCanvas()->mapSettings() );
+  << QgsExpressionContextUtils::mapSettingsScope( MainWindow::instance()->mapCanvas()->mapSettings() );
 
   const QgsVectorLayer* layer = ( const QgsVectorLayer* ) context;
   if ( layer )
@@ -68,7 +68,7 @@ QgsDiagramProperties::QgsDiagramProperties( QgsVectorLayer* layer, QWidget* pare
   connect( mEnableDiagramsCheckBox, SIGNAL( toggled( bool ) ), mDiagramTypeFrame, SLOT( setEnabled( bool ) ) );
   connect( mEnableDiagramsCheckBox, SIGNAL( toggled( bool ) ), mDiagramFrame, SLOT( setEnabled( bool ) ) );
 
-  mScaleRangeWidget->setMapCanvas( UavMain::instance()->mapCanvas() );
+  mScaleRangeWidget->setMapCanvas( MainWindow::instance()->mapCanvas() );
   mSizeFieldExpressionWidget->registerGetExpressionContextCallback( &_getExpressionContext, mLayer );
 
   mBackgroundColorButton->setColorDialogTitle( tr( "Select background color" ) );
@@ -167,7 +167,7 @@ QgsDiagramProperties::QgsDiagramProperties( QgsVectorLayer* layer, QWidget* pare
   mSizeFieldExpressionWidget->setLayer( mLayer );
   QgsDistanceArea myDa;
   myDa.setSourceCrs( mLayer->crs().srsid() );
-  myDa.setEllipsoidalMode( UavMain::instance()->mapCanvas()->mapSettings().hasCrsTransformEnabled() );
+  myDa.setEllipsoidalMode( MainWindow::instance()->mapCanvas()->mapSettings().hasCrsTransformEnabled() );
   myDa.setEllipsoid( QgsProject::instance()->readEntry( "Measure", "/Ellipsoid", GEO_NONE ) );
   mSizeFieldExpressionWidget->setGeomCalculator( myDa );
 
@@ -546,7 +546,7 @@ void QgsDiagramProperties::on_mFindMaximumValueButton_clicked()
     QgsExpressionContext context;
     context << QgsExpressionContextUtils::globalScope()
     << QgsExpressionContextUtils::projectScope()
-    << QgsExpressionContextUtils::mapSettingsScope( UavMain::instance()->mapCanvas()->mapSettings() )
+    << QgsExpressionContextUtils::mapSettingsScope( MainWindow::instance()->mapCanvas()->mapSettings() )
     << QgsExpressionContextUtils::layerScope( mLayer );
 
     exp.prepare( &context );
@@ -609,7 +609,7 @@ void QgsDiagramProperties::apply()
 
   if ( diagramsEnabled && 0 == mDiagramAttributesTreeWidget->topLevelItemCount() )
   {
-    UavMain::instance()->messageBar()->pushMessage(
+    MainWindow::instance()->messageBar()->pushMessage(
       tr( "Diagrams: No attributes added." ),
       tr( "You did not add any attributes to this diagram layer. Please specify the attributes to visualize on the diagrams or disable diagrams." ),
       QgsMessageBar::WARNING );
@@ -803,7 +803,7 @@ void QgsDiagramProperties::showAddAttributeExpressionDialog()
   context << QgsExpressionContextUtils::globalScope()
   << QgsExpressionContextUtils::projectScope()
   << QgsExpressionContextUtils::atlasScope( nullptr )
-  << QgsExpressionContextUtils::mapSettingsScope( UavMain::instance()->mapCanvas()->mapSettings() )
+  << QgsExpressionContextUtils::mapSettingsScope( MainWindow::instance()->mapCanvas()->mapSettings() )
   << QgsExpressionContextUtils::layerScope( mLayer );
 
   QgsExpressionBuilderDialog dlg( mLayer, expression, this, "generic", context );
@@ -811,7 +811,7 @@ void QgsDiagramProperties::showAddAttributeExpressionDialog()
 
   QgsDistanceArea myDa;
   myDa.setSourceCrs( mLayer->crs().srsid() );
-  myDa.setEllipsoidalMode( UavMain::instance()->mapCanvas()->mapSettings().hasCrsTransformEnabled() );
+  myDa.setEllipsoidalMode( MainWindow::instance()->mapCanvas()->mapSettings().hasCrsTransformEnabled() );
   myDa.setEllipsoid( QgsProject::instance()->readEntry( "Measure", "/Ellipsoid", GEO_NONE ) );
   dlg.setGeomCalculator( myDa );
 

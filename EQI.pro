@@ -121,7 +121,8 @@ SOURCES += \
     qgis/app/qgsvectorlayerproperties.cpp \
     qgis/app/qgsjoindialog.cpp \
     qgis/app/qgsattributeactiondialog.cpp \
-    qgis/app/qgsdiagramproperties.cpp
+    qgis/app/qgsdiagramproperties.cpp \
+    qgis/app/qgslabelengineconfigdialog.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -171,7 +172,8 @@ HEADERS += \
     qgis/app/qgsjoindialog.h \
     qgis/app/qgsattributeactiondialog.h \
     qgis/plugins/qgsapplydialog.h \
-    qgis/app/qgsdiagramproperties.h
+    qgis/app/qgsdiagramproperties.h \
+    qgis/app/qgslabelengineconfigdialog.h
 
 FORMS += \
         mainwindow.ui \
@@ -196,7 +198,8 @@ FORMS += \
     ui/toolTab/tab_checkaerialphoto.ui \
     ui/dialog/dialog_about.ui \
     ui/qgis/qgsjoindialogbase.ui \
-    ui/qgis/qgsattributeactiondialogbase.ui
+    ui/qgis/qgsattributeactiondialogbase.ui \
+    ui/qgis/qgsengineconfigdialog.ui
 
 RESOURCES += \
     Resources/images/images.qrc
