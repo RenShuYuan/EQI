@@ -353,8 +353,11 @@ private:
     QAction *mActionZoomLast;
     QAction *mActionZoomNext;
     QAction *mActionDraw;
-    QAction *mActionIdentify;
 
+    //! 信息查询
+    QAction *mActionIdentify;
+    QAction *mActionMeasure;
+    QAction *mActionMeasureArea;
 
     //! 图层管理动作
     QAction *mActionFilterLegend;

@@ -55,35 +55,12 @@ class QgsOpenVectorLayerDialog : public QDialog, private Ui::QgsOpenVectorLayerD
     QString mDataSourceType;
 
   private slots:
-    //! Opens the create connection dialog to build a new connection
-    void addNewConnection();
-    //! Opens a dialog to edit an existing connection
-    void editConnection();
-    //! Deletes the selected connection
-    void deleteConnection();
-    //! Populate the connection list combo box
-    void populateConnectionList();
-    //! Sets the actual position in connection list
-    void setConnectionListPosition();
-    //! Sets the actual position in types connection list
-    void setConnectionTypeListPosition();
-    //! Sets the selected connection type
-    void setSelectedConnectionType();
-    //! Sets the selected connection
-    void setSelectedConnection();
-
     void accept() override;
 
     void on_buttonSelectSrc_clicked();
     void on_radioSrcFile_toggled( bool checked );
     void on_radioSrcDirectory_toggled( bool checked );
-    void on_radioSrcDatabase_toggled( bool checked );
-    void on_radioSrcProtocol_toggled( bool checked );
-    void on_btnNew_clicked();
-    void on_btnEdit_clicked();
-    void on_btnDelete_clicked();
-    void on_cmbDatabaseTypes_currentIndexChanged( const QString & text );
-    void on_cmbConnections_currentIndexChanged( const QString & text );
+ 
     void on_buttonBox_helpRequested() { QgsContextHelp::run( metaObject()->className() ); }
 };
 

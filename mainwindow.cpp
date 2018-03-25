@@ -15,6 +15,7 @@
 #include "ui/toolTab/tab_datamanagement.h"
 #include "ui/toolTab/tab_selectfeatures.h"
 #include "ui/toolTab/tab_checkaerialphoto.h"
+#include "ui/toolTab/tab_inquire.h"
 #include "ui/dialog/dialog_posloaddialog.h"
 #include "ui/dialog/dialog_printtktoxy_txt.h"
 #include "ui/dialog/dialog_prjtransformsetting.h"
@@ -1078,23 +1079,24 @@ void MainWindow::initActions()
     mActionDraw->setIcon(eqiApplication::getThemeIcon("mActionDraw.svg"));
     connect( mActionDraw, SIGNAL( triggered() ), this, SLOT( refreshMapCanvas() ) );
 
+    /*--------------------------------------------信息查询---------------------------------------------*/
     mActionIdentify = new QAction("识别要素", this);
     mActionIdentify->setShortcut(tr("Ctrl+Shift+I"));
     mActionIdentify->setStatusTip("识别要素");
     mActionIdentify->setIcon(eqiApplication::getThemeIcon("mActionIdentify.svg"));
     connect( mActionIdentify, SIGNAL( triggered() ), this, SLOT( identify() ) );
 
-//    mActionMeasure = new QAction("测量距离", this);
-//    mActionMeasure->setShortcut(tr("Ctrl+Shift+M"));
-//    mActionMeasure->setStatusTip("测量距离");
-//    mActionMeasure->setIcon(eqiApplication::getThemeIcon("mActionMeasure.png"));
-//    connect( mActionMeasure, SIGNAL( triggered() ), this, SLOT( measure() ) );
+    mActionMeasure = new QAction("测量距离", this);
+    mActionMeasure->setShortcut(tr("Ctrl+Shift+M"));
+    mActionMeasure->setStatusTip("测量距离");
+    mActionMeasure->setIcon(eqiApplication::getThemeIcon("mActionMeasure.png"));
+    connect( mActionMeasure, SIGNAL( triggered() ), this, SLOT( measure() ) );
 
-//    mActionMeasureArea = new QAction("测量面积", this);
-//    mActionMeasureArea->setShortcut(tr("Ctrl+Shift+J"));
-//    mActionMeasureArea->setStatusTip("测量面积");
-//    mActionMeasureArea->setIcon(eqiApplication::getThemeIcon("mActionMeasureArea.png"));
-//    connect( mActionMeasureArea, SIGNAL( triggered() ), this, SLOT( measureArea() ) );
+    mActionMeasureArea = new QAction("测量面积", this);
+    mActionMeasureArea->setShortcut(tr("Ctrl+Shift+J"));
+    mActionMeasureArea->setStatusTip("测量面积");
+    mActionMeasureArea->setIcon(eqiApplication::getThemeIcon("mActionMeasureArea.png"));
+    connect( mActionMeasureArea, SIGNAL( triggered() ), this, SLOT( measureArea() ) );
     /*--------------------------------------------图层操作---------------------------------------------*/
     mActionRemoveLayer = new QAction("移除图层/组", this);
     mActionRemoveLayer->setShortcut(tr("Ctrl+D"));
@@ -1361,9 +1363,13 @@ void MainWindow::initTabTools()
     m_MB->addWidget(new QLabel(label));
     m_MB->addAction(mActionZoomActualSize);
     m_MB->addWidget(new QLabel(label));
-    m_MB->addSeparator(); //---
     m_MB->addWidget(new QLabel(label));
     m_MB->addAction(mActionDraw);
+    m_MB->addSeparator(); //---
+    m_MB->addWidget(new QLabel(label));
+    m_MB->addAction(mActionMeasure);
+    m_MB->addWidget(new QLabel(label));
+    m_MB->addAction(mActionMeasureArea);
     m_MB->addWidget(new QLabel(label));
     m_MB->addAction(mActionIdentify);
 
@@ -1371,6 +1377,17 @@ void MainWindow::initTabTools()
     spacer_MB->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     m_MB->addWidget(spacer_MB);
     m_MB->addAction(mActionAbout);
+
+    // 初始化“信息查询”tab
+    tab_inquire *m_iq = new tab_inquire(this);
+    m_iq->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    m_iq->setIconSize(size);
+
+
+    QWidget *spacer_IQ = new QWidget(this);
+    spacer_IQ->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_iq->addWidget(spacer_IQ);
+    m_iq->addAction(mActionAbout);
 
     // 初始化“无人机数据管理”tab
     tab_uavDataManagement *m_uDM = new tab_uavDataManagement(this);
@@ -1525,9 +1542,10 @@ void MainWindow::initTabTools()
     // 添加tab到窗口
     toolTab = new QTabWidget;
     toolTab->addTab(m_MB, " 地图浏览 ");
+    toolTab->addTab(m_SF, " 要素选择 ");
     toolTab->addTab(m_uDM, "航摄数据管理");
     toolTab->addTab(m_CAP, "航摄数据预处理");
-    toolTab->addTab(m_SF, " 要素选择 ");
+    toolTab->addTab(m_iq, "像控点快速拾取");
     toolTab->addTab(m_tCTF, "文本坐标转换");
     toolTab->addTab(m_tFM, "标准分幅管理");
     toolTab->addTab(m_tDM, "　数据管理　");

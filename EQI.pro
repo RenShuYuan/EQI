@@ -101,7 +101,6 @@ SOURCES += \
     eqi/maptool/eqimaptoolpointtotk.cpp \
     qgis/app/qgsmaptoolselectutils.cpp \
     ui/toolTab/tab_datamanagement.cpp \
-    qgis/ogr/qgsopenvectorlayerdialog.cpp \
     qgis/app/qgsvectorlayersaveasdialog.cpp \
     qgis/ogr/qgsogrhelperfunctions.cpp \
     ui/dialog/dialog_printtktoxy_txt.cpp \
@@ -142,7 +141,6 @@ SOURCES += \
     qgis/app/qgslabelpreview.cpp \
     qgis/app/qgsrulebasedlabelingwidget.cpp \
     qgis/ogr/qgsogrhelperfunctions.cpp \
-    qgis/ogr/qgsopenvectorlayerdialog.cpp \
     qgis/ogr/qgsrulebasedlabelingwidget.cpp \
     qgis/app/qgsaddattrdialog.cpp \
     qgis/app/qgsdelattrdialog.cpp \
@@ -185,7 +183,9 @@ SOURCES += \
     qgis/app/qgsstatusbarcoordinateswidget.cpp \
     qgis/app/qgsvectorlayerproperties.cpp \
     qgis/app/qgsvectorlayersaveasdialog.cpp \
-    qgis/app/qgsvisibilitypresets.cpp
+    qgis/app/qgsvisibilitypresets.cpp \
+    ui/toolTab/tab_inquire.cpp \
+    qgis/ogr/qgsopenvectorlayerdialog.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -291,7 +291,9 @@ HEADERS += \
     qgis/app/qgsstatusbarcoordinateswidget.h \
     qgis/app/qgsvectorlayerproperties.h \
     qgis/app/qgsvectorlayersaveasdialog.h \
-    qgis/app/qgsvisibilitypresets.h
+    qgis/app/qgsvisibilitypresets.h \
+    ui/toolTab/tab_inquire.h \
+    qgis/ogr/qgsopenvectorlayerdialog.h
 FORMS += \
         mainwindow.ui \
     ui/toolTab/tab_coordinatetransformation.ui \
@@ -455,7 +457,8 @@ FORMS += \
     ui/symbollayer/widget_symbolslist.ui \
     ui/symbollayer/widget_vectorfield.ui \
     ui/qgis/qgsdualviewbase.ui \
-    ui/qgis/qgsattributeloadfrommap.ui
+    ui/qgis/qgsattributeloadfrommap.ui \
+    ui/toolTab/tab_inquire.ui
 
 RESOURCES += \
     Resources/images/images.qrc
