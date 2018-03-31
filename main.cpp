@@ -6,7 +6,6 @@
 #include <QDir>
 
 #include "qgsapplication.h"
-#include "qgseditorwidgetregistry.h"
 
 int main(int argc, char *argv[])
 {
@@ -21,7 +20,6 @@ int main(int argc, char *argv[])
     QCoreApplication::setApplicationName( "EQI" );
 
     QgsApplication a(argc, argv, true);
-    a.setWindowIcon( QIcon( "plane.ico" ) );
     QgsApplication::setDefaultSvgPaths( QStringList( QDir::currentPath()+"/Resources/images/svg" ) );
     QgsApplication::setPrefixPath( QDir::currentPath(), true );
     QgsApplication::init(QDir::currentPath()+"/Resources");
@@ -36,9 +34,6 @@ int main(int argc, char *argv[])
     m.setWindowState(Qt::WindowMaximized);
     m.setWindowTitle("EQI");
     m.show();
-
-    QgsEditorWidgetRegistry::initEditors();
-
 
     return a.exec();
 }

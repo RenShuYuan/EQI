@@ -1,4 +1,4 @@
-﻿/***************************************************************************
+/***************************************************************************
      QgsAttributeTableView.cpp
      --------------------------------------
     Date                 : Feb 2009
@@ -82,6 +82,7 @@ void QgsFeatureListView::setModel( QgsFeatureListModel* featureListModel )
 
   connect( mCurrentEditSelectionModel, SIGNAL( selectionChanged( QItemSelection, QItemSelection ) ), SLOT( editSelectionChanged( QItemSelection, QItemSelection ) ) );
 
+  connect( mModel->layerCache()->layer(), SIGNAL( attributeValueChanged( QgsFeatureId, int, QVariant ) ), this, SLOT( repaintRequested() ) );
 }
 
 bool QgsFeatureListView::setDisplayExpression( const QString& expression )
@@ -257,7 +258,8 @@ void QgsFeatureListView::mouseReleaseEvent( QMouseEvent *event )
   }
   else
   {
-    mFeatureSelectionModel->enableSync( true );
+    if ( mFeatureSelectionModel )
+      mFeatureSelectionModel->enableSync( true );
   }
 }
 

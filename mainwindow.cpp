@@ -3,10 +3,12 @@
 #include "eqi/eqiapplication.h"
 #include "eqi/eqifractalmanagement.h"
 #include "eqi/maptool/eqimaptoolpointtotk.h"
+#include "eqi/maptool/eqipcmfastpicksystem.h"
 #include "eqi/pos/posdataprocessing.h"
 #include "eqi/eqippinteractive.h"
 #include "eqi/eqianalysisaerialphoto.h"
 #include "eqi/eqisymbol.h"
+#include "eqi/gdal/eqigdalprogresstools.h"
 #include "ui_mainwindow.h"
 #include "ui/toolTab/tab_mapbrowsing.h"
 #include "ui/toolTab/tab_coordinatetransformation.h"
@@ -82,6 +84,9 @@
 #include "qgsmaptoolzoom.h"
 #include "qgsmaptoolpan.h"
 #include "qgspallabeling.h"
+#include "qgsrasterfilewriter.h"
+#include "qgseditorwidgetregistry.h"
+#include "qgsdataitem.h"
 
 MainWindow *MainWindow::smInstance = nullptr;
 
@@ -103,6 +108,7 @@ MainWindow::MainWindow(QWidget *parent) :
     , pPPInter( nullptr )
     , pAnalysis(nullptr)
     , sketchMapLayer(nullptr)
+    , pcm_rasterLayer(nullptr)
     , isSmSmall(false)
     , isPosLabel(false)
 {
@@ -177,8 +183,12 @@ MainWindow::MainWindow(QWidget *parent) :
     connect( pPosdp, SIGNAL( stopProcess() ), this, SLOT( canvasRefreshFinished() ) );
     upDataPosActions();
 
-    mRasterFileFilter = QgsProviderRegistry::instance()->fileRasterFilters();
+    // Init the editor widget types
+    QgsEditorWidgetRegistry::initEditors( mMapCanvas, mInfoBar );
 
+    // now build vector and raster file filters
+//    mVectorFileFilter = QgsProviderRegistry::instance()->fileVectorFilters();
+    mRasterFileFilter = QgsProviderRegistry::instance()->fileRasterFilters();
     setupConnections();
 
 //    eqiApplication::setStyle("F:/Develop/1.Programming/Qt/EQI/Resources/360safe.qss");
@@ -428,6 +438,11 @@ void MainWindow::deleteAerialPhotographyData(const QStringList &delList)
         QgsMessageLog::logMessage("删除相片：POS与相片没有建立联动关系，或POS与相片未完全对应，已忽略。");
 
     QgsMessageLog::logMessage(QString("删除航摄数据：%1项。").arg(delList.size()));
+}
+
+QgsRasterLayer *MainWindow::addRasterLayer(const QString &rasterFile, const QString &baseName, bool guiWarning)
+{
+    return addRasterLayerPrivate( rasterFile, baseName, QString(), guiWarning, true );
 }
 
 void MainWindow::about()
@@ -725,8 +740,8 @@ void MainWindow::activateDeactivateLayerRelatedActions(QgsMapLayer *layer)
     /***********Vector layers****************/
     if ( layer->type() == QgsMapLayer::VectorLayer )
     {
-        QgsVectorLayer* vlayer = qobject_cast<QgsVectorLayer *>( layer );
-        QgsVectorDataProvider* dprovider = vlayer->dataProvider();
+//        QgsVectorLayer* vlayer = qobject_cast<QgsVectorLayer *>( layer );
+//        QgsVectorDataProvider* dprovider = vlayer->dataProvider();
 
 //        bool isEditable = vlayer->isEditable();
 //        bool layerHasSelection = vlayer->selectedFeatureCount() > 0;
@@ -1013,7 +1028,7 @@ void MainWindow::activeLayerChanged(QgsMapLayer *layer)
 void MainWindow::markDirty()
 {
     // notify the project that there was a change
-    QgsProject::instance()->dirty( true );
+    QgsProject::instance()->setDirty( true );
 }
 
 void MainWindow::initActions()
@@ -1097,6 +1112,7 @@ void MainWindow::initActions()
     mActionMeasureArea->setStatusTip("测量面积");
     mActionMeasureArea->setIcon(eqiApplication::getThemeIcon("mActionMeasureArea.png"));
     connect( mActionMeasureArea, SIGNAL( triggered() ), this, SLOT( measureArea() ) );
+
     /*--------------------------------------------图层操作---------------------------------------------*/
     mActionRemoveLayer = new QAction("移除图层/组", this);
     mActionRemoveLayer->setShortcut(tr("Ctrl+D"));
@@ -1201,7 +1217,7 @@ void MainWindow::initActions()
 
     mActionDelOverlapping = new QAction("删除重叠度\n超限相片", this);
     mActionDelOverlapping->setStatusTip("在保证重叠度的情况下，自动删除已检查出所有超过最大重叠度的相片。");
-    mActionDelOverlapping->setIcon(eqiApplication::getThemeIcon("eqi/other/CheckOverlapping.png"));
+    mActionDelOverlapping->setIcon(eqiApplication::getThemeIcon("eqi/other/CheckOverlappingDel.png"));
     connect( mActionDelOverlapping, SIGNAL( triggered() ), this, SLOT( delOverlapping() ) );
 
     mActionDelSelect = new QAction("删除航摄数据", this);
@@ -1228,6 +1244,32 @@ void MainWindow::initActions()
     mActionSelectSetting->setIcon(eqiApplication::getThemeIcon("propertyicons/settings.svg"));
     mActionSelectSetting->setStatusTip("删除、保存所选航飞数据的相关设置。");
     connect( mActionSelectSetting, SIGNAL( triggered() ), this, SLOT( selectSetting() ));
+
+    /*--------------------------------------------像控点快速拾取---------------------------------------------*/
+    pcm_mActionAddDOMLayer = new QAction("加载DOM", this);
+    pcm_mActionAddDOMLayer->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionAddRasterLayer.png"));
+    pcm_mActionAddDOMLayer->setStatusTip("加载拾取像控点所用的DOM数据。");
+    connect( pcm_mActionAddDOMLayer, SIGNAL( triggered() ), this, SLOT( addPcmDomLayer() ));
+
+    pcm_mActionAddDEMLayer = new QAction("加载DEM", this);
+    pcm_mActionAddDEMLayer->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionAddDEMLayer.png"));
+    pcm_mActionAddDEMLayer->setStatusTip("加载拾取像控点所用的DEM高程模型。");
+    connect( pcm_mActionAddDEMLayer, SIGNAL( triggered() ), this, SLOT( addPcmDemPath() ));
+
+    pcm_mActionPickContrelPoint = new QAction("拾取像控点", this);
+    pcm_mActionPickContrelPoint->setIcon(eqiApplication::getThemeIcon("eqi/other/pickContrelPoint.png"));
+    pcm_mActionPickContrelPoint->setStatusTip("从视图上拾取像控点，直到右键结束。");
+    connect( pcm_mActionPickContrelPoint, SIGNAL( triggered() ), this, SLOT( pcmPicking() ));
+
+    pcm_mActionOutContrelPoint = new QAction("输出像控成果", this);
+    pcm_mActionOutContrelPoint->setIcon(eqiApplication::getThemeIcon("eqi/other/mActionLayerSaveAs.png"));
+    pcm_mActionOutContrelPoint->setStatusTip("输出所选取的像控点成果表，以及裁切的小影像。");
+    connect( pcm_mActionOutContrelPoint, SIGNAL( triggered() ), this, SLOT( printPcmToTxt() ));
+
+    pcm_mActionsetting = new QAction("设置", this);
+    pcm_mActionsetting->setIcon(eqiApplication::getThemeIcon("propertyicons/settings.svg"));
+    pcm_mActionsetting->setStatusTip("相关参数设置。");
+    connect( pcm_mActionsetting, SIGNAL( triggered() ), this, SLOT(  ));
 
     /*--------------------------------------------要素选择、航摄数据处理---------------------------------------------*/
     mActionSelectFeatures = new QAction("选择要素", this);
@@ -1378,11 +1420,24 @@ void MainWindow::initTabTools()
     m_MB->addWidget(spacer_MB);
     m_MB->addAction(mActionAbout);
 
-    // 初始化“信息查询”tab
+    // 初始化“像控点快速拾取”tab
     tab_inquire *m_iq = new tab_inquire(this);
     m_iq->setToolButtonStyle(Qt::ToolButtonIconOnly);
     m_iq->setIconSize(size);
-
+    m_iq->addWidget(new QLabel(label));
+    m_iq->addAction(pcm_mActionAddDOMLayer);
+    m_iq->addWidget(new QLabel(label));
+    m_iq->addAction(pcm_mActionAddDEMLayer);
+    m_iq->addWidget(new QLabel(label));
+    m_iq->addSeparator(); //---
+    m_iq->addWidget(new QLabel(label));
+    m_iq->addAction(pcm_mActionPickContrelPoint);
+    m_iq->addWidget(new QLabel(label));
+    m_iq->addAction(pcm_mActionOutContrelPoint);
+    m_iq->addWidget(new QLabel(label));
+    m_iq->addSeparator(); //---
+    m_iq->addWidget(new QLabel(label));
+    m_iq->addAction(pcm_mActionsetting);
 
     QWidget *spacer_IQ = new QWidget(this);
     spacer_IQ->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -1488,18 +1543,18 @@ void MainWindow::initTabTools()
     m_SF->addAction(mActionAbout);
 
     // 初始化“坐标转换”tab
-    tab_coordinateTransformation *m_tCTF = new tab_coordinateTransformation(this);
-    m_tCTF->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    m_tCTF->setIconSize(size);
-    m_tCTF->addWidget(new QLabel(label));
-    m_tCTF->addAction(mActionTextTranfrom);
-    m_tCTF->addWidget(new QLabel(label));
-    m_tCTF->addAction(mActionDegreeMutual);
+//    tab_coordinateTransformation *m_tCTF = new tab_coordinateTransformation(this);
+//    m_tCTF->setToolButtonStyle(Qt::ToolButtonIconOnly);
+//    m_tCTF->setIconSize(size);
+//    m_tCTF->addWidget(new QLabel(label));
+//    m_tCTF->addAction(mActionTextTranfrom);
+//    m_tCTF->addWidget(new QLabel(label));
+//    m_tCTF->addAction(mActionDegreeMutual);
 
-    QWidget *spacer_tCTF = new QWidget(this);
-    spacer_tCTF->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    m_tCTF->addWidget(spacer_tCTF);
-    m_tCTF->addAction(mActionAbout);
+//    QWidget *spacer_tCTF = new QWidget(this);
+//    spacer_tCTF->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+//    m_tCTF->addWidget(spacer_tCTF);
+//    m_tCTF->addAction(mActionAbout);
 
     // 初始化“标准分幅管理”tab
     tab_fractalManagement *m_tFM = new tab_fractalManagement(this);
@@ -1546,7 +1601,7 @@ void MainWindow::initTabTools()
     toolTab->addTab(m_uDM, "航摄数据管理");
     toolTab->addTab(m_CAP, "航摄数据预处理");
     toolTab->addTab(m_iq, "像控点快速拾取");
-    toolTab->addTab(m_tCTF, "文本坐标转换");
+//    toolTab->addTab(m_tCTF, "文本坐标转换");
     toolTab->addTab(m_tFM, "标准分幅管理");
     toolTab->addTab(m_tDM, "　数据管理　");
     ui->mainToolBar->addWidget(toolTab);
@@ -1989,26 +2044,97 @@ void MainWindow::askUserForOGRSublayers(QgsVectorLayer *layer)
     QStringList sublayers = layer->dataProvider()->subLayers();
     QString layertype = layer->dataProvider()->storageType();
 
-    // 我们初始化一个选择对话框并显示它
-    QgsSublayersDialog chooseSublayersDialog( QgsSublayersDialog::Ogr, "ogr", this );
-    chooseSublayersDialog.populateLayerTable( sublayers );
-
-    if ( chooseSublayersDialog.exec() )
+    QgsSublayersDialog::LayerDefinitionList list;
+    Q_FOREACH ( const QString& sublayer, sublayers )
     {
-        QString uri = layer->source();
-        //the separator char & was changed to | to be compatible
-        //with url for protocol drivers
-        if ( uri.contains( '|', Qt::CaseSensitive ) )
+        // OGR provider returns items in this format:
+        // <layer_index>:<name>:<feature_count>:<geom_type>
+
+        QStringList elements = sublayer.split( ":" );
+        // merge back parts of the name that may have been split
+        while ( elements.size() > 4 )
         {
-            // If we get here, there are some options added to the filename.
-            // A valid uri is of the form: filename&option1=value1&option2=value2,...
-            // We want only the filename here, so we get the first part of the split.
-            QStringList theURIParts = uri.split( '|' );
-            uri = theURIParts.at( 0 );
+            elements[1] += ":" + elements[2];
+            elements.removeAt( 2 );
         }
-        QgsDebugMsg( "Layer type " + layertype );
-        // the user has done his choice
-        loadOGRSublayers( layertype, uri, chooseSublayersDialog.selectionNames() );
+
+        if ( elements.count() == 4 )
+        {
+            QgsSublayersDialog::LayerDefinition def;
+            def.layerId = elements[0].toInt();
+            def.layerName = elements[1];
+            def.count = elements[2].toInt();
+            def.type = elements[3];
+            list << def;
+        }
+        else
+        {
+            QgsDebugMsg( "Unexpected output from OGR provider's subLayers()! " + sublayer );
+        }
+    }
+
+
+    // We initialize a selection dialog and display it.
+    QgsSublayersDialog chooseSublayersDialog( QgsSublayersDialog::Ogr, "ogr", this );
+    chooseSublayersDialog.populateLayerTable( list );
+
+    if ( !chooseSublayersDialog.exec() )
+        return;
+
+    QString uri = layer->source();
+    //the separator char & was changed to | to be compatible
+    //with url for protocol drivers
+    if ( uri.contains( '|', Qt::CaseSensitive ) )
+    {
+        // If we get here, there are some options added to the filename.
+        // A valid uri is of the form: filename&option1=value1&option2=value2,...
+        // We want only the filename here, so we get the first part of the split.
+        QStringList theURIParts = uri.split( '|' );
+        uri = theURIParts.at( 0 );
+    }
+    QgsDebugMsg( "Layer type " + layertype );
+
+    // The uri must contain the actual uri of the vectorLayer from which we are
+    // going to load the sublayers.
+    QString fileName = QFileInfo( uri ).baseName();
+    QList<QgsMapLayer *> myList;
+    Q_FOREACH ( const QgsSublayersDialog::LayerDefinition& def, chooseSublayersDialog.selection() )
+    {
+        QString layerGeometryType = def.type;
+        QString composedURI = uri + "|layerid=" + QString::number( def.layerId );
+
+        if ( !layerGeometryType.isEmpty() )
+        {
+            composedURI += "|geometrytype=" + layerGeometryType;
+        }
+
+        QgsDebugMsg( "Creating new vector layer using " + composedURI );
+        QString name = fileName + " " + def.layerName;
+        if ( !layerGeometryType.isEmpty() )
+            name += " " + layerGeometryType;
+        QgsVectorLayer *layer = new QgsVectorLayer( composedURI, name, "ogr", false );
+        if ( layer && layer->isValid() )
+        {
+            myList << layer;
+        }
+        else
+        {
+            QString msg = tr( "%1 is not a valid or recognized data source" ).arg( composedURI );
+            messageBar()->pushMessage( tr( "Invalid Data Source" ), msg, QgsMessageBar::CRITICAL, messageTimeout() );
+            if ( layer )
+                delete layer;
+        }
+    }
+
+    if ( ! myList.isEmpty() )
+    {
+        // Register layer(s) with the layers registry
+        QgsMapLayerRegistry::instance()->addMapLayers( myList );
+        Q_FOREACH ( QgsMapLayer *l, myList )
+        {
+            bool ok;
+            l->loadDefaultStyle( ok );
+        }
     }
 }
 
@@ -3005,7 +3131,7 @@ bool MainWindow::addVectorLayers(const QStringList &theLayerQStringList, const Q
                 Q_ASSERT( elements.size() >= 4 );
                 if ( layer->name() != elements.at( 1 ) )
                 {
-                    layer->setLayerName( QString( "%1 %2 %3" ).arg( layer->name(), elements.at( 1 ), elements.at( 3 ) ) );
+                    layer->setName( QString( "%1 %2 %3" ).arg( layer->name(), elements.at( 1 ), elements.at( 3 ) ) );
                 }
 
                 myList << layer;
@@ -3057,7 +3183,7 @@ bool MainWindow::addVectorLayers(const QStringList &theLayerQStringList, const Q
 void MainWindow::addRasterLayer()
 {
     QStringList selectedFiles;
-    QString e;//只为参数的正确性
+    QString e;  //只为参数的正确性
     QString title = "打开GDAL支持的光栅数据源";
     QgisGui::openFilesRememberingFilter( "lastRasterFileFilter", mRasterFileFilter, selectedFiles, e, title );
 
@@ -3197,6 +3323,117 @@ bool MainWindow::shouldAskUserForGDALSublayers(QgsRasterLayer *layer)
     return promptLayers == 0 || promptLayers == 3 || ( promptLayers == 1 && layer->bandCount() == 0 );
 }
 
+bool MainWindow::askUserForZipItemLayers(QString path)
+{
+    bool ok = false;
+    QVector<QgsDataItem*> childItems;
+    QgsZipItem *zipItem = nullptr;
+    QSettings settings;
+    int promptLayers = settings.value( "/qgis/promptForRasterSublayers", 1 ).toInt();
+
+    QgsDebugMsg( "askUserForZipItemLayers( " + path + ')' );
+
+    // if scanZipBrowser == no: skip to the next file
+    if ( settings.value( "/qgis/scanZipInBrowser2", "basic" ).toString() == "no" )
+    {
+      return false;
+    }
+
+    zipItem = new QgsZipItem( nullptr, path, path );
+    if ( ! zipItem )
+      return false;
+
+    zipItem->populate();
+    QgsDebugMsg( QString( "Path= %1 got zipitem with %2 children" ).arg( path ).arg( zipItem->rowCount() ) );
+
+    // if 1 or 0 child found, exit so a normal item is created by gdal or ogr provider
+    if ( zipItem->rowCount() <= 1 )
+    {
+      zipItem->deleteLater();
+      return false;
+    }
+
+    // if promptLayers=Load all, load all layers without prompting
+    if ( promptLayers == 3 )
+    {
+      childItems = zipItem->children();
+    }
+    // exit if promptLayers=Never
+    else if ( promptLayers == 2 )
+    {
+      zipItem->deleteLater();
+      return false;
+    }
+    else
+    {
+      // We initialize a selection dialog and display it.
+      QgsSublayersDialog chooseSublayersDialog( QgsSublayersDialog::Vsifile, "vsi", this );
+      QgsSublayersDialog::LayerDefinitionList layers;
+
+      for ( int i = 0; i < zipItem->children().size(); i++ )
+      {
+        QgsDataItem *item = zipItem->children().at( i );
+        QgsLayerItem *layerItem = dynamic_cast<QgsLayerItem *>( item );
+        if ( !layerItem )
+          continue;
+
+        QgsDebugMsgLevel( QString( "item path=%1 provider=%2" ).arg( item->path(), layerItem->providerKey() ), 2 );
+
+        QgsSublayersDialog::LayerDefinition def;
+        def.layerId = i;
+        def.layerName = item->name();
+        if ( layerItem->providerKey() == "gdal" )
+        {
+          def.type = tr( "Raster" );
+        }
+        else if ( layerItem->providerKey() == "ogr" )
+        {
+          def.type = tr( "Vector" );
+        }
+        layers << def;
+      }
+
+      chooseSublayersDialog.populateLayerTable( layers );
+
+      if ( chooseSublayersDialog.exec() )
+      {
+        Q_FOREACH ( const QgsSublayersDialog::LayerDefinition& def, chooseSublayersDialog.selection() )
+        {
+          childItems << zipItem->children().at( def.layerId );
+        }
+      }
+    }
+
+    if ( childItems.isEmpty() )
+    {
+      // return true so dialog doesn't popup again (#6225) - hopefully this doesn't create other trouble
+      ok = true;
+    }
+
+    // add childItems
+    Q_FOREACH ( QgsDataItem* item, childItems )
+    {
+      QgsLayerItem *layerItem = dynamic_cast<QgsLayerItem *>( item );
+      if ( !layerItem )
+        continue;
+
+      QgsDebugMsg( QString( "item path=%1 provider=%2" ).arg( item->path(), layerItem->providerKey() ) );
+      if ( layerItem->providerKey() == "gdal" )
+      {
+        if ( addRasterLayer( item->path(), QFileInfo( item->name() ).completeBaseName() ) )
+          ok = true;
+      }
+      else if ( layerItem->providerKey() == "ogr" )
+      {
+        if ( addVectorLayers( QStringList( item->path() ), "System", "file" ) )
+          ok = true;
+      }
+    }
+
+    zipItem->deleteLater();
+    return ok;
+}
+
 void MainWindow::askUserForGDALSublayers(QgsRasterLayer *layer)
 {
     if ( !layer )
@@ -3255,35 +3492,122 @@ void MainWindow::askUserForGDALSublayers(QgsRasterLayer *layer)
         layers << QString( "%1|%2" ).arg( i ).arg( name );
     }
 
-    chooseSublayersDialog.populateLayerTable( layers, "|" );
+    chooseSublayersDialog.populateLayerTable( layers );
 
     if ( chooseSublayersDialog.exec() )
     {
-        // 创造出更多的信息图层名称，包含文件名以及子名字
+        // create more informative layer names, containing filename as well as sublayer name
         QRegExp rx( "\"(.*)\"" );
         QString uri, name;
 
-        Q_FOREACH ( int i, chooseSublayersDialog.selectionIndexes() )
+        Q_FOREACH ( const QgsSublayersDialog::LayerDefinition& def, chooseSublayersDialog.selection() )
         {
-            if ( rx.indexIn( sublayers[i] ) != -1 )
-            {
-                uri = rx.cap( 1 );
-                name = sublayers[i];
-                name.replace( uri, QFileInfo( uri ).completeBaseName() );
-            }
-            else
-            {
-                name = names[i];
-            }
+          int i = def.layerId;
+          if ( rx.indexIn( sublayers[i] ) != -1 )
+          {
+            uri = rx.cap( 1 );
+            name = sublayers[i];
+            name.replace( uri, QFileInfo( uri ).completeBaseName() );
+          }
+          else
+          {
+            name = names[i];
+          }
 
-            QgsRasterLayer *rlayer = new QgsRasterLayer( sublayers[i], name );
-            if ( rlayer && rlayer->isValid() )
-                addRasterLayer( rlayer );
+          QgsRasterLayer *rlayer = new QgsRasterLayer( sublayers[i], name );
+          if ( rlayer && rlayer->isValid() )
+          {
+            addRasterLayer( rlayer );
+          }
         }
     }
 }
 
-bool MainWindow::addRasterLayers(const QStringList &theFileNameQStringList, bool guiWarning)
+bool MainWindow::addRasterLayers(QStringList const &theFileNameQStringList, bool guiWarning)
+{
+    if ( theFileNameQStringList.empty() )
+    {
+      // no files selected so bail out, but
+      // allow mMapCanvas to handle events
+      // first
+      mMapCanvas->freeze( false );
+      return false;
+    }
+    mMapCanvas->freeze( true );
+
+    // this is messy since some files in the list may be rasters and others may
+    // be ogr layers. We'll set returnValue to false if one or more layers fail
+    // to load.
+    bool returnValue = true;
+    for ( QStringList::ConstIterator myIterator = theFileNameQStringList.begin();
+          myIterator != theFileNameQStringList.end();
+          ++myIterator )
+    {
+      QString errMsg;
+      bool ok = false;
+
+      // if needed prompt for zipitem layers
+      QString vsiPrefix = QgsZipItem::vsiPrefix( *myIterator );
+      if ( ! myIterator->startsWith( "/vsi", Qt::CaseInsensitive ) &&
+           ( vsiPrefix == "/vsizip/" || vsiPrefix == "/vsitar/" ) )
+      {
+        if ( askUserForZipItemLayers( *myIterator ) )
+          continue;
+      }
+
+      if ( QgsRasterLayer::isValidRasterFileName( *myIterator, errMsg ) )
+      {
+        QFileInfo myFileInfo( *myIterator );
+
+        // try to create the layer
+        QgsRasterLayer *layer = addRasterLayerPrivate( *myIterator, myFileInfo.completeBaseName(),
+                                QString(), guiWarning, true );
+        if ( layer && layer->isValid() )
+        {
+          //only allow one copy of a ai grid file to be loaded at a
+          //time to prevent the user selecting all adfs in 1 dir which
+          //actually represent 1 coverate,
+
+          if ( myFileInfo.fileName().toLower().endsWith( ".adf" ) )
+          {
+            break;
+          }
+        }
+        // if layer is invalid addRasterLayerPrivate() will show the error
+
+      } // valid raster filename
+      else
+      {
+        ok = false;
+
+        // Issue message box warning unless we are loading from cmd line since
+        // non-rasters are passed to this function first and then successfully
+        // loaded afterwards (see main.cpp)
+        if ( guiWarning )
+        {
+          QString msg = tr( "%1 is not a supported raster data source" ).arg( *myIterator );
+          if ( !errMsg.isEmpty() )
+            msg += '\n' + errMsg;
+
+          messageBar()->pushMessage( tr( "Unsupported Data Source" ), msg, QgsMessageBar::CRITICAL, messageTimeout() );
+        }
+      }
+      if ( ! ok )
+      {
+        returnValue = false;
+      }
+    }
+
+    mMapCanvas->freeze( false );
+    mMapCanvas->refresh();
+
+  // Let render() do its own cursor management
+  //  QApplication::restoreOverrideCursor();
+
+    return returnValue;
+}
+
+bool MainWindow::addRasterLayers(const QStringList &theFileNameQStringList, QgsRasterLayer*& rasterLayer, bool guiWarning)
 {
     if ( theFileNameQStringList.empty() )
     {
@@ -3317,6 +3641,8 @@ bool MainWindow::addRasterLayers(const QStringList &theFileNameQStringList, bool
                 QString(), guiWarning, true );
             if ( layer && layer->isValid() )
             {
+                rasterLayer = layer;
+
                 //只允许一次加载一个AI网格文件的一个副本，
                 // 以防止用户选择在1目录中的所有ADFS这实际上代表1覆盖，
                 if ( myFileInfo.fileName().toLower().endsWith( ".adf" ) )
@@ -3582,4 +3908,85 @@ void MainWindow::prjtransformsetting()
 {
     dialog_PrjTransformSetting *ptfs = new dialog_PrjTransformSetting(this);
     ptfs->exec();
+}
+
+void MainWindow::addPcmDomLayer()
+{
+    QStringList selectedFiles;
+    QString e;  //只为参数的正确性
+    QString title = "打开GDAL支持的光栅数据源";
+    QgisGui::openFilesRememberingFilter( "lastRasterFileFilter", mRasterFileFilter, selectedFiles, e, title );
+
+    if ( selectedFiles.isEmpty() )
+    {
+        // no files were selected, so just bail
+        return;
+    }
+
+    addRasterLayers( selectedFiles, pcm_rasterLayer );
+}
+
+void MainWindow::addPcmDemPath()
+{
+    QString e;  //只为参数的正确性
+    QString title = "打开GDAL支持的光栅数据源";
+    QgisGui::openFilesRememberingFilter( "lastRasterFileFilter", mRasterFileFilter, pcm_demPaths, e, title );
+}
+
+void MainWindow::readPickPcm(QStringList &list)
+{
+    pcmList = list;
+}
+
+void MainWindow::pcmPicking()
+{
+//    if (!pcm_rasterLayer) return;
+//    if (pcm_demPaths.isEmpty()) return;
+
+    eqiGdalProgressTools tools;
+//    QString str = "-projwin 407755 3393182 408292 3392879 -ot Float32 -of GTiff F:\\工作相关\\文档\\科技管理\\中航时无人机\\鹞鹰\\自己分析资料\\Export11-12-49.tif D:\\OUTPUT.tif";
+    QString str = "-projwin 103.666249134 33.4037333545 104.011500398 33.074949667 -ot Float32 -of GTiff F:\\工作相关\\文档\\科技管理\\中航时无人机\\鹞鹰\\自己分析资料\\Export11-12-49.tif D:\\OUTPUT.tif";
+    tools.eqiGDALTranslate(str);
+    qDebug() << "eqiGDALTranslate完成。。。。。。。。。。。";
+    return;
+//    eqiPcmFastPickSystem *pfps = new eqiPcmFastPickSystem(mMapCanvas, pcm_rasterLayer, pcm_demPaths);
+//    connect( pfps, SIGNAL( readPickPcm(QStringList&) ), this, SLOT( readPickPcm(QStringList&) ) );
+//    mMapCanvas->setMapTool(pfps);
+}
+
+void MainWindow::printPcmToTxt()
+{
+    // 读取保存的上一次路径
+    QString strListPath = mSettings.value( "/eqi/pos/pathName", QDir::homePath()).toString();
+
+    //浏览文件夹
+    QString dir = QFileDialog::getExistingDirectory(nullptr, "选择文件夹", strListPath,
+                                                    QFileDialog::ShowDirsOnly |
+                                                    QFileDialog::DontResolveSymlinks);
+    if (dir.isEmpty()) return;
+    mSettings.setValue("/eqi/pos/pathName", dir);
+
+    // 创建txt保存XYZ坐标
+    QString path = dir + "/control.txt";
+    QFile file(path);
+    if (!file.open(QFile::WriteOnly | QFile::Text | QFile::Truncate))   //只写、文本、重写
+    {
+        MainWindow::instance()->messageBar()->pushMessage( "导出控制点成果表",
+            QString("创建%1文件失败.").arg(QDir::toNativeSeparators(path)),
+            QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
+        QgsMessageLog::logMessage(QString("导出控制点成果表 : \t创建%1文件失败.").arg(QDir::toNativeSeparators(path)));
+        return;
+    }
+
+    QTextStream out(&file);
+    foreach (QString str, pcmList)
+    {
+        out << str;
+    }
+    file.close();
+
+    MainWindow::instance()->messageBar()->pushMessage( "导出控制点成果表",
+        "控制点坐标导出到control.txt",
+        QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
+    QgsMessageLog::logMessage("导出控制点成果表 : \t控制点坐标导出到control.txt.");
 }

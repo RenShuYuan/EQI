@@ -22,26 +22,44 @@ DEFINES += QT_DEPRECATED_WARNINGS
 # You can also select to disable deprecated APIs only up to a certain version of Qt.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
-#RC_ICONS = plane.ico
 RC_FILE += my.rc
 
 # 加载头文件
-INCLUDEPATH +=  C:/qgis-2.14.4/dev/include \
+INCLUDEPATH +=	C:/qgis-2.18.18/dev/include \
+                C:/qgis-2.18.18/qgis-2.18.18/src \
+                C:/qgis-2.18.18/qgis-2.18.18/src/python \
+                C:/qgis-2.18.18/qgis-2.18.18/src/plugins \
+                C:/qgis-2.18.18/qgis-2.18.18/src/core \
+                C:/qgis-2.18.18/qgis-2.18.18/src/core/auth \
+                C:/qgis-2.18.18/qgis-2.18.18/src/core/composer \
+                C:/qgis-2.18.18/qgis-2.18.18/src/core/dxf \
+                C:/qgis-2.18.18/qgis-2.18.18/src/core/effects \
+                C:/qgis-2.18.18/qgis-2.18.18/src/core/geometry \
+                C:/qgis-2.18.18/qgis-2.18.18/src/core/layertree \
+                C:/qgis-2.18.18/qgis-2.18.18/src/core/pal \
+                C:/qgis-2.18.18/qgis-2.18.18/src/core/raster \
+                C:/qgis-2.18.18/qgis-2.18.18/src/core/renderer \
+                C:/qgis-2.18.18/qgis-2.18.18/src/core/symbology-ng \
+                C:/qgis-2.18.18/qgis-2.18.18/src/core/gps/qextserialport \
+                C:/qgis-2.18.18/qgis-2.18.18/src/gui \
+                C:/qgis-2.18.18/qgis-2.18.18/src/app \
+                C:/qgis-2.18.18/qgis-2.18.18/src/app/ogr \
+                C:/qgis-2.18.18/qgis-2.18.18/src/app/pluginmanager \
                 C:/OSGeo4W/include \
-                C:/OSGeo4W/include/qt4 \
-                C:/OSGeo4W/include/libxml \
-                C:/OSGeo4W/include/qwt \
                 C:/OSGeo4W/include/spatialindex \
                 C:/OSGeo4W/include/spatialite \
-                C:/qgis-2.14.4/qgis-2.14.4/src/core \
-                C:/qgis-2.14.4/qgis-2.14.4/src/core/pal \
-                C:/qgis-2.14.4/qgis-2.14.4/src/core/geometry \
-                C:/qgis-2.14.4/qgis-2.14.4/src/core/raster \
-                C:/qgis-2.14.4/qgis-2.14.4/src/python \
-                C:/qgis-2.14.4/qgis-2.14.4/src/gui
+                C:/OSGeo4W/include/qwt \
+                C:/OSGeo4W/include/qt4 \
+                C:/OSGeo4W/include/qt4/QtCrypto \
+                C:/Qt/4.8.6/include/QtSvg \
+                C:/Qt/4.8.6/include/QtGui \
+                C:/Qt/4.8.6/include/QtXml \
+                C:/Qt/4.8.6/include/QtSql \
+                C:/Qt/4.8.6/include/QtNetwork \
+                C:/Qt/4.8.6/include/QtCore
 
 # 加载lib文件
-LIBS += -LC:/qgis-2.14.4/dev/lib    -lqgis_core \
+LIBS += -LC:/qgis-2.18.18/dev/lib   -lqgis_core \
                                     -lqgis_gui \
                                     -lqgis_networkanalysis \
                                     -lqgis_analysis \
@@ -62,10 +80,17 @@ LIBS += -LC:/OSGeo4W/lib    -llibexpat \
                             -lszip \
                             -lspatialindex_i \
 
-#win32: LIBS += -L C:/gdal201/lib/ -lgdal
-#INCLUDEPATH += C:/gdal201/include
-#DEPENDPATH += C:/gdal201/include
+#DEFINES += NOMINMAX
+#DEFINES += WITH_QTWEBKIT
+#DEFINES += CORE_EXPORT=__declspec(dllimport)
+#DEFINES += GUI_EXPORT=_declspec(dllimport)
+#DEFINES += GUI_EXPORT=__declspec(dllimport)
+#DEFINES += ANALYSIS_EXPORT=_declspec(dllimport)
+#DEFINES += APP_EXPORT=__declspec(dllexport)
+#DEFINES += PYTHON_EXPORT=__declspec(dllimport)
 
+DEFINES += WIN32
+DEFINES += _WINDOWS
 DEFINES += NOMINMAX
 DEFINES += WITH_QTWEBKIT
 DEFINES += CORE_EXPORT=__declspec(dllimport)
@@ -73,6 +98,29 @@ DEFINES += GUI_EXPORT=_declspec(dllimport)
 DEFINES += ANALYSIS_EXPORT=_declspec(dllimport)
 DEFINES += APP_EXPORT=__declspec(dllexport)
 DEFINES += PYTHON_EXPORT=__declspec(dllimport)
+DEFINES += SPATIALITE_VERSION_GE_4_0_0
+DEFINES += SPATIALITE_VERSION_G_4_1_1
+DEFINES += SPATIALITE_HAS_INIT_EX
+DEFINES += NDEBUG
+DEFINES += QGISDEBUG=1
+DEFINES += CUSTOMWIDGETS_EXPORT=__declspec(dllimport)
+DEFINES += SERVER_EXPORT=__declspec(dllimport)
+DEFINES += QT_DLL
+DEFINES += QT_NO_DEBUG
+DEFINES += QT_SVG_LIB
+DEFINES += QT_GUI_LIB
+DEFINES += QT_XML_LIB
+DEFINES += QT_SQL_LIB
+DEFINES += QT_NETWORK_LIB
+DEFINES += QT_CORE_LIB
+DEFINES += ENABLE_TESTS
+DEFINES += QT_NO_CAST_TO_ASCII
+DEFINES += _USE_MATH_DEFINES
+DEFINES += _CRT_SECURE_NO_WARNINGS
+DEFINES += _CRT_NONSTDC_NO_WARNINGS
+DEFINES += _TTY_WIN_
+DEFINES += _HAVE_WINDOWS_H_
+DEFINES += qgis_core_EXPORTS
 
 QMAKE_CXXFLAGS_RELEASE += /Zi
 QMAKE_CXXFLAGS_RELEASE += /Od
@@ -80,8 +128,8 @@ QMAKE_LFLAGS_RELEASE += /DEBUG
 DEFINES -=QT_NO_DEBUG_OUTPUT # enable debug output
 
 SOURCES += \
-        main.cpp \
-        mainwindow.cpp \
+    main.cpp \
+    mainwindow.cpp \
     ui/toolTab/tab_coordinatetransformation.cpp \
     qgis/app/qgsstatusbarcoordinateswidget.cpp \
     eqi/eqiapplication.cpp \
@@ -125,7 +173,6 @@ SOURCES += \
     qgis/app/qgsrasterlayerproperties.cpp \
     qgis/app/qgsvectorlayerproperties.cpp \
     qgis/app/qgsjoindialog.cpp \
-    qgis/app/qgsattributeactiondialog.cpp \
     qgis/app/qgsdiagramproperties.cpp \
     qgis/app/qgslabelengineconfigdialog.cpp \
     qgis/app/qgsfieldcalculator.cpp \
@@ -140,55 +187,22 @@ SOURCES += \
     qgis/app/qgsaddtaborgroup.cpp \
     qgis/app/qgslabelpreview.cpp \
     qgis/app/qgsrulebasedlabelingwidget.cpp \
-    qgis/ogr/qgsogrhelperfunctions.cpp \
     qgis/ogr/qgsrulebasedlabelingwidget.cpp \
     qgis/app/qgsaddattrdialog.cpp \
     qgis/app/qgsdelattrdialog.cpp \
-    qgis/app/qgisappstylesheet.cpp \
-    qgis/app/qgsaddattrdialog.cpp \
-    qgis/app/qgsaddtaborgroup.cpp \
-    qgis/app/qgsapplayertreeviewmenuprovider.cpp \
-    qgis/app/qgsattributeactiondialog.cpp \
     qgis/app/qgsattributetabledialog.cpp \
     qgis/app/qgsattributetypedialog.cpp \
-    qgis/app/qgsclipboard.cpp \
-    qgis/app/qgsdelattrdialog.cpp \
-    qgis/app/qgsdiagramproperties.cpp \
     qgis/app/qgsfeatureaction.cpp \
-    qgis/app/qgsfieldcalculator.cpp \
-    qgis/app/qgsfieldsproperties.cpp \
     qgis/app/qgsguivectorlayertools.cpp \
-    qgis/app/qgsidentifyresultsdialog.cpp \
-    qgis/app/qgsjoindialog.cpp \
-    qgis/app/qgslabeldialog.cpp \
-    qgis/app/qgslabelengineconfigdialog.cpp \
-    qgis/app/qgslabelinggui.cpp \
-    qgis/app/qgslabelingwidget.cpp \
-    qgis/app/qgslabelpreview.cpp \
-    qgis/app/qgsloadstylefromdbdialog.cpp \
-    qgis/app/qgsmaplayerstyleguiutils.cpp \
-    qgis/app/qgsmaptoolidentifyaction.cpp \
-    qgis/app/qgsmaptoolselectfreehand.cpp \
-    qgis/app/qgsmaptoolselectpolygon.cpp \
-    qgis/app/qgsmaptoolselectrectangle.cpp \
-    qgis/app/qgsmaptoolselectutils.cpp \
-    qgis/app/qgsmeasuredialog.cpp \
-    qgis/app/qgsmeasuretool.cpp \
-    qgis/app/qgspluginmetadata.cpp \
-    qgis/app/qgspluginregistry.cpp \
-    qgis/app/qgsprojectproperties.cpp \
-    qgis/app/qgsrasterlayerproperties.cpp \
-    qgis/app/qgsrulebasedlabelingwidget.cpp \
-    qgis/app/qgssavestyletodbdialog.cpp \
-    qgis/app/qgsstatusbarcoordinateswidget.cpp \
-    qgis/app/qgsvectorlayerproperties.cpp \
-    qgis/app/qgsvectorlayersaveasdialog.cpp \
-    qgis/app/qgsvisibilitypresets.cpp \
     ui/toolTab/tab_inquire.cpp \
-    qgis/ogr/qgsopenvectorlayerdialog.cpp
+    qgis/ogr/qgsopenvectorlayerdialog.cpp \
+    eqi/maptool/eqipcmfastpicksystem.cpp \
+    qgis/app/qgsattributeactiondialog.cpp \
+    qgis/app/qgsattributeactionpropertiesdialog.cpp \
+    eqi/gdal/eqigdalprogresstools.cpp
 
 HEADERS += \
-        mainwindow.h \
+    mainwindow.h \
     ui/toolTab/tab_coordinatetransformation.h \
     qgis/app/qgsstatusbarcoordinateswidget.h \
     eqi/eqiapplication.h \
@@ -231,7 +245,6 @@ HEADERS += \
     qgis/app/qgsrasterlayerproperties.h \
     qgis/app/qgsvectorlayerproperties.h \
     qgis/app/qgsjoindialog.h \
-    qgis/app/qgsattributeactiondialog.h \
     qgis/plugins/qgsapplydialog.h \
     qgis/app/qgsdiagramproperties.h \
     qgis/app/qgslabelengineconfigdialog.h \
@@ -252,50 +265,22 @@ HEADERS += \
     qgis/ogr/qgsrulebasedlabelingwidget.h \
     qgis/app/qgsaddattrdialog.h \
     qgis/app/qgsdelattrdialog.h \
-    qgis/app/qgisappstylesheet.h \
-    qgis/app/qgsaddattrdialog.h \
-    qgis/app/qgsaddtaborgroup.h \
-    qgis/app/qgsapplayertreeviewmenuprovider.h \
-    qgis/app/qgsattributeactiondialog.h \
     qgis/app/qgsattributetabledialog.h \
     qgis/app/qgsattributetypedialog.h \
-    qgis/app/qgsclipboard.h \
-    qgis/app/qgsdelattrdialog.h \
-    qgis/app/qgsdiagramproperties.h \
     qgis/app/qgsfeatureaction.h \
-    qgis/app/qgsfieldcalculator.h \
-    qgis/app/qgsfieldsproperties.h \
     qgis/app/qgsguivectorlayertools.h \
-    qgis/app/qgsidentifyresultsdialog.h \
-    qgis/app/qgsjoindialog.h \
-    qgis/app/qgslabeldialog.h \
-    qgis/app/qgslabelengineconfigdialog.h \
-    qgis/app/qgslabelinggui.h \
-    qgis/app/qgslabelingwidget.h \
-    qgis/app/qgslabelpreview.h \
-    qgis/app/qgsloadstylefromdbdialog.h \
-    qgis/app/qgsmaplayerstyleguiutils.h \
-    qgis/app/qgsmaptoolidentifyaction.h \
-    qgis/app/qgsmaptoolselectfreehand.h \
-    qgis/app/qgsmaptoolselectpolygon.h \
-    qgis/app/qgsmaptoolselectrectangle.h \
-    qgis/app/qgsmaptoolselectutils.h \
-    qgis/app/qgsmeasuredialog.h \
-    qgis/app/qgsmeasuretool.h \
-    qgis/app/qgspluginmetadata.h \
-    qgis/app/qgspluginregistry.h \
-    qgis/app/qgsprojectproperties.h \
-    qgis/app/qgsrasterlayerproperties.h \
-    qgis/app/qgsrulebasedlabelingwidget.h \
-    qgis/app/qgssavestyletodbdialog.h \
-    qgis/app/qgsstatusbarcoordinateswidget.h \
-    qgis/app/qgsvectorlayerproperties.h \
-    qgis/app/qgsvectorlayersaveasdialog.h \
-    qgis/app/qgsvisibilitypresets.h \
     ui/toolTab/tab_inquire.h \
-    qgis/ogr/qgsopenvectorlayerdialog.h
+    eqi/maptool/eqipcmfastpicksystem.h \
+    gdal/commonutils.h \
+    gdal/gdal_utils_priv.h \
+    qgis/app/qgsattributeactiondialog.h \
+    qgis/app/qgsattributeactionpropertiesdialog.h \
+    gdal/commonutils.h \
+    gdal/gdal_utils_priv.h \
+    eqi/gdal/eqigdalprogresstools.h
+
 FORMS += \
-        mainwindow.ui \
+    mainwindow.ui \
     ui/toolTab/tab_coordinatetransformation.ui \
     ui/toolTab/tab_uavdatamanagement.ui \
     ui/qgis/qgssymbolv2selectordialogbase.ui \
@@ -322,113 +307,32 @@ FORMS += \
     ui/qgis/qgsdiagrampropertiesbase.ui \
     ui/qgis/qgsfieldcalculatorbase.ui \
     ui/qgis/qgsaddattrdialogbase.ui \
-    ui/qgis/qgsattributeactiondialogbase.ui \
     ui/qgis/qgsattributetabledialog.ui \
     ui/qgis/qgsattributetypeedit.ui \
-    ui/qgis/qgsdatumtransformdialogbase.ui \
     ui/qgis/qgsdelattrdialogbase.ui \
-    ui/qgis/qgsdiagrampropertiesbase.ui \
     ui/qgis/qgsdualviewbase.ui \
-    ui/qgis/qgsengineconfigdialog.ui \
-    ui/qgis/qgsextentgroupboxwidget.ui \
-    ui/qgis/qgsfieldcalculatorbase.ui \
     ui/qgis/qgsfieldconditionalformatwidget.ui \
     ui/qgis/qgsidentifyresultsbase.ui \
-    ui/qgis/qgsjoindialogbase.ui \
     ui/qgis/qgslabeldialogbase.ui \
     ui/qgis/qgslabelingwidget.ui \
     ui/qgis/qgsloadstylefromdbdialog.ui \
-    ui/qgis/qgsmeasurebase.ui \
     ui/qgis/qgsmultibandcolorrendererwidgetbase.ui \
-    ui/qgis/qgsopenvectorlayerdialogbase.ui \
     ui/qgis/qgspalettedrendererwidgetbase.ui \
-    ui/qgis/qgsprojectpropertiesbase.ui \
     ui/qgis/qgsrasterhistogramwidgetbase.ui \
     ui/qgis/qgsrasterlayerpropertiesbase.ui \
     ui/qgis/qgsrasterminmaxwidgetbase.ui \
     ui/qgis/qgssavetodbdialog.ui \
     ui/qgis/qgssinglebandgrayrendererwidgetbase.ui \
     ui/qgis/qgssinglebandpseudocolorrendererwidgetbase.ui \
-    ui/qgis/qgssymbolv2selectordialogbase.ui \
     ui/qgis/qgsvectorlayerpropertiesbase.ui \
-    ui/qgis/qgsvectorlayersaveasdialogbase.ui \
     ui/qgis/qgsrulebasedlabelingwidget.ui \
-    ui/qgis/qgsaddattrdialogbase.ui \
-    ui/qgis/qgsattributeactiondialogbase.ui \
-    ui/qgis/qgsattributetabledialog.ui \
-    ui/qgis/qgsattributetypeedit.ui \
-    ui/qgis/qgsdatumtransformdialogbase.ui \
-    ui/qgis/qgsdelattrdialogbase.ui \
-    ui/qgis/qgsdiagrampropertiesbase.ui \
-    ui/qgis/qgsdualviewbase.ui \
-    ui/qgis/qgsengineconfigdialog.ui \
-    ui/qgis/qgsextentgroupboxwidget.ui \
-    ui/qgis/qgsfieldcalculatorbase.ui \
-    ui/qgis/qgsfieldconditionalformatwidget.ui \
     ui/qgis/qgsfieldspropertiesbase.ui \
-    ui/qgis/qgsidentifyresultsbase.ui \
-    ui/qgis/qgsjoindialogbase.ui \
-    ui/qgis/qgslabeldialogbase.ui \
     ui/qgis/qgslabelingguibase.ui \
-    ui/qgis/qgslabelingwidget.ui \
-    ui/qgis/qgsloadstylefromdbdialog.ui \
-    ui/qgis/qgsmeasurebase.ui \
-    ui/qgis/qgsmultibandcolorrendererwidgetbase.ui \
-    ui/qgis/qgsopenvectorlayerdialogbase.ui \
-    ui/qgis/qgspalettedrendererwidgetbase.ui \
-    ui/qgis/qgsprojectpropertiesbase.ui \
-    ui/qgis/qgsrasterhistogramwidgetbase.ui \
-    ui/qgis/qgsrasterlayerpropertiesbase.ui \
-    ui/qgis/qgsrasterminmaxwidgetbase.ui \
-    ui/qgis/qgsrulebasedlabelingwidget.ui \
-    ui/qgis/qgssavetodbdialog.ui \
-    ui/qgis/qgssinglebandgrayrendererwidgetbase.ui \
-    ui/qgis/qgssinglebandpseudocolorrendererwidgetbase.ui \
-    ui/qgis/qgssymbolv2selectordialogbase.ui \
-    ui/qgis/qgsvectorlayerpropertiesbase.ui \
-    ui/qgis/qgsvectorlayersaveasdialogbase.ui \
     ui/qgis/qgscolordialog.ui \
     ui/qgis/qgsaddtaborgroupbase.ui \
-    ui/qgis/qgsaddattrdialogbase.ui \
-    ui/qgis/qgsaddtaborgroupbase.ui \
-    ui/qgis/qgsattributeactiondialogbase.ui \
-    ui/qgis/qgsattributetabledialog.ui \
-    ui/qgis/qgsattributetypeedit.ui \
-    ui/qgis/qgscolordialog.ui \
-    ui/qgis/qgsdatumtransformdialogbase.ui \
-    ui/qgis/qgsdelattrdialogbase.ui \
-    ui/qgis/qgsdiagrampropertiesbase.ui \
-    ui/qgis/qgsdualviewbase.ui \
-    ui/qgis/qgsengineconfigdialog.ui \
-    ui/qgis/qgsextentgroupboxwidget.ui \
-    ui/qgis/qgsfieldcalculatorbase.ui \
-    ui/qgis/qgsfieldconditionalformatwidget.ui \
-    ui/qgis/qgsfieldspropertiesbase.ui \
-    ui/qgis/qgsidentifyresultsbase.ui \
-    ui/qgis/qgsjoindialogbase.ui \
-    ui/qgis/qgslabeldialogbase.ui \
-    ui/qgis/qgslabelingguibase.ui \
-    ui/qgis/qgslabelingwidget.ui \
-    ui/qgis/qgsloadstylefromdbdialog.ui \
     ui/qgis/qgsmapunitscaledialog.ui \
-    ui/qgis/qgsmeasurebase.ui \
-    ui/qgis/qgsmultibandcolorrendererwidgetbase.ui \
-    ui/qgis/qgsopenvectorlayerdialogbase.ui \
-    ui/qgis/qgspalettedrendererwidgetbase.ui \
-    ui/qgis/qgsprojectpropertiesbase.ui \
-    ui/qgis/qgsrasterhistogramwidgetbase.ui \
-    ui/qgis/qgsrasterlayerpropertiesbase.ui \
-    ui/qgis/qgsrasterminmaxwidgetbase.ui \
     ui/qgis/qgsrendererv2propsdialogbase.ui \
-    ui/qgis/qgsrulebasedlabelingwidget.ui \
-    ui/qgis/qgssavetodbdialog.ui \
-    ui/qgis/qgssinglebandgrayrendererwidgetbase.ui \
-    ui/qgis/qgssinglebandpseudocolorrendererwidgetbase.ui \
-    ui/qgis/qgssymbolv2selectordialogbase.ui \
     ui/qgis/qgsunitselectionwidget.ui \
-    ui/qgis/qgsvectorlayerpropertiesbase.ui \
-    ui/qgis/qgsvectorlayersaveasdialogbase.ui \
-    ui/qgis/qgsrulebasedlabelingwidget.ui \
     ui/qgis/qgseffectstackpropertieswidgetbase.ui \
     ui/qgis/qgscharacterselectdialogbase.ui \
     ui/qgis/qgslabelingrulepropsdialog.ui \
@@ -456,9 +360,13 @@ FORMS += \
     ui/symbollayer/widget_svgselector.ui \
     ui/symbollayer/widget_symbolslist.ui \
     ui/symbollayer/widget_vectorfield.ui \
-    ui/qgis/qgsdualviewbase.ui \
     ui/qgis/qgsattributeloadfrommap.ui \
-    ui/toolTab/tab_inquire.ui
+    ui/toolTab/tab_inquire.ui \
+    ui/qgis/qgsnewogrconnectionbase.ui \
+    ui/qgis/qgssnappingdialogbase.ui \
+    ui/qgis/qgspluginmanagerbase.ui \
+    ui/qgis/qgsbookmarksbase.ui \
+    ui/qgis/qgsattributeactionpropertiesdialogbase.ui
 
 RESOURCES += \
     Resources/images/images.qrc

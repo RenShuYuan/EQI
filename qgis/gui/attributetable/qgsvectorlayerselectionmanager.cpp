@@ -1,4 +1,4 @@
-﻿/***************************************************************************
+/***************************************************************************
     qgsvectorlayerselectionmanager.cpp
      --------------------------------------
     Date                 : 6.6.2013
@@ -41,7 +41,7 @@ void QgsVectorLayerSelectionManager::deselect( const QgsFeatureIds& ids )
 
 void QgsVectorLayerSelectionManager::setSelectedFeatures( const QgsFeatureIds& ids )
 {
-  mLayer->setSelectedFeatures( ids );
+  mLayer->selectByIds( ids );
 }
 
 const QgsFeatureIds& QgsVectorLayerSelectionManager::selectedFeaturesIds() const

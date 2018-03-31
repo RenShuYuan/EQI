@@ -1,4 +1,4 @@
-﻿/***************************************************************************
+/***************************************************************************
     qgsifeatureselectionmanager.h
      --------------------------------------
     Date                 : 6.6.2013
@@ -20,7 +20,7 @@
 
 #include "qgsfeature.h"
 
-/**
+/** \ingroup gui
  * Is an interface class to abstract feature selection handling.
  *
  * e.g. { @link QgsVectorLayer } implements this interface to manage its selections.

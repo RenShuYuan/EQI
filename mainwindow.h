@@ -83,6 +83,13 @@ public:
     // 删除航摄数据，包括POS、略图、相片
     void deleteAerialPhotographyData(const QStringList& delList);
 
+    /** Open a raster layer for the given file
+      @returns false if unable to open a raster layer for rasterFile
+      @note
+      This is essentially a simplified version of the above
+      */
+    QgsRasterLayer *addRasterLayer( const QString &rasterFile, const QString &baseName, bool guiWarning = true );
+
 public slots:
 //    QMenu *panelMenu() { return mPanelMenu; }
     void about();
@@ -132,6 +139,11 @@ private:
     /** 此方法将验证GDAL层是否包含子层
     */
     bool shouldAskUserForGDALSublayers( QgsRasterLayer *layer );
+
+    /** This method will open a dialog so the user can select GDAL sublayers to load
+     * @returns true if any items were loaded
+     */
+    bool askUserForZipItemLayers( QString path );
 
     /** 这种方法将打开对话框，因此用户可以选择的GDAL子层加载
     */
@@ -214,7 +226,8 @@ private slots:
     /** 重载版本，需要文件名列表，而不是与一个对话框，提示用户列表私有addRasterLayer（）方法。
      @returns 如果添加图层成功返回true
     */
-    bool addRasterLayers( const QStringList &theFileNameQStringList, bool guiWarning = true );
+    bool addRasterLayers( QStringList const &theFileNameQStringList, bool guiWarning = true );
+    bool addRasterLayers( const QStringList &theFileNameQStringList, QgsRasterLayer*& rasterLayer, bool guiWarning = true );
 
     //! 返回活动图层的指针
     QgsMapLayer *activeLayer();
@@ -272,6 +285,7 @@ private slots:
 
     //! 相机设置
     void posSetting();
+
     /************ 航摄数据预处理 ************/
     //! 重叠度检查
     void checkOverlapping();
@@ -305,6 +319,7 @@ private slots:
 
     //! 设置
     void selectSetting();
+
     /************ 分幅管理 ************/
     //! 根据坐标创建图框
     void pointToTk();
@@ -315,6 +330,15 @@ private slots:
     //! 分幅管理的参数设置
     void prjtransformsetting();
 
+    /************ 像控快速拾取系统 ************/
+    void addPcmDomLayer();
+
+    void addPcmDemPath();
+
+    void readPickPcm(QStringList &list);
+    void pcmPicking();
+
+    void printPcmToTxt();
 signals:
     void layerSavedAs( QgsMapLayer* l, const QString& path );
 
@@ -322,23 +346,38 @@ private:
     Ui::MainWindow *ui;
     static MainWindow *smInstance;
     QSettings mSettings;
+
+    // POS类
     posDataProcessing *pPosdp;
+
+    // 动态联动类
     eqiPPInteractive* pPPInter;
+
+    // 空间分析类
     eqiAnalysisAerialphoto* pAnalysis;
 
-    // 保存航摄略图的显示状态
+    // 保存航摄略图的比例显示状态
     bool isSmSmall;
 
-    // 保存航摄略图的标注状态
+    // 保存航摄略图的标注显示状态
     bool isPosLabel;
 
-    //! 用于保存航飞略图
+    // 用于保存航飞略图
     QgsVectorLayer* sketchMapLayer;
 
-    //! 含有辅助光栅文件格式适合于FileDialog的文件过滤字符串。内置构造函数.
+    // 用于保存像控快速拾取系统的DOM
+    QgsRasterLayer* pcm_rasterLayer;
+
+    // 用于保存像控快速拾取系统的DEM路径
+    QStringList pcm_demPaths;
+
+    // 用于保存拾取到的控制点
+    QStringList pcmList;
+
+    // 含有辅助光栅文件格式适合于FileDialog的文件过滤字符串。内置构造函数.
     QString mRasterFileFilter;
 
-    //! 标志，表示该项目属性对话框是怎么出现
+    // 标志，表示该项目属性对话框是怎么出现
     bool mShowProjectionTab;
 
     //! 地图浏览动作
@@ -400,6 +439,13 @@ private:
     QAction *mActionDelOverlapping;
     QAction *mActionModifyPos;
     QAction *mActionModifyPhoto;
+
+    //! 像控点快速拾取
+    QAction *pcm_mActionAddDOMLayer;
+    QAction *pcm_mActionAddDEMLayer;
+    QAction *pcm_mActionPickContrelPoint;
+    QAction *pcm_mActionOutContrelPoint;
+    QAction *pcm_mActionsetting;
 
     //! 坐标转换动作
     QAction *mActionTextTranfrom;

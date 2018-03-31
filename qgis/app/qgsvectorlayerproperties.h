@@ -23,9 +23,9 @@
 #include "qgsscalerangewidget.h"
 #include "ui_qgsvectorlayerpropertiesbase.h"
 #include "qgisgui.h"
-#include "qgis/app/qgsaddattrdialog.h"
-#include "qgis/app/qgsdelattrdialog.h"
-#include "qgis/app/qgsattributetypedialog.h"
+#include "app/qgsaddattrdialog.h"
+#include "app/qgsdelattrdialog.h"
+#include "app/qgsattributetypedialog.h"
 #include "qgsfield.h"
 #include "qgsmapcanvas.h"
 #include "qgscontexthelp.h"
@@ -160,7 +160,7 @@ class APP_EXPORT QgsVectorLayerProperties : public QgsOptionsDialogBase, private
 
     void updateSymbologyPage();
 
-    QgsVectorLayer *layer;
+    QgsVectorLayer *mLayer;
 
     bool mMetadataFilled;
 
@@ -179,7 +179,7 @@ class APP_EXPORT QgsVectorLayerProperties : public QgsOptionsDialogBase, private
     /** Label dialog. If apply is pressed, options are applied to vector's QgsLabel */
     QgsLabelDialog* labelDialog;
     /** Actions dialog. If apply is pressed, the actions are stored for later use */
-    QgsAttributeActionDialog* actionDialog;
+    QgsAttributeActionDialog* mActionDialog;
     /** Diagram dialog. If apply is pressed, options are applied to vector's diagrams*/
     QgsDiagramProperties* diagramPropertiesDialog;
     /** Fields dialog. If apply is pressed, options are applied to vector's diagrams*/

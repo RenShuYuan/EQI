@@ -44,12 +44,6 @@ void eqiAnalysisAerialphoto::checkOverlapping()
     {
         QgsMessageLog::logMessage(QString("重叠度检查 : \t创建航带失败，无法进行旋片角检查。"));
     }
-    // debug
-//    QList<QString> listt = myOlp.getAllPhotoNo();
-//    foreach (QString name, listt)
-//    {
-//        qDebug() << name << "是属于第:" << myOlp.getLineNumber(name) << "航带......";
-//    }
 
     int lineSize = myOlp.getLineSize();
     if (!lineSize) return;

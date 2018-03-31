@@ -1,4 +1,4 @@
-/***************************************************************************
+﻿/***************************************************************************
                     qgspluginmetadata.cpp  -  Metadata class for
                     describing a loaded plugin.
                              -------------------
@@ -16,7 +16,7 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "../plugins/qgisplugin.h"
+#include "qgisplugin.h"
 #include "qgspluginmetadata.h"
 QgsPluginMetadata::QgsPluginMetadata( const QString& _libraryPath,
                                       const QString& _name,

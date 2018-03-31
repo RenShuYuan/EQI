@@ -1,4 +1,4 @@
-﻿/***************************************************************************
+/***************************************************************************
      QgsAttributeListView.h
      --------------------------------------
     Date                 : Jan 2012
@@ -31,7 +31,7 @@ class QgsVectorLayerCache;
 class QgsFeatureListViewDelegate;
 class QRect;
 
-/**
+/** \ingroup gui
  * Shows a list of features and renders a edit button next to each feature.
  *
  * @brief

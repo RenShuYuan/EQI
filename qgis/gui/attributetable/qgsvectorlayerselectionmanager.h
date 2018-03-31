@@ -1,4 +1,4 @@
-﻿/***************************************************************************
+/***************************************************************************
     qgsvectorlayerselectionmanager.h
      --------------------------------------
     Date                 : 6.6.2013
@@ -20,7 +20,7 @@
 
 class QgsVectorLayer;
 
-/**
+/** \ingroup gui
  * \class QgsVectorLayerSelectionManager
  * \note not available in Python bindings
  */
