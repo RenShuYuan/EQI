@@ -8,9 +8,14 @@
 #include <QStringList>
 
 #include "eqi/eqisymbol.h"
+#include "eqi/gdal/eqigdalprogresstools.h"
 #include "qgsvectorlayer.h"
 
+#include <vector>
+using std::vector;
+
 class posDataProcessing;
+class eqiPPInteractive;
 
 // 重叠度处理
 class OverlappingProcessing
@@ -21,10 +26,20 @@ public:
 
     void addLineNumber(QString &photoNumber, int lineNumber);
     void setQgsFeature(const QString& photoNumber, QgsFeature* f);
+
+    // 设置当前相片与下张相片重叠度比例
     void setNextPhotoOl(const QString& currentNumber, QString nextNumber, const int n);
+
+    // 设置当前相片与下张相片连接点数量
+    void setNextPhotoKeys(const QString& currentNumber, QString nextNumber, const int n);
+
+    // 设置当前相片与下一航带相片重叠度比例
     void setNextLineOl(const QString& currentNumber, QString photoNumber, const int n);
 
-    // 返回指定相片所在的航线号
+    // 设置当前相片与下一航带相片连接点数量
+    void setNextLineKeys(const QString& currentNumber, QString nextNumber, const int n);
+
+    // 返回指定相片所在的航线号（从1开始)
     int getLineNumber(const QString &photoNumber);
 
     // 返回总相片数量
@@ -45,11 +60,20 @@ public:
     // 计算2张相片的重叠度，同时保存到map中。指定是否是旁向重叠比较
     int calculateOverlap(const QString &currentNo, const QString &nextNo);
 
+    // 基于SiftGPU计算两张相片连接点数量
+    int calculateOverlapSiftGPU(const QString &currentNo, const QString &nextNo);
+
     // 返回指定相片与下张相片的重叠统计
     QMap<QString, int> getNextPhotoOverlapping(const QString &number);
 
+    // 返回指定相片与下张相片的连接点统计
+    QMap<QString, int> getNextPhotoKeys(const QString &number);
+
     // 返回指定相片与下一航带相片的重叠统计
     QMap<QString, int> getNextLineOverlapping(const QString &number);
+
+    // 返回指定相片与下张相片的连接点统计
+    QMap<QString, int> getNextLineKeys(const QString &number);
 
     // 删除指定相片
     void delItem(const QString &photoNumber);
@@ -63,10 +87,12 @@ public:
 private:
     struct Ol
     {
-        int mLineNumber; // 航线编号
-        QgsFeature* mF;  // 图形要素
-        QMap<QString, int> mMapNextPhoto; // 航带内相邻相片
-        QMap<QString, int> mMapNextLine;  // 航带间有重叠度关系相片
+        int mLineNumber;                        // 航线编号
+        QgsFeature* mF;                         // 图形要素
+        QMap<QString, int> mMapNextPhoto;       // 航带内相邻相片
+        QMap<QString, int> mMapNextLine;        // 航带间有重叠度关系相片
+        QMap<QString, int> mMapNextPhotoKeys;   // 航带内有重叠度关系特征点匹配数
+        QMap<QString, int> mMapNextLineKeys;   // 航带间有重叠度关系特征点匹配数
 
         Ol(){mLineNumber = -1; mF = nullptr;}
         Ol(int lineNumber){mLineNumber = lineNumber; mF = nullptr;}
@@ -81,6 +107,11 @@ private:
     };
 
     QMap<QString, Ol*> map;
+    eqiGdalProgressTools gdalTools;
+    QSettings mSetting;
+
+    // 用于保存每张相片匹配到的点，避免重复匹配
+    QMap< QString, vector<float> > mapKeyDescriptors;
 };
 
 
@@ -89,10 +120,13 @@ class eqiAnalysisAerialphoto : public QObject
     Q_OBJECT
 public:
     explicit eqiAnalysisAerialphoto(QObject *parent);
-    explicit eqiAnalysisAerialphoto(QObject *parent, QgsVectorLayer* layer, posDataProcessing *posdp);
+    explicit eqiAnalysisAerialphoto(QObject *parent, QgsVectorLayer* layer,
+                                    posDataProcessing *posdp,
+                                    eqiPPInteractive *pp);
 
     //! 重叠度检查
-    void checkOverlapping();
+    void checkoverlappingIn();
+    void checkoverlappingBetween();
 
     //! 删除重叠度过大的相片
     QStringList delOverlapping();
@@ -100,16 +134,12 @@ public:
     //! 倾角检查、删除
     void checkOmega();
 
-    //! 删除超限倾角，当isEdge为true时位于边缘处的
-    //! 相片会直接删除
-    QStringList delOmega(const bool isEdge = true);
-
     //! 旋片角检查
     void checkKappa();
 
     //! 删除超限倾角、旋偏角，当isEdge为true时位于边缘处的
-    //! 相片会直接删除
-    QStringList delKappa(const bool isEdge = true);
+    //! type="Omega" OR "Kappa"
+    QStringList delOmegaAndKappa(const QString& type, const bool isEdge = true);
 public slots:
     void updataChackValue();
 
@@ -131,17 +161,28 @@ private:
                                   , QgsGeometry *errGeometry
                                   , const QString& number
                                   , const int index
-                                  , const QString& overlappingVelue
-                                  , const QString& errType
+                                  , const QString& overlappingValue
+                                  , const QString &keysValue, const QString& errType
+                                  , eqiSymbol *mySymbol
+                                  , eqiSymbol::linkedType type);
+    void addOverLappingErrFeature(QgsFeatureList& featureList
+                                  , QgsGeometry errGeometry
+                                  , const QString& number
+                                  , const int index
+                                  , const QString& overlappingValue
+                                  , const QString &keysValue, const QString& errType
                                   , eqiSymbol *mySymbol
                                   , eqiSymbol::linkedType type);
 
+    bool isCheckLineLast(const QString& name);
 private:
     QSettings mSetting;
     QgsVectorLayer* mLayerMap;
+    eqiPPInteractive* mPp;
     QgsVectorLayer* mLayer_Omega;
     QgsVectorLayer* mLayer_Kappa;
-    QgsVectorLayer* mLayer_Overlapping;
+    QgsVectorLayer* mLayer_OverlapIn;
+    QgsVectorLayer* mLayer_OverlapBetween;
     posDataProcessing* mPosdp;
 
     // 重叠度限差
@@ -167,6 +208,8 @@ private:
     QString errTpye_nextPhotoMinOverlap;
     QString errTpye_nextPhotoGeneralOverlap;
     QString errTpye_nextPhotoMaxOverlap;
+    QString errTpye_NoKeys;
+    QString errTpye_nextPhotoKeysThreshold;
     QString errTpye_nextLineNoOverlap;
     QString errTpye_nextLineMinOverlap;
     QString errTpye_nextLineGeneralOverlap;
@@ -177,6 +220,9 @@ private:
 
     // 用于分类的字段名称
     QString mField;
+
+    // 相邻相片最小连接点阈值
+    static const int keyThreshold = 50;
 };
 
 #endif // EQIANALYSISAERIALPHOTO_H

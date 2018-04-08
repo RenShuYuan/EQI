@@ -16,6 +16,7 @@
 #include "qgsfillsymbollayerv2.h"
 
 #include <QFile>
+#include <QProgressDialog>
 
 eqiPPInteractive::eqiPPInteractive(QObject *parent, QgsVectorLayer* layer, posDataProcessing *posdp)
     : QObject(parent),
@@ -204,6 +205,13 @@ int eqiPPInteractive::delMap(const QStringList &delList)
 
 void eqiPPInteractive::delPhoto(const QStringList &photoList, const QString &tempFolder)
 {
+    //进度条
+    QProgressDialog prDialog("删除错误相片...", "取消", 0, photoList.size(), nullptr);
+    prDialog.setWindowTitle("处理进度");              //设置窗口标题
+    prDialog.setWindowModality(Qt::WindowModal);      //将对话框设置为模态
+    prDialog.show();
+    int prCount = 0;
+
     foreach (QString name, photoList)
     {
         if (mPhotoMap.contains(name))
@@ -252,6 +260,9 @@ void eqiPPInteractive::delPhoto(const QStringList &photoList, const QString &tem
         {
 //            QgsMessageLog::logMessage(QString("\t\t||--> 删除相片 : mPhotoMap err。").arg(name));
         }
+        prDialog.setValue(++prCount);
+        QApplication::processEvents();
+        if (prDialog.wasCanceled()) return;
     }
 }
 
@@ -291,6 +302,15 @@ QStringList eqiPPInteractive::modifyPhoto()
     }
 
     return willDel;
+}
+
+QString eqiPPInteractive::getPhotoPath(const QString &name)
+{
+    if (mPhotoMap.contains(name))
+    {
+        return mPhotoMap.value(name);
+    }
+    return QString();
 }
 
 void eqiPPInteractive::saveMap(const QString &savePath)
@@ -390,6 +410,13 @@ void eqiPPInteractive::savePhoto(const QString &savePath, const QStringList &pho
         }
     }
 
+    //进度条
+    QProgressDialog prDialog("保存相片...", "取消", 0, photoList.size(), nullptr);
+    prDialog.setWindowTitle("处理进度");              //设置窗口标题
+    prDialog.setWindowModality(Qt::WindowModal);      //将对话框设置为模态
+    prDialog.show();
+    int prCount = 0;
+
     foreach (QString name, photoList)
     {
         if (mPhotoMap.contains(name))
@@ -406,6 +433,9 @@ void eqiPPInteractive::savePhoto(const QString &savePath, const QStringList &pho
         {
             QgsMessageLog::logMessage(QString("保存航摄数据 : \t%1相片未找到原始对应记录，保存失败。").arg(name));
         }
+        prDialog.setValue(++prCount);
+        QApplication::processEvents();
+        if (prDialog.wasCanceled()) return;
     }
     QgsMessageLog::logMessage("保存航摄数据 : \t导出相片成功。");
 }

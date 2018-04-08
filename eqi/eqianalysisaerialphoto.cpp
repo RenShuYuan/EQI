@@ -1,6 +1,8 @@
 ﻿#include "eqianalysisaerialphoto.h"
 #include "eqi/pos/posdataprocessing.h"
+#include "eqi/eqippinteractive.h"
 #include "mainwindow.h"
+#include "siftGPU.h"
 
 #include "qgsmessagelog.h"
 #include "qgsvectordataprovider.h"
@@ -14,22 +16,24 @@ eqiAnalysisAerialphoto::eqiAnalysisAerialphoto(QObject *parent)
     : QObject(parent)
     , mLayerMap(nullptr)
     , mPosdp(nullptr)
+    , mPp(nullptr)
     , mLayer_Omega(nullptr)
     , mLayer_Kappa(nullptr)
-    , mLayer_Overlapping(nullptr)
+    , mLayer_OverlapIn(nullptr)
     , isGroup(false)
 {
     mField = "错误类型";
     updataChackValue();
 }
 
-eqiAnalysisAerialphoto::eqiAnalysisAerialphoto(QObject *parent, QgsVectorLayer *layer, posDataProcessing *posdp)
+eqiAnalysisAerialphoto::eqiAnalysisAerialphoto(QObject *parent, QgsVectorLayer *layer, posDataProcessing *posdp, eqiPPInteractive *pp)
     : QObject(parent)
     , mLayerMap(layer)
     , mPosdp(posdp)
+    , mPp(pp)
     , mLayer_Omega(nullptr)
     , mLayer_Kappa(nullptr)
-    , mLayer_Overlapping(nullptr)
+    , mLayer_OverlapIn(nullptr)
     , isGroup(false)
 {
     airLineGroup();
@@ -38,7 +42,314 @@ eqiAnalysisAerialphoto::eqiAnalysisAerialphoto(QObject *parent, QgsVectorLayer *
     updataChackValue();
 }
 
-void eqiAnalysisAerialphoto::checkOverlapping()
+void eqiAnalysisAerialphoto::checkoverlappingIn()
+{
+    if (!isGroup)
+    {
+        QgsMessageLog::logMessage(QString("重叠度检查 : \t创建航带失败，无法进行重叠度检查。"));
+    }
+
+    int lineSize = myOlp.getLineSize();
+    if (!lineSize) return;
+    int lineNumber = 0;
+
+    // 检查是否需要特征匹配以及能否达到匹配条件
+    bool isEnable = false;
+    isEnable = mSetting.value("/eqi/options/imagePreprocessing/match", true).toBool();
+    if (isEnable)
+    {
+        if (!(mPp && mPp->islinked()))
+        {
+            isEnable = false;
+            QgsMessageLog::logMessage("重叠度检查 : \tPOS未与相片创建联动关系,将忽略特征点匹配。");
+        }
+    }
+
+    //进度条
+    QProgressDialog prDialog("检查重叠度...", "取消", 0, myOlp.getAllPhotoNo().size(), nullptr);
+    prDialog.setWindowTitle("处理进度");              //设置窗口标题
+    prDialog.setWindowModality(Qt::WindowModal);      //将对话框设置为模态
+    prDialog.show();
+    int prCount = 0;
+
+    // 遍历每条航线
+    while (++lineNumber <= lineSize)
+    {
+        QString currentPhoto;
+        QString nextPhoto;
+        QStringList lineList;
+
+        // 获得当前航线上所有相片号集合
+        myOlp.getLinePhoto(lineNumber, lineList);
+        if (lineList.isEmpty()) return;
+
+        QStringList::const_iterator i = lineList.constBegin();
+
+        // 获得第一张相片
+        if (i != lineList.constEnd())
+        {
+            currentPhoto = *i;
+            prDialog.setValue(++prCount);
+            QApplication::processEvents();
+        }
+
+        // 遍历行带内每张相片
+        while (++i != lineList.constEnd())
+        {
+            // 检查相邻两张相片的重叠度
+            nextPhoto = *i;
+            int percentage = myOlp.calculateOverlap(currentPhoto, nextPhoto);
+            myOlp.setNextPhotoOl(currentPhoto, nextPhoto, percentage);
+
+            // 匹配特征点
+            int keys = 0;
+            if (isEnable)
+            {
+                QString currentPhotoPath = mPp->getPhotoPath(currentPhoto);
+                QString nextPhotoPath = mPp->getPhotoPath(nextPhoto);
+                if (currentPhotoPath.isEmpty() || nextPhotoPath.isEmpty())
+                {
+                    myOlp.setNextPhotoKeys(currentPhoto, nextPhoto, keys);
+                    QgsMessageLog::logMessage(QString("重叠度检查 : \t获取相片路径失败,%1与%2特征点匹配失败。")
+                                              .arg(currentPhoto).arg(nextPhoto));
+                }
+                else
+                {
+                    // 连接点数量
+                    keys = myOlp.calculateOverlapSiftGPU(currentPhotoPath, nextPhotoPath);
+                    myOlp.setNextPhotoKeys(currentPhoto, nextPhoto, keys);
+
+                    QgsMessageLog::logMessage(QString("重叠度检查 : \t%1与%2特征点匹配：%3个。")
+                                              .arg(currentPhoto).arg(nextPhoto).arg(keys));
+                }
+            }
+
+            currentPhoto = nextPhoto;
+
+            prDialog.setValue(++prCount);
+            QApplication::processEvents();
+        }
+
+        //当按下取消按钮则中断
+        if (prDialog.wasCanceled()) break;
+    }
+
+    // 创建错误图层
+    if ( !mLayer_OverlapIn )
+    {
+        mLayer_OverlapIn = MainWindow::instance()->createrMemoryMap("航带间重叠度检查",
+                                                            "Polygon",
+                                                            QStringList()
+                                                            << "field=id:integer"
+                                                            << "field=相片编号:string(50)"
+                                                            << "field=与相邻相片重叠度:string(10)"
+                                                            << "field=与相邻相片同名点:string(10)"
+                                                            << "field=错误类型:string(100)");
+
+        if (!mLayer_OverlapIn && !mLayer_OverlapIn->isValid())
+        {
+            MainWindow::instance()->messageBar()->pushMessage( "创建检查图层",
+                "创建图层失败, 运行已终止, 注意检查plugins文件夹!",
+                QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
+            QgsMessageLog::logMessage(QString("创建检查图层 : \t创建图层失败, 程序已终止, 注意检查plugins文件夹。"));
+            return;
+        }
+        mLayer_OverlapIn->setCrs(mLayerMap->crs());
+    }
+    else if (mLayer_OverlapIn->isValid())
+    {
+        // 重置符号
+        eqiSymbol *mySymbol = new eqiSymbol(nullptr, mLayer_OverlapIn, mField);
+        mySymbol->delAllSymbolItem();
+        delete mySymbol;
+
+        if ( !( mLayer_OverlapIn->dataProvider()->capabilities() & QgsVectorDataProvider::DeleteFeatures ) )
+        {
+          MainWindow::instance()->messageBar()->pushMessage( tr( "Provider does not support deletion" ),
+                                     tr( "Data provider does not support deleting features" ),
+                                     QgsMessageBar::INFO, MainWindow::instance()->messageTimeout() );
+          return;
+        }
+
+        mLayer_OverlapIn->selectAll();
+        QgsFeatureIds ids = mLayer_OverlapIn->selectedFeaturesIds();
+        if ( ids.size() != 0 )
+        {
+            mLayer_OverlapIn->dataProvider()->deleteFeatures(ids);
+        }
+    }
+
+    // 初始化渲染类
+    eqiSymbol *mySymbol = new eqiSymbol(this, mLayer_OverlapIn, mField);
+
+    // 对比超限值，输出错误矢量面
+    int index = 0;
+    QgsFeatureList featureList;
+    QList<QString> list = myOlp.getAllPhotoNo();
+
+    //进度条
+    QProgressDialog prSymDialog("生成错误图层...", "取消", 0, list.size(), nullptr);
+    prSymDialog.setWindowTitle("处理进度");              //设置窗口标题
+    prSymDialog.setWindowModality(Qt::WindowModal);      //将对话框设置为模态
+    prSymDialog.show();
+    prCount = 0;
+
+    // 错误分类
+    foreach (QString number, list)
+    {
+        QMap<QString, int> mapOverlap = myOlp.getNextPhotoOverlapping(number);
+        QMap<QString, int>::const_iterator itOverlap = mapOverlap.constBegin();
+        int overlap = itOverlap.value();
+
+        QMap<QString, int> mapKeys = myOlp.getNextPhotoKeys(number);
+        QMap<QString, int>::const_iterator itKeys = mapKeys.constBegin();
+        int keys = itKeys.value();
+
+        // 启用同名点检查
+        if (isEnable)
+        {
+            // 检查是否与下张相片进行特征匹配，并且匹配有特征点
+            if (!mapKeys.isEmpty() && keys !=0)
+            {
+                // 进行后续检查
+
+                // 获得相交区域矢量面
+                QgsGeometry *errGeometry = myOlp.getFeature(number)->geometry()
+                        ->intersection(myOlp.getFeature(itOverlap.key())->geometry());
+
+                if (overlap < heading_Min)   // 与航带内下张相片重叠度低于最低标准
+                {
+                    addOverLappingErrFeature(featureList, errGeometry, number
+                                             , ++index, QString("%1%").arg(overlap)
+                                             , QString::number(keys)
+                                             , errTpye_nextPhotoMinOverlap
+                                             , mySymbol, eqiSymbol::SeriousSrror);
+                }
+                else if (overlap < heading_Gen)   // 与航带内下张相片重叠度低于建议标准
+                {
+                    if (keys < keyThreshold)
+                    {
+                        addOverLappingErrFeature(featureList, errGeometry, number
+                                                 , ++index, QString("%1%").arg(overlap)
+                                                 , QString::number(keys)
+                                                 , errTpye_nextPhotoKeysThreshold
+                                                 , mySymbol, eqiSymbol::SeriousSrror);
+                    }
+                    else
+                    {
+                        addOverLappingErrFeature(featureList, errGeometry, number
+                                                 , ++index, QString("%1%").arg(overlap)
+                                                 , QString::number(keys)
+                                                 , errTpye_nextPhotoGeneralOverlap
+                                                 , mySymbol, eqiSymbol::warning);
+                    }
+
+                }
+                else if (overlap > heading_Max)   // 与航带内下张相片重叠度大于最大建议值
+                {
+                    if (keys < keyThreshold)
+                    {
+                        addOverLappingErrFeature(featureList, errGeometry, number
+                                                 , ++index, QString("%1%").arg(overlap)
+                                                 , QString::number(keys)
+                                                 , errTpye_nextPhotoKeysThreshold
+                                                 , mySymbol, eqiSymbol::SeriousSrror);
+                    }
+                    else
+                    {
+                        addOverLappingErrFeature(featureList, errGeometry, number
+                                                 , ++index, QString("%1%").arg(overlap)
+                                                 , QString::number(keys)
+                                                 , errTpye_nextPhotoMaxOverlap
+                                                 , mySymbol, eqiSymbol::warning);
+                    }
+
+                }
+                else if (keys < keyThreshold)  // 正常情况
+                {
+                    addOverLappingErrFeature(featureList, errGeometry, number
+                                             , ++index, QString("%1%").arg(overlap)
+                                             , QString::number(keys)
+                                             , errTpye_nextPhotoKeysThreshold
+                                             , mySymbol, eqiSymbol::SeriousSrror);
+                }
+            }
+            else
+            {
+                // 检查是否最后一张
+                if (!isCheckLineLast(number))
+                {
+                    QgsGeometry errGeometry = QgsGeometry(*myOlp.getFeature(number)->geometry());
+                    addOverLappingErrFeature(featureList, errGeometry, number
+                                             , ++index, "0%", "0"
+                                             , errTpye_NoKeys
+                                             , mySymbol, eqiSymbol::SeriousSrror);
+                }
+            }
+        }
+        else    // 不启用同名点检查
+        {
+            if (!mapOverlap.isEmpty() && overlap != 0)
+            {
+                // 进行后续检查
+
+                // 获得相交区域矢量面
+                QgsGeometry *errGeometry = myOlp.getFeature(number)->geometry()
+                        ->intersection(myOlp.getFeature(itOverlap.key())->geometry());
+
+                if (overlap < heading_Min)   // 与航带内下张相片重叠度低于最低标准
+                {
+                    addOverLappingErrFeature(featureList, errGeometry, number
+                                             , ++index, QString("%1%").arg(overlap)
+                                             , QString::number(keys)
+                                             , errTpye_nextPhotoMinOverlap
+                                             , mySymbol, eqiSymbol::SeriousSrror);
+                }
+                else if (overlap < heading_Gen)   // 与航带内下张相片重叠度低于建议标准
+                {
+                    addOverLappingErrFeature(featureList, errGeometry, number
+                                             , ++index, QString("%1%").arg(overlap)
+                                             , QString::number(keys)
+                                             , errTpye_nextPhotoGeneralOverlap
+                                             , mySymbol, eqiSymbol::warning);
+
+                }
+                else if (overlap > heading_Max)   // 与航带内下张相片重叠度大于最大建议值
+                {
+                    addOverLappingErrFeature(featureList, errGeometry, number
+                                             , ++index, QString("%1%").arg(overlap)
+                                             , QString::number(keys)
+                                             , errTpye_nextPhotoMaxOverlap
+                                             , mySymbol, eqiSymbol::warning);
+                }
+            }
+            else
+            {
+                // 检查是否最后一张
+                if (!isCheckLineLast(number))
+                {
+                    QgsGeometry errGeometry = QgsGeometry(*myOlp.getFeature(number)->geometry());
+                    addOverLappingErrFeature(featureList, errGeometry, number
+                                             , ++index, "0%", "0"
+                                             , errTpye_nextPhotoNoOverlap
+                                             , mySymbol, eqiSymbol::SeriousSrror);
+                }
+            }
+        }
+
+        prSymDialog.setValue(++prCount);
+        QApplication::processEvents();
+        //当按下取消按钮则中断
+        if (prDialog.wasCanceled()) return;
+    }
+
+    // 将要素添加到图层中
+    mLayer_OverlapIn->dataProvider()->addFeatures(featureList);
+    MainWindow::instance()->refreshMapCanvas();
+    mySymbol->updata();
+}
+
+void eqiAnalysisAerialphoto::checkoverlappingBetween()
 {
     if (!isGroup)
     {
@@ -49,6 +360,18 @@ void eqiAnalysisAerialphoto::checkOverlapping()
     if (!lineSize) return;
     int lineNumber = 0;
 
+    // 检查是否需要特征匹配以及能否达到匹配条件
+    bool isEnable = false;
+    isEnable = mSetting.value("/eqi/options/imagePreprocessing/match", true).toBool();
+    if (isEnable)
+    {
+        if (!(mPp && mPp->islinked()))
+        {
+            isEnable = false;
+            QgsMessageLog::logMessage("重叠度检查 : \tPOS未与相片创建联动关系,将忽略特征点匹配。");
+        }
+    }
+
     //进度条
     QProgressDialog prDialog("检查重叠度...", "取消", 0, myOlp.getAllPhotoNo().size(), nullptr);
     prDialog.setWindowTitle("处理进度");              //设置窗口标题
@@ -56,57 +379,59 @@ void eqiAnalysisAerialphoto::checkOverlapping()
     prDialog.show();
     int prCount = 0;
 
-    while (++lineNumber <= lineSize)
+    while (lineNumber < lineSize-1)
     {
         QString currentPhoto;
         QString nextPhoto;
         QStringList lineList;
         QStringList nextlineList;
 
+        // 获得当前航带相片
         myOlp.getLinePhoto(lineNumber, lineList);
         if (lineList.isEmpty()) return;
 
-        QStringList::const_iterator i = lineList.constBegin();
-        if (i != lineList.constEnd())
-        {
-            currentPhoto = *i;
+        // 获得下条航带相片
+        myOlp.getLinePhoto(++lineNumber, nextlineList);
+        if (nextlineList.isEmpty()) return;
 
-            //! 与下一航带重叠度检查
-            myOlp.getLinePhoto(lineNumber+1, nextlineList);
-            QStringList::const_iterator i_next = nextlineList.constBegin();
-            while (i_next != nextlineList.constEnd())
+        foreach (QString clPhoto, lineList)
+        {
+            // 保存重叠度最大的相片
+            foreach (QString nlPhoto, nextlineList)
             {
-                QString photoNo = *i_next++;
-                int percentage = myOlp.calculateOverlap(currentPhoto, photoNo);
-                myOlp.setNextLineOl(currentPhoto, photoNo, percentage);
+                int percentage = myOlp.calculateOverlap(clPhoto, nlPhoto);
+                myOlp.setNextLineOl(clPhoto, nlPhoto, percentage);
                 if (percentage > sideways_Max) break;
             }
 
-            prDialog.setValue(++prCount);
-            QApplication::processEvents();
-        }
-
-        //! 行带内重叠度比较
-        while (++i != lineList.constEnd())
-        {
-            nextPhoto = *i;
-            int percentage = myOlp.calculateOverlap(currentPhoto, nextPhoto);
-            myOlp.setNextPhotoOl(currentPhoto, nextPhoto, percentage);
-
-            //! 与下一航带重叠度检查
-            myOlp.getLinePhoto(lineNumber+1, nextlineList);
-
-            QStringList::const_iterator i_next = nextlineList.constBegin();
-            while (i_next != nextlineList.constEnd())
+            // 将重叠度最大的相片提取出来进行匹配
+            int keys = 0;
+            if (isEnable)
             {
-                QString photoNo = *i_next++;
-                int percentage = myOlp.calculateOverlap(nextPhoto, photoNo);
-                myOlp.setNextLineOl(nextPhoto, photoNo, percentage);
-                if (percentage > sideways_Max) break;
+                QMap<QString, int> nlOverlap = myOlp.getNextLineOverlapping(clPhoto);
+                if (!nlOverlap.isEmpty())
+                {
+                    QMap<QString, int>::const_iterator it = nlOverlap.constBegin();
+                    QString nlPhoto = it.key();
+
+                    QString currentPhotoPath = mPp->getPhotoPath(clPhoto);
+                    QString nextPhotoPath = mPp->getPhotoPath(nlPhoto);
+                    if (currentPhotoPath.isEmpty() || nextPhotoPath.isEmpty())
+                    {
+                        myOlp.setNextLineKeys(clPhoto, nlPhoto, keys);
+                        QgsMessageLog::logMessage(QString("重叠度检查 : \t获取相片路径失败,%1与%2特征点匹配失败。")
+                                                  .arg(clPhoto).arg(nlPhoto));
+                    }
+                    else
+                    {
+                        // 连接点数量
+                        keys = myOlp.calculateOverlapSiftGPU(currentPhotoPath, nextPhotoPath);
+                        myOlp.setNextLineKeys(clPhoto, nlPhoto, keys);
+                        QgsMessageLog::logMessage(QString("重叠度检查 : \t%1与%2特征点匹配：%3个。")
+                                                  .arg(clPhoto).arg(nlPhoto).arg(keys));
+                    }
+                }
             }
-
-            currentPhoto = nextPhoto;
-
             prDialog.setValue(++prCount);
             QApplication::processEvents();
         }
@@ -116,17 +441,18 @@ void eqiAnalysisAerialphoto::checkOverlapping()
     }
 
     // 创建错误图层
-    if ( !mLayer_Overlapping || !mLayer_Overlapping->isValid() )
+    if ( !mLayer_OverlapBetween || !mLayer_OverlapBetween->isValid() )
     {
-        mLayer_Overlapping = MainWindow::instance()->createrMemoryMap("重叠度检查",
+        mLayer_OverlapBetween = MainWindow::instance()->createrMemoryMap("航带内重叠度检查",
                                                             "Polygon",
                                                             QStringList()
                                                             << "field=id:integer"
                                                             << "field=相片编号:string(50)"
                                                             << "field=与相邻相片重叠度:string(10)"
+                                                            << "field=航带间相片同名点:string(10)"
                                                             << "field=错误类型:string(100)");
 
-        if (!mLayer_Overlapping && !mLayer_Overlapping->isValid())
+        if (!mLayer_OverlapBetween && !mLayer_OverlapBetween->isValid())
         {
             MainWindow::instance()->messageBar()->pushMessage( "创建检查图层",
                 "创建图层失败, 运行已终止, 注意检查plugins文件夹!",
@@ -134,26 +460,33 @@ void eqiAnalysisAerialphoto::checkOverlapping()
             QgsMessageLog::logMessage(QString("创建检查图层 : \t创建图层失败, 程序已终止, 注意检查plugins文件夹。"));
             return;
         }
-        mLayer_Overlapping->setCrs(mLayerMap->crs());
+        mLayer_OverlapBetween->setCrs(mLayerMap->crs());
     }
-    else
+    else if (mLayer_OverlapBetween->isValid())
     {
-        MainWindow::instance()->mapCanvas()->freeze();
-
-        mLayer_Overlapping->startEditing();
-        mLayer_Overlapping->selectAll();
-        mLayer_Overlapping->deleteSelectedFeatures();
-        mLayer_Overlapping->commitChanges();
-        mLayer_Overlapping->updateExtents();
-
-        MainWindow::instance()->mapCanvas()->freeze( false );
-        MainWindow::instance()->refreshMapCanvas();
-        eqiSymbol *mySymbol = new eqiSymbol(this, mLayer_Overlapping, mField);
+        // 重置符号
+        eqiSymbol *mySymbol = new eqiSymbol(nullptr, mLayer_OverlapBetween, mField);
         mySymbol->delAllSymbolItem();
+        delete mySymbol;
+
+        if ( !( mLayer_OverlapBetween->dataProvider()->capabilities() & QgsVectorDataProvider::DeleteFeatures ) )
+        {
+          MainWindow::instance()->messageBar()->pushMessage( tr( "Provider does not support deletion" ),
+                                     tr( "Data provider does not support deleting features" ),
+                                     QgsMessageBar::INFO, MainWindow::instance()->messageTimeout() );
+          return;
+        }
+
+        mLayer_OverlapBetween->selectAll();
+        QgsFeatureIds ids = mLayer_OverlapBetween->selectedFeaturesIds();
+        if ( ids.size() != 0 )
+        {
+            mLayer_OverlapBetween->dataProvider()->deleteFeatures(ids);
+        }
     }
 
     // 初始化渲染类
-    eqiSymbol *mySymbol = new eqiSymbol(this, mLayer_Overlapping, mField);
+    eqiSymbol *mySymbol = new eqiSymbol(this, mLayer_OverlapBetween, mField);
 
     // 对比超限值，输出错误矢量面
     int index = 0;
@@ -169,115 +502,95 @@ void eqiAnalysisAerialphoto::checkOverlapping()
 
     foreach (QString number, list)
     {
-        //! 航带内
-        QMap<QString, int> map = myOlp.getNextPhotoOverlapping(number);
-        if (map.isEmpty())  // 没有重叠度
+        QMap<QString, int> mapOverlap = myOlp.getNextLineOverlapping(number);
+        QMap<QString, int>::const_iterator itOverlap = mapOverlap.constBegin();
+        int overlap = itOverlap.value();
+
+        QMap<QString, int> mapKeys = myOlp.getNextLineKeys(number);
+        QMap<QString, int>::const_iterator itKeys = mapKeys.constBegin();
+        int keys = itKeys.value();
+
+        // 检查是否与下张相片进行特征匹配，并且匹配有特征点
+        if (!mapKeys.isEmpty() && keys !=0)
         {
-            // 检查当前相片是否为该航线最后一张
-            QStringList list;
-            int lineNo = myOlp.getLineNumber(number);
-            myOlp.getLinePhoto(lineNo, list);
-            if (number != list.last())
+            // 启用同名点检查
+            if (isEnable)
             {
-                QgsGeometry *errGeometry = myOlp.getFeature(number)->geometry();
-                addOverLappingErrFeature(featureList, errGeometry, number
-                                         , ++index, "0%"
-                                         , errTpye_nextPhotoNoOverlap
-                                         , mySymbol, eqiSymbol::SeriousSrror);
-            }
-        }
-        else
-        {
-            QMap<QString, int>::const_iterator it = map.constBegin();
 
-            // 获得相交区域矢量面
-            QgsGeometry *errGeometry = myOlp.getFeature(number)->geometry()
-                    ->intersection(myOlp.getFeature(it.key())->geometry());
-
-            if (it.value() < heading_Min)   // 与航带内下张相片重叠度低于最低标准
-            {
-                addOverLappingErrFeature(featureList, errGeometry, number
-                                         , ++index, QString("%1%").arg(it.value())
-                                         , errTpye_nextPhotoMinOverlap
-                                         , mySymbol, eqiSymbol::SeriousSrror);
-            }
-            else if (it.value() < heading_Gen)   // 与航带内下张相片重叠度低于建议标准
-            {
-                addOverLappingErrFeature(featureList, errGeometry, number
-                                         , ++index, QString("%1%").arg(it.value())
-                                         , errTpye_nextPhotoGeneralOverlap
-                                         , mySymbol, eqiSymbol::warning);
-            }
-            else if (it.value() > heading_Max)   // 与航带内下张相片重叠度大于最大建议值
-            {
-                addOverLappingErrFeature(featureList, errGeometry, number
-                                         , ++index, QString("%1%").arg(it.value())
-                                         , errTpye_nextPhotoMaxOverlap
-                                         , mySymbol, eqiSymbol::warning);
-            }
-        }
-
-        //! 航带间
-        QMap<QString, int> mapNext = myOlp.getNextLineOverlapping(number);
-        if (mapNext.isEmpty())  // 没有重叠度
-        {
-            // 检查当前相片是否为最后一条航线
-            int lineNo = myOlp.getLineNumber(number);
-            int lineSize = myOlp.getLineSize();
-
-            if (lineNo != lineSize)
-            {
-                QgsGeometry *errGeometry = myOlp.getFeature(number)->geometry();
-                addOverLappingErrFeature(featureList, errGeometry, number
-                                         , ++index, "0%"
-                                         , errTpye_nextLineNoOverlap
-                                         , mySymbol, eqiSymbol::SeriousSrror);
-            }
-        }
-        else
-        {
-            QMap<QString, int>::const_iterator itNext = mapNext.constBegin();
-            QString maxNumber = itNext.key();
-            int maxPercentage = itNext.value();
-
-            // 获得相交区域矢量面
-            QgsGeometry *currentGeometry = myOlp.getFeature(number)->geometry();
-            QgsGeometry *maxGeometry = myOlp.getFeature(maxNumber)->geometry();
-            QgsGeometry *errGeometry = nullptr;
-
-            if (currentGeometry && maxGeometry)
-            {
-                errGeometry = currentGeometry->intersection(maxGeometry);
             }
             else
             {
-                prSymDialog.setValue(++prCount);
-                QApplication::processEvents();
-                continue;
-            }
 
-            if (maxPercentage < sideways_Min)  // 低于最低标准
-            {
-                addOverLappingErrFeature(featureList, errGeometry, number
-                                         , ++index, QString("%1%").arg(maxPercentage)
-                                         , errTpye_nextLineMinOverlap
-                                         , mySymbol, eqiSymbol::SeriousSrror);
-            }
-            else if (maxPercentage < sideways_Min) // 低于建议标准
-            {
-                addOverLappingErrFeature(featureList, errGeometry, number
-                                         , ++index, QString("%1%").arg(maxPercentage)
-                                         , errTpye_nextLineGeneralOverlap
-                                         , mySymbol, eqiSymbol::warning);
-            }
-            else if (maxPercentage > sideways_Max) // 大于最大建议
-            {
-                addOverLappingErrFeature(featureList, errGeometry, number
-                                         , ++index, QString("%1%").arg(maxPercentage)
-                                         , errTpye_nextLineMaxOverlap
-                                         , mySymbol, eqiSymbol::warning);
             }
         }
+        else
+        {
+            QgsGeometry errGeometry = QgsGeometry(*myOlp.getFeature(number)->geometry());
+            addOverLappingErrFeature(featureList, errGeometry, number
+                                     , ++index, "0%", "0"
+                                     , errTpye_NoKeys
+                                     , mySymbol, eqiSymbol::SeriousSrror);
+        }
+
+//        if (mapNext.isEmpty())  // 没有重叠度
+//        {
+            // 检查当前相片是否为最后一条航线
+//            int lineNo = myOlp.getLineNumber(number);
+//            int lineSize = myOlp.getLineSize();
+
+//            if (lineNo != lineSize)
+//            {
+//                QgsGeometry *errGeometry = myOlp.getFeature(number)->geometry();
+//                addOverLappingErrFeature(featureList, errGeometry, number
+//                                         , ++index, "0%"
+//                                         , errTpye_nextLineNoOverlap
+//                                         , mySymbol, eqiSymbol::SeriousSrror);
+//            }
+//        }
+//        else
+//        {
+//            QMap<QString, int>::const_iterator itNext = mapNext.constBegin();
+//            QString maxNumber = itNext.key();
+//            int maxPercentage = itNext.value();
+
+//            // 获得相交区域矢量面
+//            QgsGeometry *currentGeometry = myOlp.getFeature(number)->geometry();
+//            QgsGeometry *maxGeometry = myOlp.getFeature(maxNumber)->geometry();
+//            QgsGeometry *errGeometry = nullptr;
+
+//            if (currentGeometry && maxGeometry)
+//            {
+//                errGeometry = currentGeometry->intersection(maxGeometry);
+//            }
+//            else
+//            {
+//                prSymDialog.setValue(++prCount);
+//                QApplication::processEvents();
+//                continue;
+//            }
+
+//            if (maxPercentage < sideways_Min)  // 低于最低标准
+//            {
+//                addOverLappingErrFeature(featureList, errGeometry, number
+//                                         , ++index, QString("%1%").arg(maxPercentage)
+//                                         , errTpye_nextLineMinOverlap
+//                                         , mySymbol, eqiSymbol::SeriousSrror);
+//            }
+//            else if (maxPercentage < sideways_Min) // 低于建议标准
+//            {
+//                addOverLappingErrFeature(featureList, errGeometry, number
+//                                         , ++index, QString("%1%").arg(maxPercentage)
+//                                         , errTpye_nextLineGeneralOverlap
+//                                         , mySymbol, eqiSymbol::warning);
+//            }
+//            else if (maxPercentage > sideways_Max) // 大于最大建议
+//            {
+//                addOverLappingErrFeature(featureList, errGeometry, number
+//                                         , ++index, QString("%1%").arg(maxPercentage)
+//                                         , errTpye_nextLineMaxOverlap
+//                                         , mySymbol, eqiSymbol::warning);
+//            }
+//        }
 
         prSymDialog.setValue(++prCount);
         QApplication::processEvents();
@@ -285,22 +598,15 @@ void eqiAnalysisAerialphoto::checkOverlapping()
         if (prDialog.wasCanceled()) return;
     }
 
-    MainWindow::instance()->mapCanvas()->freeze();
-
     // 将要素添加到图层中
-    mLayer_Overlapping->startEditing();
-    mLayer_Overlapping->dataProvider()->addFeatures(featureList);
-    mLayer_Overlapping->commitChanges();
-    mLayer_Overlapping->updateExtents();
-
-    MainWindow::instance()->mapCanvas()->freeze( false );
+    mLayer_OverlapBetween->dataProvider()->addFeatures(featureList);
     MainWindow::instance()->refreshMapCanvas();
     mySymbol->updata();
 }
 
 QStringList eqiAnalysisAerialphoto::delOverlapping()
 {
-    if ( !mLayer_Overlapping || !mLayer_Overlapping->isValid() )
+    if ( !(mLayer_OverlapIn && mLayer_OverlapIn->isValid()) )
     {
         MainWindow::instance()->messageBar()->pushMessage( "删除重叠度超限相片"
             ,"请先检查后再进行自动删除。", QgsMessageBar::INFO
@@ -309,11 +615,11 @@ QStringList eqiAnalysisAerialphoto::delOverlapping()
     }
 
     QStringList overrunHead;
-    QStringList overrunSide;
+//    QStringList overrunSide;
     QStringList willDel;
 
     //进度条
-    QProgressDialog prDialog("统计错误相片...", "取消", 0, mLayer_Overlapping->featureCount(), nullptr);
+    QProgressDialog prDialog("统计错误相片...", "取消", 0, mLayer_OverlapIn->featureCount(), nullptr);
     prDialog.setWindowTitle("处理进度");              //设置窗口标题
     prDialog.setWindowModality(Qt::WindowModal);      //将对话框设置为模态
     prDialog.show();
@@ -321,7 +627,7 @@ QStringList eqiAnalysisAerialphoto::delOverlapping()
 
     // 从错误图层中提取所有超过最大限差的相片集合
     QgsFeature f;
-    QgsFeatureIterator it = mLayer_Overlapping->getFeatures();
+    QgsFeatureIterator it = mLayer_OverlapIn->getFeatures();
     while (it.nextFeature(f))
     {
         if (f.isValid())
@@ -331,19 +637,33 @@ QStringList eqiAnalysisAerialphoto::delOverlapping()
 
             if (strType == errTpye_nextPhotoMaxOverlap)
                 overrunHead << currentNo;
-            else if (strType == errTpye_nextLineMaxOverlap)  // 航带间
-                overrunSide << currentNo;
+//            else if (strType == errTpye_nextLineMaxOverlap)  // 航带间
+//                overrunSide << currentNo;
         }
         prDialog.setValue(++prCount);
         QApplication::processEvents();
     }
 
+    // 检查是否需要特征匹配以及能否达到匹配条件
+    bool isEnable = false;
+    isEnable = mSetting.value("/eqi/options/imagePreprocessing/match", true).toBool();
+    if (isEnable)
+    {
+        if (!(mPp && mPp->islinked()))
+        {
+            isEnable = false;
+            QgsMessageLog::logMessage("重叠度检查 : \tPOS未与相片创建联动关系,将忽略特征点匹配。");
+        }
+    }
+
     prCount = 0;
-    prDialog.setMaximum(overrunHead.size() + overrunSide.size());
+//    prDialog.setMaximum(overrunHead.size() + overrunSide.size());
+    prDialog.reset();
+    prDialog.setMaximum(overrunHead.size());
     prDialog.setLabelText("判断航带内相片是否可删除...");
 
     // 遍历每张相片  航带内
-    for (int i=0; i!=overrunHead.size(); ++i )
+    for (int i=0; i<overrunHead.size(); ++i )
     {
         QString currentNo = overrunHead.at(i);
         QStringList list;
@@ -351,25 +671,35 @@ QStringList eqiAnalysisAerialphoto::delOverlapping()
         myOlp.getLinePhoto(lineNo, list);
         if (currentNo!=list.first() && currentNo!=list.last())
         {
+            int keys = 0;
+            bool isDeleted = false;
             int index = list.indexOf(currentNo);
             QString lastNo = list.at(index-1);
             QString nextNo = list.at(index+1);
 
-            // debug
-            qDebug() << "==========》航带内检查：" << "lastNo： " << lastNo << "=currentNo：" << currentNo << "=nextNo：" << nextNo;
-
             int percentage = myOlp.calculateOverlap(lastNo, nextNo);
-            if (percentage > heading_Gen)
+            if (isEnable)
             {
-                // qdebug
-                qDebug() << (QString("%1相片航带内重叠度%2 删除").arg(currentNo).arg(percentage));
+                QString lastPhotoPath = mPp->getPhotoPath(lastNo);
+                QString nextPhotoPath = mPp->getPhotoPath(nextNo);
+                keys = myOlp.calculateOverlapSiftGPU(lastPhotoPath, nextPhotoPath);
+                if (keys > keyThreshold)
+                {
+                    if (percentage > heading_Gen) isDeleted = true;
+                }
+            }
+            else
+            {
+                if (percentage > heading_Gen) isDeleted = true;
+            }
+            if (isDeleted)
+            {
+                QgsMessageLog::logMessage(QString("%1相邻两张相片重叠度为：%2，同名点为：%3，可删除").arg(currentNo).arg(percentage).arg(keys));
                 myOlp.delItem(currentNo);
                 willDel << currentNo;
                 overrunHead.removeOne(currentNo);
-                ++i;
             }
         }
-
         prDialog.setValue(++prCount);
         QApplication::processEvents();
         //当按下取消按钮则中断
@@ -377,53 +707,53 @@ QStringList eqiAnalysisAerialphoto::delOverlapping()
             return QStringList();
     }
 
-    prDialog.setLabelText("判断航带间相片是否可删除...");
+//    prDialog.setLabelText("判断航带间相片是否可删除...");
 
-    // 遍历每张相片  航带间
-    foreach (QString currentNo, overrunSide)
-    {
-        QStringList list;
-        int lineNo = myOlp.getLineNumber(currentNo);
-        myOlp.getLinePhoto(lineNo, list);
-        int lineSize = myOlp.getLineSize();
+//    // 遍历每张相片  航带间
+//    foreach (QString currentNo, overrunSide)
+//    {
+//        QStringList list;
+//        int lineNo = myOlp.getLineNumber(currentNo);
+//        myOlp.getLinePhoto(lineNo, list);
+//        int lineSize = myOlp.getLineSize();
 
-        if ( (lineNo-1)>0 && (lineNo+1)<=lineSize ) // 保证上下还有航线
-        {
-            // 获得下条航带中的相片号
-            QMap<QString, int> mapNext = myOlp.getNextLineOverlapping(currentNo);
-            QMap<QString, int>::const_iterator itNext = mapNext.constBegin();
-            QString maxNumber = itNext.key();
+//        if ( (lineNo-1)>0 && (lineNo+1)<=lineSize ) // 保证上下还有航线
+//        {
+//            // 获得下条航带中的相片号
+//            QMap<QString, int> mapNext = myOlp.getNextLineOverlapping(currentNo);
+//            QMap<QString, int>::const_iterator itNext = mapNext.constBegin();
+//            QString maxNumber = itNext.key();
 
-            // 遍历上一条航带中的每张相片，比较重叠度
-            QStringList lastList;
-            myOlp.getLinePhoto(lineNo-1, lastList);
+//            // 遍历上一条航带中的每张相片，比较重叠度
+//            QStringList lastList;
+//            myOlp.getLinePhoto(lineNo-1, lastList);
 
-            QStringList::const_iterator itLast = lastList.constBegin();
-            while (itLast != lastList.constEnd())
-            {
-                QString lastPhoto = *itLast++;
-                int percentage = myOlp.calculateOverlap(lastPhoto, maxNumber);
+//            QStringList::const_iterator itLast = lastList.constBegin();
+//            while (itLast != lastList.constEnd())
+//            {
+//                QString lastPhoto = *itLast++;
+//                int percentage = myOlp.calculateOverlap(lastPhoto, maxNumber);
 
-                if (percentage > sideways_Gen)
-                {
-                    // 删除本张相片
-                    myOlp.delItem(currentNo);
-                    willDel << currentNo;
-                    // qdebug
-                    qDebug() << (QString("%1相片航带间重叠度%2 删除").arg(currentNo).arg(percentage));
-                    break;
-                }
-            }
-        }
+//                if (percentage > sideways_Gen)
+//                {
+//                    // 删除本张相片
+//                    myOlp.delItem(currentNo);
+//                    willDel << currentNo;
+//                    // qdebug
+//                    qDebug() << (QString("%1相片航带间重叠度%2 删除").arg(currentNo).arg(percentage));
+//                    break;
+//                }
+//            }
+//        }
 
-        prDialog.setValue(++prCount);
-        QApplication::processEvents();
-        //当按下取消按钮则中断
-        if (prDialog.wasCanceled())
-            return QStringList();
-    }
+//        prDialog.setValue(++prCount);
+//        QApplication::processEvents();
+//        //当按下取消按钮则中断
+//        if (prDialog.wasCanceled())
+//            return QStringList();
+//    }
 
-    myOlp.updataLineNumber();
+//    myOlp.updataLineNumber();
     myOlp.updataPhotoNumber();
     return willDel;
 }
@@ -540,115 +870,6 @@ void eqiAnalysisAerialphoto::checkOmega()
     mySymbol->updata();
 
     QgsMessageLog::logMessage("倾斜角检查完成。");
-}
-
-QStringList eqiAnalysisAerialphoto::delOmega(const bool isEdge)
-{
-    if ( !mLayer_Omega || !mLayer_Omega->isValid() )
-    {
-        MainWindow::instance()->messageBar()->pushMessage( "删除错误相片"
-            ,"请先检查后再进行自动删除。", QgsMessageBar::INFO
-            , MainWindow::instance()->messageTimeout() );
-        return QStringList();
-    }
-
-    QStringList overrun;
-    QStringList willDel;
-    QString lastNo;
-    QString nextNo;
-
-    //进度条
-    QProgressDialog prDialog("统计错误相片...", "取消", 0, mLayer_Omega->featureCount(), nullptr);
-    prDialog.setWindowTitle("处理进度");              //设置窗口标题
-    prDialog.setWindowModality(Qt::WindowModal);      //将对话框设置为模态
-    prDialog.show();
-    int prCount = 0;
-
-    // 从错误图层中提取所有超过最大限差的相片集合
-    QgsFeature f;
-    QgsFeatureIterator it = mLayer_Omega->getFeatures();
-    while (it.nextFeature(f))
-    {
-        if (f.isValid())
-        {
-            QString currentNo = f.attribute("相片编号").toString();
-            double omegaValue = f.attribute("Omega").toString().toDouble();
-            if (abs(omegaValue) > omega_angle_Max)
-            {
-                overrun << currentNo;
-
-                // qdebug
-                QgsMessageLog::logMessage(QString("%1相片超限 ").arg(currentNo));
-            }
-        }
-        prDialog.setValue(++prCount);
-        QApplication::processEvents();
-    }
-
-    prCount = 0;
-    prDialog.setMaximum(overrun.size());
-    prDialog.setLabelText("判断相片是否可删除...");
-
-    // 遍历每张相片
-    foreach (QString currentNo, overrun)
-    {
-        QStringList list;
-        int lineNo = myOlp.getLineNumber(currentNo);
-        myOlp.getLinePhoto(lineNo, list);
-        if (currentNo==list.first() || currentNo==list.last())
-        {
-            // qdebug
-            QgsMessageLog::logMessage(QString("相片位于航线两端 %1").arg(currentNo));
-
-            // 相片位于航线两端,根据isEdge是否删除
-            if (isEdge)
-            {
-                // 删除本张相片
-                myOlp.delItem(currentNo);
-                willDel << currentNo;
-                overrun.removeOne(currentNo);
-
-                // qdebug
-                QgsMessageLog::logMessage(QString("相片位于航线两端 删除 %1").arg(currentNo));
-            }
-        }
-        else
-        {
-            QStringList::const_iterator qit = list.constBegin();
-            while (++qit != list.constEnd())
-            {
-                if (*qit == currentNo)
-                {
-                    lastNo = *(qit-1);
-                    nextNo = *(qit+1);
-                    break;
-                }
-            }
-            int percentage = myOlp.calculateOverlap(lastNo, nextNo);
-            // qdebug
-            QgsMessageLog::logMessage(QString("%1相片相邻重叠度%2 ").arg(currentNo).arg(percentage));
-            if (percentage > heading_Min)
-            {
-                // 删除本张相片
-                myOlp.delItem(currentNo);
-                willDel << currentNo;
-                overrun.removeOne(currentNo);
-
-                // qdebug
-                QgsMessageLog::logMessage(QString("%1相片相邻重叠度%2 删除").arg(currentNo).arg(percentage));
-            }
-        }
-
-        prDialog.setValue(++prCount);
-        QApplication::processEvents();
-        //当按下取消按钮则中断
-        if (prDialog.wasCanceled())
-            return QStringList();
-    }
-
-    myOlp.updataLineNumber();
-    myOlp.updataPhotoNumber();
-    return willDel;
 }
 
 void eqiAnalysisAerialphoto::checkKappa()
@@ -822,20 +1043,19 @@ void eqiAnalysisAerialphoto::checkKappa()
     QgsMessageLog::logMessage("旋偏角检查完成。");
 }
 
-QStringList eqiAnalysisAerialphoto::delKappa(const bool isEdge)
+QStringList eqiAnalysisAerialphoto::delOmegaAndKappa(const QString& type, const bool isEdge)
 {
-    if ( !mLayer_Kappa || !mLayer_Kappa->isValid() )
-    {
-        MainWindow::instance()->messageBar()->pushMessage( "删除错误相片"
-            ,"请先检查后再进行自动删除。", QgsMessageBar::INFO
-            , MainWindow::instance()->messageTimeout() );
-        return QStringList();
-    }
+    // 重新检查mLayer_Kappa与mLayer_Omega图层有效性
+//    if ( !mLayer_Kappa || !mLayer_Kappa->isValid() )
+//    {
+//        MainWindow::instance()->messageBar()->pushMessage( "删除错误相片"
+//            ,"请先检查后再进行自动删除。", QgsMessageBar::INFO
+//            , MainWindow::instance()->messageTimeout() );
+//        return QStringList();
+//    }
 
     QStringList overrun;
     QStringList willDel;
-    QString lastNo;
-    QString nextNo;
 
     //进度条
     QProgressDialog prDialog("统计错误相片...", "取消", 0, mLayer_Kappa->featureCount(), nullptr);
@@ -846,20 +1066,38 @@ QStringList eqiAnalysisAerialphoto::delKappa(const bool isEdge)
 
     // 从错误图层中提取所有超过最大限差的相片集合
     QgsFeature f;
-    QgsFeatureIterator it = mLayer_Kappa->getFeatures();
+    QgsFeatureIterator it;
+    if (type=="Omega")
+        it = mLayer_Omega->getFeatures();
+    else
+        it = mLayer_Kappa->getFeatures();
+
     while (it.nextFeature(f))
     {
         if (f.isValid())
         {
             QString currentNo = f.attribute("相片编号").toString();
-            double kappaValue = f.attribute("Kappa").toString().toDouble();
-            if (abs(kappaValue) > kappa_angle_Max)
+            if (type=="Omega")
             {
-                overrun << currentNo;
-
-                // qdebug
-                QgsMessageLog::logMessage(QString("%1相片超限 ").arg(currentNo));
+                double omegaValue = f.attribute("Omega").toString().toDouble();
+                if (abs(omegaValue) > omega_angle_Max)
+                {
+                    overrun << currentNo;
+                    // qdebug
+                    QgsMessageLog::logMessage(QString("%1相片超限 ").arg(currentNo));
+                }
             }
+            else
+            {
+                double kappaValue = f.attribute("Kappa").toString().toDouble();
+                if (abs(kappaValue) > kappa_angle_Max)
+                {
+                    overrun << currentNo;
+                    // qdebug
+                    QgsMessageLog::logMessage(QString("%1相片超限 ").arg(currentNo));
+                }
+            }
+
         }
         prDialog.setValue(++prCount);
         QApplication::processEvents();
@@ -869,6 +1107,18 @@ QStringList eqiAnalysisAerialphoto::delKappa(const bool isEdge)
     prDialog.setMaximum(overrun.size());
     prDialog.setLabelText("判断相片是否可删除...");
 
+    // 检查是否需要特征匹配以及能否达到匹配条件
+    bool isEnable = false;
+    isEnable = mSetting.value("/eqi/options/imagePreprocessing/match", true).toBool();
+    if (isEnable)
+    {
+        if (!(mPp && mPp->islinked()))
+        {
+            isEnable = false;
+            QgsMessageLog::logMessage("重叠度检查 : \tPOS未与相片创建联动关系,将忽略特征点匹配。");
+        }
+    }
+
     // 遍历每张相片
     foreach (QString currentNo, overrun)
     {
@@ -877,9 +1127,6 @@ QStringList eqiAnalysisAerialphoto::delKappa(const bool isEdge)
         myOlp.getLinePhoto(lineNo, list);
         if (currentNo==list.first() || currentNo==list.last())
         {
-            // qdebug
-            QgsMessageLog::logMessage(QString("相片位于航线两端 %1").arg(currentNo));
-
             // 相片位于航线两端,根据isEdge是否删除
             if (isEdge)
             {
@@ -894,30 +1141,33 @@ QStringList eqiAnalysisAerialphoto::delKappa(const bool isEdge)
         }
         else
         {
-            QStringList::const_iterator qit = list.constBegin();
-            while (++qit != list.constEnd())
-            {
-                if (*qit == currentNo)
-                {
-                    lastNo = *(qit-1);
-                    nextNo = *(qit+1);
-                    break;
-                }
-            }
+            int keys = 0;
+            bool isDeleted = false;
+            int index = list.indexOf(currentNo);
+            QString lastNo = list.at(index-1);
+            QString nextNo = list.at(index+1);
             int percentage = myOlp.calculateOverlap(lastNo, nextNo);
 
-            // qdebug
-            QgsMessageLog::logMessage(QString("%1相片相邻重叠度%2 ").arg(currentNo).arg(percentage));
-
-            if (percentage > heading_Min)
+            if (isEnable)
             {
-                // 删除本张相片
+                QString lastPhotoPath = mPp->getPhotoPath(lastNo);
+                QString nextPhotoPath = mPp->getPhotoPath(nextNo);
+                keys = myOlp.calculateOverlapSiftGPU(lastPhotoPath, nextPhotoPath);
+                if (keys > keyThreshold)
+                {
+                    if (percentage > heading_Gen) isDeleted = true;
+                }
+            }
+            else
+            {
+                if (percentage > heading_Gen) isDeleted = true;
+            }
+            if (isDeleted)
+            {
+                QgsMessageLog::logMessage(QString("%1相邻两张相片重叠度为：%2，同名点为：%3，可删除").arg(currentNo).arg(percentage).arg(keys));
                 myOlp.delItem(currentNo);
                 willDel << currentNo;
                 overrun.removeOne(currentNo);
-
-                // qdebug
-                QgsMessageLog::logMessage(QString("%1相片相邻重叠度%2 删除").arg(currentNo).arg(percentage));
             }
         }
 
@@ -959,13 +1209,15 @@ void eqiAnalysisAerialphoto::updataChackValue()
     omega_angle_Average = mSettings.value("/eqi/options/imagePreprocessing/omega_angle_Average", 8.0).toDouble();
 
     errTpye_nextPhotoNoOverlap = "与下张相片没有重叠度";
-    errTpye_nextPhotoMinOverlap = QString("航带内重叠度低于最低阈值%2%").arg(heading_Min);
-    errTpye_nextPhotoGeneralOverlap = QString("航带内重叠度低于建议阈值%2%").arg(heading_Gen);
-    errTpye_nextPhotoMaxOverlap = QString("航带内重叠度超过建议阈值%2%").arg(heading_Max);
+    errTpye_nextPhotoMinOverlap = QString("航带内重叠度低于最低阈值%1%").arg(heading_Min);
+    errTpye_nextPhotoGeneralOverlap = QString("航带内重叠度低于建议阈值%1%").arg(heading_Gen);
+    errTpye_nextPhotoMaxOverlap = QString("航带内重叠度超过建议阈值%1%").arg(heading_Max);
+    errTpye_NoKeys = QString("未匹配到同名点");
+    errTpye_nextPhotoKeysThreshold = QString("航带内相邻相片同名点低于阈值：1%").arg(keyThreshold);;
     errTpye_nextLineNoOverlap = "与下航带相片没有重叠度";
-    errTpye_nextLineMinOverlap = QString("航带间重叠度低于最低阈值%2%").arg(sideways_Min);
-    errTpye_nextLineGeneralOverlap = QString("航带间重叠度低于建议阈值%2%").arg(sideways_Gen);
-    errTpye_nextLineMaxOverlap = QString("航带间重叠度超过建议阈值%2%").arg(sideways_Max);
+    errTpye_nextLineMinOverlap = QString("航带间重叠度低于最低阈值%1%").arg(sideways_Min);
+    errTpye_nextLineGeneralOverlap = QString("航带间重叠度低于建议阈值%1%").arg(sideways_Gen);
+    errTpye_nextLineMaxOverlap = QString("航带间重叠度超过建议阈值%1%").arg(sideways_Max);
 }
 
 void eqiAnalysisAerialphoto::airLineGroup()
@@ -1000,13 +1252,6 @@ void eqiAnalysisAerialphoto::airLineGroup()
     }
 
     isGroup = true;
-
-    //  debug
-//    const QStringList* noList = mPosdp->noList();
-//    foreach (QString noName, *noList)
-//    {
-
-//    }
 }
 
 void eqiAnalysisAerialphoto::extractFeature(QgsFeatureList &featureList
@@ -1041,7 +1286,8 @@ void eqiAnalysisAerialphoto::addOverLappingErrFeature(QgsFeatureList &featureLis
                                                       , QgsGeometry *errGeometry
                                                       , const QString &number
                                                       , const int index
-                                                      , const QString &overlappingVelue
+                                                      , const QString &overlappingValue
+                                                      , const QString &keysValue
                                                       , const QString &errType
                                                       , eqiSymbol *mySymbol
                                                       , eqiSymbol::linkedType type)
@@ -1050,10 +1296,42 @@ void eqiAnalysisAerialphoto::addOverLappingErrFeature(QgsFeatureList &featureLis
     MyFeature.setGeometry(errGeometry);
     MyFeature.setAttributes(QgsAttributes() << QVariant(index)
                             << QVariant(number)
-                            << QVariant(overlappingVelue)
+                            << QVariant(overlappingValue)
+                            << QVariant(keysValue)
                             << QVariant(errType));
     featureList.append(MyFeature);
     mySymbol->addChangedItem(errType, type);
+}
+
+void eqiAnalysisAerialphoto::addOverLappingErrFeature(QgsFeatureList &featureList
+                                                      , QgsGeometry errGeometry
+                                                      , const QString &number
+                                                      , const int index
+                                                      , const QString &overlappingValue
+                                                      , const QString &keysValue
+                                                      , const QString &errType
+                                                      , eqiSymbol *mySymbol
+                                                      , eqiSymbol::linkedType type)
+{
+    QgsFeature MyFeature;
+    MyFeature.setGeometry(errGeometry);
+    MyFeature.setAttributes(QgsAttributes() << QVariant(index)
+                            << QVariant(number)
+                            << QVariant(overlappingValue)
+                            << QVariant(keysValue)
+                            << QVariant(errType));
+    featureList.append(MyFeature);
+    mySymbol->addChangedItem(errType, type);
+}
+
+bool eqiAnalysisAerialphoto::isCheckLineLast(const QString &name)
+{
+    QStringList list;
+    int lineNo = myOlp.getLineNumber(name);
+    myOlp.getLinePhoto(lineNo, list);
+
+    if (name != list.last()) return false;
+    return true;
 }
 
 
@@ -1105,10 +1383,7 @@ void OverlappingProcessing::setQgsFeature(const QString &photoNumber, QgsFeature
 void OverlappingProcessing::setNextPhotoOl(const QString &currentNumber,
                                             QString nextNumber, const int n)
 {
-    if (n == 0)
-    {
-        return;
-    }
+    if (n == 0) return;
 
     if (map.contains(currentNumber))
     {
@@ -1118,13 +1393,22 @@ void OverlappingProcessing::setNextPhotoOl(const QString &currentNumber,
     }
 }
 
+void OverlappingProcessing::setNextPhotoKeys(const QString &currentNumber, QString nextNumber, const int n)
+{
+    if (n == 0) return;
+
+    if (map.contains(currentNumber))
+    {
+        Ol* ol = map.value(currentNumber);
+        ol->mMapNextPhotoKeys.clear();
+        ol->mMapNextPhotoKeys.insert(nextNumber, n);
+    }
+}
+
 void OverlappingProcessing::setNextLineOl(const QString &currentNumber
                                           , QString photoNumber, const int n)
 {
-    if (n == 0)
-    {
-        return;
-    }
+    if (n == 0) return;
 
     if (map.contains(currentNumber))
     {
@@ -1142,6 +1426,18 @@ void OverlappingProcessing::setNextLineOl(const QString &currentNumber
                 ol->mMapNextLine.insert(photoNumber, n);
             }
         }
+    }
+}
+
+void OverlappingProcessing::setNextLineKeys(const QString &currentNumber, QString nextNumber, const int n)
+{
+    if (n == 0) return;
+
+    if (map.contains(currentNumber))
+    {
+        Ol* ol = map.value(currentNumber);
+        ol->mMapNextLineKeys.clear();
+        ol->mMapNextLineKeys.insert(nextNumber, n);
     }
 }
 
@@ -1193,6 +1489,15 @@ void OverlappingProcessing::updataPhotoNumber()
             if (!map.contains(it.key()))
             {
                 ol->mMapNextPhoto.clear();
+            }
+        }
+
+        if (!(ol->mMapNextPhotoKeys.isEmpty()))
+        {
+            QMap<QString, int>::const_iterator it = ol->mMapNextPhotoKeys.constBegin();
+            if (!map.contains(it.key()))
+            {
+                ol->mMapNextPhotoKeys.clear();
             }
         }
 
@@ -1277,17 +1582,90 @@ int OverlappingProcessing::calculateOverlap(const QString &currentNo, const QStr
         return percentage;
     }
 
-//    if (currentGeometry->intersects(nextGeometry))
-//    {
-//        // 计算重叠百分比
-//        QgsGeometry *intersectGeometry = currentGeometry->intersection(nextGeometry);
-//        double intersectArea = intersectGeometry->area();
-//        double currentArea = currentGeometry->area();
-//        double nextArea = nextGeometry->area();
-//        int percentage = (int)((intersectArea/currentArea + intersectArea/nextArea)/2*100);
-//        return percentage;
-//    }
     return 0;
+}
+
+int OverlappingProcessing::calculateOverlapSiftGPU(const QString &currentNo, const QString &nextNo)
+{
+    SiftGPU  *sift = new SiftGPU;
+    SiftMatchGPU *matcher = new SiftMatchGPU(4096);
+    vector<float> descriptors1(1), descriptors2(1);
+
+//    char * argv[] = {"-fo", "-1",  "-v", "1", "-tc", "2000"};
+    char * argv[] = {"-fo", "-1",  "-v", "1"};
+    int argc = sizeof(argv)/sizeof(char*);
+    sift->ParseParam(argc, argv);
+
+    // 检查硬件是否支持SiftGPU
+    int support = sift->CreateContextGL();
+    if ( support != SiftGPU::SIFTGPU_FULL_SUPPORTED )
+    {
+        QgsMessageLog::logMessage("当前硬件不支持GPU计算功能!");
+        return 0;
+    }
+
+    // 检查是否已匹配过
+    if (mapKeyDescriptors.contains(currentNo))
+    {
+        descriptors1 = mapKeyDescriptors.value(currentNo);
+    }
+    else
+    {
+        // 使用GDAL读取影像
+        float *image1;
+        int xSize1 = 0;
+        int ySize1 = 0;
+        bool isReadImage1 = gdalTools.readRasterIO(currentNo, &image1, xSize1, ySize1);
+        if (!isReadImage1) return 0;
+
+        if(sift->RunSIFT(xSize1, ySize1, image1, GL_LUMINANCE, GL_FLOAT))
+        {
+            int num1 = sift->GetFeatureNum();
+            vector<SiftGPU::SiftKeypoint> keys1(num1);
+            descriptors1.resize(128*num1);
+            sift->GetFeatureVector(&keys1[0], &descriptors1[0]);
+            mapKeyDescriptors[currentNo] = descriptors1;
+        }
+
+        delete[] image1;
+    }
+
+    if (mapKeyDescriptors.contains(nextNo))
+    {
+        descriptors2 = mapKeyDescriptors.value(nextNo);
+    }
+    else
+    {
+        // 使用GDAL读取影像
+        float *image2;
+        int xSize2 = 0;
+        int ySize2 = 0;
+        bool isReadImage2 = gdalTools.readRasterIO(nextNo, &image2, xSize2, ySize2);
+        if (!isReadImage2) return 0;
+
+        if(sift->RunSIFT(xSize2, ySize2, image2, GL_LUMINANCE, GL_FLOAT))
+        {
+            int num2 = sift->GetFeatureNum();
+            vector<SiftGPU::SiftKeypoint> keys2(num2);
+            descriptors2.resize(128*num2);
+            sift->GetFeatureVector(&keys2[0], &descriptors2[0]);
+        }
+
+        delete[] image2;
+    }
+
+    int num1 = descriptors1.size()/128;
+    int num2 = descriptors2.size()/128;
+    matcher->VerifyContextGL();
+    matcher->SetDescriptors(0, num1, &descriptors1[0]);
+    matcher->SetDescriptors(1, num2, &descriptors2[0]);
+    int (*match_buf)[2] = new int[num1][2];
+    int num_match = matcher->GetSiftMatch(num1, match_buf);
+
+    delete[] match_buf;
+    delete sift;
+    delete matcher;
+    return num_match;
 }
 
 QMap<QString, int> OverlappingProcessing::getNextPhotoOverlapping(const QString &number)
@@ -1295,9 +1673,19 @@ QMap<QString, int> OverlappingProcessing::getNextPhotoOverlapping(const QString 
     return map.value(number)->mMapNextPhoto;
 }
 
+QMap<QString, int> OverlappingProcessing::getNextPhotoKeys(const QString &number)
+{
+    return map.value(number)->mMapNextPhotoKeys;
+}
+
 QMap<QString, int> OverlappingProcessing::getNextLineOverlapping(const QString &number)
 {
     return map.value(number)->mMapNextLine;
+}
+
+QMap<QString, int> OverlappingProcessing::getNextLineKeys(const QString &number)
+{
+    return map.value(number)->mMapNextLineKeys;
 }
 
 void OverlappingProcessing::delItem(const QString &photoNumber)

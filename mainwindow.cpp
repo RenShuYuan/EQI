@@ -24,6 +24,7 @@
 #include "ui/dialog/dialog_possetting.h"
 #include "ui/dialog/dialog_selectsetting.h"
 #include "ui/dialog/dialog_about.h"
+#include "ui/dialog/dialog_pcmsetting.h"
 #include "qgis/app/qgsstatusbarcoordinateswidget.h"
 #include "qgis/app/qgsapplayertreeviewmenuprovider.h"
 #include "qgis/app/qgsclipboard.h"
@@ -243,8 +244,9 @@ MainWindow::~MainWindow()
     delete mMapTools.mCircularStringCurvePoint;
     delete mMapTools.mCircularStringRadius;
 
-    delete pPosdp;
-    delete pPPInter;
+    if(pPosdp) delete pPosdp; pPosdp=nullptr;
+    if(pPPInter) delete pPPInter; pPPInter=nullptr;
+    if(pAnalysis) delete pAnalysis; pAnalysis=nullptr;
 
 //    delete mOverviewMapCursor;
 
@@ -419,6 +421,12 @@ void MainWindow::deleteAerialPhotographyData(const QStringList &delList)
         delPath = autoPath;
     }
 
+    // 删除相片
+    if (pPPInter && pPPInter->isAlllinked())
+        pPPInter->delPhoto(delList, delPath);
+    else
+        QgsMessageLog::logMessage("删除相片：POS与相片没有建立联动关系，或POS与相片未完全对应，已忽略。");
+
     // 删除POS
     if (pPosdp->isValid())
         pPosdp->deletePosRecords(delList);
@@ -430,12 +438,6 @@ void MainWindow::deleteAerialPhotographyData(const QStringList &delList)
         deleteSketchMap(delList);
     else
         QgsMessageLog::logMessage("删除航摄略图：无效的航摄略图，已忽略。");
-
-    // 删除相片
-    if (pPPInter && pPPInter->isAlllinked())
-        pPPInter->delPhoto(delList, delPath);
-    else
-        QgsMessageLog::logMessage("删除相片：POS与相片没有建立联动关系，或POS与相片未完全对应，已忽略。");
 
     QgsMessageLog::logMessage(QString("删除航摄数据：%1项。").arg(delList.size()));
 }
@@ -1189,10 +1191,15 @@ void MainWindow::initActions()
     connect( mActionPosSetting, SIGNAL( triggered() ), this, SLOT( posSetting() ));
 
     /*--------------------------------------------航摄数据预处理---------------------------------------------*/
-    mActionCheckOverlapping = new QAction("重叠度检查", this);
-    mActionCheckOverlapping->setStatusTip("重叠度检查");
-    mActionCheckOverlapping->setIcon(eqiApplication::getThemeIcon("eqi/other/CheckOverlapping.png"));
-    connect( mActionCheckOverlapping, SIGNAL( triggered() ), this, SLOT( checkOverlapping() ) );
+    mActionCheckOverlapIn = new QAction("航带内\n重叠度检查", this);
+    mActionCheckOverlapIn->setStatusTip("航带内重叠度检查");
+    mActionCheckOverlapIn->setIcon(eqiApplication::getThemeIcon("eqi/other/checkoverlappingIn.png"));
+    connect( mActionCheckOverlapIn, SIGNAL( triggered() ), this, SLOT( checkOverlapping() ) );
+
+    mActionCheckOverlapBetween = new QAction("航带间\n重叠度检查", this);
+    mActionCheckOverlapBetween->setStatusTip("航带间重叠度检查");
+    mActionCheckOverlapBetween->setIcon(eqiApplication::getThemeIcon("eqi/other/checkoverlappingBetween.png"));
+    connect( mActionCheckOverlapBetween, SIGNAL( triggered() ), this, SLOT(  ) );
 
     mActionCheckOmega = new QAction("倾斜角检查", this);
     mActionCheckOmega = new QAction("倾斜角检查", this);
@@ -1215,10 +1222,15 @@ void MainWindow::initActions()
     mActionDelKappa->setIcon(eqiApplication::getThemeIcon("mActionNodeTool.png"));
     connect( mActionDelKappa, SIGNAL( triggered() ), this, SLOT( delKappa() ) );
 
-    mActionDelOverlapping = new QAction("删除重叠度\n超限相片", this);
-    mActionDelOverlapping->setStatusTip("在保证重叠度的情况下，自动删除已检查出所有超过最大重叠度的相片。");
-    mActionDelOverlapping->setIcon(eqiApplication::getThemeIcon("eqi/other/CheckOverlappingDel.png"));
-    connect( mActionDelOverlapping, SIGNAL( triggered() ), this, SLOT( delOverlapping() ) );
+    mActionDelOverlapIn = new QAction("航带内剔片", this);
+    mActionDelOverlapIn->setStatusTip("在保证重叠度的情况下，自动删除已检查出航带内所有超过最大重叠度的相片。");
+    mActionDelOverlapIn->setIcon(eqiApplication::getThemeIcon("eqi/other/deloverlappingIn.png"));
+    connect( mActionDelOverlapIn, SIGNAL( triggered() ), this, SLOT( delOverlapIn() ) );
+
+    mActionDelOverlapBetween = new QAction("航带间剔片", this);
+    mActionDelOverlapBetween->setStatusTip("在保证重叠度的情况下，自动删除已检查出航带间所有超过最大重叠度的相片。");
+    mActionDelOverlapBetween->setIcon(eqiApplication::getThemeIcon("eqi/other/deloverlappingBetween.png"));
+    connect( mActionDelOverlapBetween, SIGNAL( triggered() ), this, SLOT(  ) );
 
     mActionDelSelect = new QAction("删除航摄数据", this);
     mActionDelSelect->setStatusTip("将选择的略图、POS、相片数据删除，保持一套数据完整性。");
@@ -1269,7 +1281,7 @@ void MainWindow::initActions()
     pcm_mActionsetting = new QAction("设置", this);
     pcm_mActionsetting->setIcon(eqiApplication::getThemeIcon("propertyicons/settings.svg"));
     pcm_mActionsetting->setStatusTip("相关参数设置。");
-    connect( pcm_mActionsetting, SIGNAL( triggered() ), this, SLOT(  ));
+    connect( pcm_mActionsetting, SIGNAL( triggered() ), this, SLOT( pcmSetting() ));
 
     /*--------------------------------------------要素选择、航摄数据处理---------------------------------------------*/
     mActionSelectFeatures = new QAction("选择要素", this);
@@ -1483,7 +1495,9 @@ void MainWindow::initTabTools()
     m_CAP->setToolButtonStyle(Qt::ToolButtonIconOnly);
     m_CAP->setIconSize(size);
     m_CAP->addWidget(new QLabel(label));
-    m_CAP->addAction(mActionCheckOverlapping);
+    m_CAP->addAction(mActionCheckOverlapIn);
+    m_CAP->addWidget(new QLabel(label));
+    m_CAP->addAction(mActionCheckOverlapBetween);
     m_CAP->addWidget(new QLabel(label));
     m_CAP->addAction(mActionCheckOmega);
     m_CAP->addWidget(new QLabel(label));
@@ -1491,7 +1505,9 @@ void MainWindow::initTabTools()
     m_CAP->addWidget(new QLabel(label));
     m_CAP->addSeparator(); //---
     m_CAP->addWidget(new QLabel(label));
-    m_CAP->addAction(mActionDelOverlapping);
+    m_CAP->addAction(mActionDelOverlapIn);
+    m_CAP->addWidget(new QLabel(label));
+    m_CAP->addAction(mActionDelOverlapBetween);
     m_CAP->addWidget(new QLabel(label));
     m_CAP->addAction(mActionDelOmega);
     m_CAP->addWidget(new QLabel(label));
@@ -3756,7 +3772,7 @@ void MainWindow::posSketchMap()
     if (!sketchMapLayer)
         return;
     pPPInter = new eqiPPInteractive(this, sketchMapLayer, pPosdp);
-    pAnalysis = new eqiAnalysisAerialphoto(this, sketchMapLayer, pPosdp);
+    pAnalysis = new eqiAnalysisAerialphoto(this, sketchMapLayer, pPosdp, pPPInter);
 }
 
 void MainWindow::posLinkPhoto()
@@ -3852,7 +3868,7 @@ void MainWindow::posSetting()
 
 void MainWindow::checkOverlapping()
 {
-    pAnalysis->checkOverlapping();
+    pAnalysis->checkoverlappingIn();
 }
 
 void MainWindow::checkOmega()
@@ -3865,7 +3881,7 @@ void MainWindow::checkKappa()
     pAnalysis->checkKappa();
 }
 
-void MainWindow::delOverlapping()
+void MainWindow::delOverlapIn()
 {
     QStringList delList = pAnalysis->delOverlapping();
     if (delList.isEmpty())
@@ -3876,7 +3892,7 @@ void MainWindow::delOverlapping()
 
 void MainWindow::delOmega()
 {
-    QStringList delList = pAnalysis->delOmega();
+    QStringList delList = pAnalysis->delOmegaAndKappa("Omega");
     if (delList.isEmpty())
         return;
 
@@ -3885,7 +3901,7 @@ void MainWindow::delOmega()
 
 void MainWindow::delKappa()
 {
-    QStringList delList = pAnalysis->delKappa();
+    QStringList delList = pAnalysis->delOmegaAndKappa("Kappa");
     if (delList.isEmpty())
         return;
 
@@ -3940,18 +3956,12 @@ void MainWindow::readPickPcm(QStringList &list)
 
 void MainWindow::pcmPicking()
 {
-//    if (!pcm_rasterLayer) return;
+    if (!pcm_rasterLayer) return;
 //    if (pcm_demPaths.isEmpty()) return;
 
-    eqiGdalProgressTools tools;
-//    QString str = "-projwin 407755 3393182 408292 3392879 -ot Float32 -of GTiff F:\\工作相关\\文档\\科技管理\\中航时无人机\\鹞鹰\\自己分析资料\\Export11-12-49.tif D:\\OUTPUT.tif";
-    QString str = "-projwin 103.666249134 33.4037333545 104.011500398 33.074949667 -ot Float32 -of GTiff F:\\工作相关\\文档\\科技管理\\中航时无人机\\鹞鹰\\自己分析资料\\Export11-12-49.tif D:\\OUTPUT.tif";
-    tools.eqiGDALTranslate(str);
-    qDebug() << "eqiGDALTranslate完成。。。。。。。。。。。";
-    return;
-//    eqiPcmFastPickSystem *pfps = new eqiPcmFastPickSystem(mMapCanvas, pcm_rasterLayer, pcm_demPaths);
-//    connect( pfps, SIGNAL( readPickPcm(QStringList&) ), this, SLOT( readPickPcm(QStringList&) ) );
-//    mMapCanvas->setMapTool(pfps);
+    eqiPcmFastPickSystem *pfps = new eqiPcmFastPickSystem(mMapCanvas, pcm_rasterLayer, pcm_demPaths);
+    connect( pfps, SIGNAL( readPickPcm(QStringList&) ), this, SLOT( readPickPcm(QStringList&) ) );
+    mMapCanvas->setMapTool(pfps);
 }
 
 void MainWindow::printPcmToTxt()
@@ -3985,8 +3995,66 @@ void MainWindow::printPcmToTxt()
     }
     file.close();
 
-    MainWindow::instance()->messageBar()->pushMessage( "导出控制点成果表",
-        "控制点坐标导出到control.txt",
-        QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
+//    MainWindow::instance()->messageBar()->pushMessage( "导出控制点成果表",
+//        "控制点坐标导出到control.txt",
+//        QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
     QgsMessageLog::logMessage("导出控制点成果表 : \t控制点坐标导出到control.txt.");
+
+    // 裁切小影像
+    if (!(pcm_rasterLayer && pcm_rasterLayer->isValid()))
+    {
+        QgsMessageLog::logMessage("导出控制点裁切影像 : \t没有指定参考DOM。");
+        return;
+    }
+
+    // 各项参数获取
+
+    // 参考DOM影像路径
+    QString DOMname = pcm_rasterLayer->name();
+
+    // 数据源路径
+    QString src_dataset = pcm_rasterLayer->source();
+
+    // 输出格式
+    QString format = "GTiff";
+
+    // 位深
+    QGis::DataType vaule = pcm_rasterLayer->dataProvider()->dataType(1);
+    QString dataType = eqiGdalProgressTools::enumToString(vaule);
+
+    // 计算外扩距离
+    int heightSize = mSettings.value("/eqi/options/pcm/height", 500).toInt();
+    int widthSize = mSettings.value("/eqi/options/pcm/width", 500).toInt();
+    double exDisHeight = pcm_rasterLayer->rasterUnitsPerPixelY() * heightSize;
+    double exDisWidth = pcm_rasterLayer->rasterUnitsPerPixelX() * widthSize;
+
+    eqiGdalProgressTools gdalTools;
+    foreach (QString str, pcmList)
+    {
+        // 分割点号、X、Y、Z
+        QStringList list = str.split('\t', QString::SkipEmptyParts);
+        QgsPoint point(list.at(1).toDouble(), list.at(2).toDouble());
+
+        // 目标数据路径
+        QString dst_dataset = dir + "\\" + DOMname + list.at(0) + ".tif";
+
+        // 裁切范围
+        QString leftCd = QString::number( point.x()-exDisWidth );
+        QString topCd = QString::number( point.y()+exDisHeight );
+        QString rightCd = QString::number( point.x()+exDisWidth );
+        QString downCd = QString::number( point.y()-exDisHeight );
+
+        QString strArgv = QString("-projwin %1 %2 %3 %4 -ot %5 -of %6 %7 %8")
+                                   .arg(leftCd).arg(topCd).arg(rightCd).arg(downCd)
+                                   .arg(dataType).arg(format).arg(src_dataset).arg(dst_dataset);
+
+        QgsMessageLog::logMessage( strArgv );
+        gdalTools.eqiGDALTranslate(strArgv);
+    }
+}
+
+void MainWindow::pcmSetting()
+{
+    dialog_pcmSetting *pPcm = new dialog_pcmSetting(this);
+    pPcm->exec();
 }

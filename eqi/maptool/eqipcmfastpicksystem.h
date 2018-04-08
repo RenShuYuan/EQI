@@ -25,6 +25,7 @@ public slots:
 
 private:
     // 用于保存像控快速拾取系统的DOM
+    // 没用上
     QgsRasterLayer* pcm_rasterLayer;
 
     // 用于保存像控快速拾取系统的DEM路径

@@ -89,17 +89,27 @@ eqiGdalProgressTools::eqiGdalProgressTools()
 
 eqiGdalProgressTools::~eqiGdalProgressTools()
 {
-    // 卸载
-//    GDALDestroyDriverManager();
-
     delete proDialog;
 }
 
 void eqiGdalProgressTools::eqiGDALTranslate(const QString &str)
 {
-    int argc = 0;
-    char **argv = NULL;
-    argv = QStringToChar(str, argc);
+    QStringList list = str.split(' ', QString::SkipEmptyParts);
+    int argc = list.size();
+    if ( argc==0 )
+        return;
+
+    char **argv=(char **)malloc(sizeof(char*)*argc);
+    for (int var = 0; var < argc; ++var)
+    {
+        std::string str = list.at(var).toStdString();
+        const char* p = str.c_str();
+        size_t cSize = strlen(p);
+        char *c = (char*)malloc(sizeof(char*)*cSize);
+        strncpy(c, p, cSize);
+        c[cSize] = '\0';
+        argv[var] = c;
+    }
 
     if (argc==0)
     {
@@ -109,9 +119,6 @@ void eqiGdalProgressTools::eqiGDALTranslate(const QString &str)
 
     // 提前设置配置信息
     EarlySetConfigOptions(argc, argv);
-
-    //注册所有影像格式
-    GDALAllRegister();
 
     // GDAL通用命令行处理
     argc = GDALGeneralCmdLineProcessor(argc, &argv, 0);
@@ -164,10 +171,8 @@ void eqiGdalProgressTools::eqiGDALTranslate(const QString &str)
     }
     if (!(psOptionsForBinary->bQuiet))
     {
-//        qDebug("proDialog->value()=%d", proDialog->value());
         proDialog->show();
         GDALTranslateOptionsSetProgress(psOptions, ALGTermProgress, proDialog);
-//        GDALTranslateOptionsSetProgress(psOptions, GDALTermProgress, NULL);
     }
 
     // 检查输出格式，如果不正确，则将列出所支持的格式
@@ -180,7 +185,6 @@ void eqiGdalProgressTools::eqiGDALTranslate(const QString &str)
 
             GDALTranslateOptionsFree(psOptions);
             GDALTranslateOptionsForBinaryFree(psOptionsForBinary);
-            GDALDestroyDriverManager();
             return;
         }
     }
@@ -196,7 +200,6 @@ void eqiGdalProgressTools::eqiGDALTranslate(const QString &str)
     {
         QgsMessageLog::logMessage("影像裁切：影像源无法打开，已终止。");
 
-        GDALDestroyDriverManager();
         return;
     }
 
@@ -208,7 +211,6 @@ void eqiGdalProgressTools::eqiGDALTranslate(const QString &str)
         QgsMessageLog::logMessage("影像裁切：输入的文件包含子数据集，请选择其中一个处理，已终止。");
 
         GDALClose(hDataset);
-        GDALDestroyDriverManager();
         return;
     }
 
@@ -217,7 +219,6 @@ void eqiGdalProgressTools::eqiGDALTranslate(const QString &str)
     {
         char **papszSubdatasets = GDALGetMetadata(hDataset, "SUBDATASETS");
         char *pszSubDest = (char *)CPLMalloc(strlen(psOptionsForBinary->pszDest) + 32);
-        int i;
 
         CPLString osPath = CPLGetPath(psOptionsForBinary->pszDest);
         CPLString osBasename = CPLGetBasename(psOptionsForBinary->pszDest);
@@ -240,7 +241,7 @@ void eqiGdalProgressTools::eqiGDALTranslate(const QString &str)
 
         const char* pszDest = pszSubDest;
 
-        for (i = 0; papszSubdatasets[i] != NULL; i += 2)
+        for (int i = 0; papszSubdatasets[i] != NULL; i += 2)
         {
             char* pszSource = CPLStrdup(strstr(papszSubdatasets[i], "=") + 1);
             osTemp = CPLSPrintf(pszFormat, osBasename.c_str(), i / 2 + 1);
@@ -263,7 +264,6 @@ void eqiGdalProgressTools::eqiGDALTranslate(const QString &str)
         GDALTranslateOptionsForBinaryFree(psOptionsForBinary);
         CPLFree(pszSubDest);
 
-        GDALDestroyDriverManager();
         return;
     }
 
@@ -279,20 +279,52 @@ void eqiGdalProgressTools::eqiGDALTranslate(const QString &str)
     GDALClose(hDataset);
     GDALTranslateOptionsFree(psOptions);
     GDALTranslateOptionsForBinaryFree(psOptionsForBinary);
-
-    GDALDestroyDriverManager();
-    qDebug() << "执行。。。。。。释放";
 }
 
-char** eqiGdalProgressTools::QStringToChar(const QString &str, int &doneSize)
+bool eqiGdalProgressTools::readRasterIO(const QString &rasterName, float **pDataBuffer, int &xSize, int &ySize)
 {
+    // 尝试打开数据源
+    GDALDataset* poDataset = NULL;
+    poDataset = (GDALDataset*)GDALOpenEx(rasterName.toStdString().c_str(), GDAL_OF_RASTER, NULL, NULL, NULL);
+    if (poDataset != NULL)
+    {
+        if (poDataset->GetRasterCount()>0)
+        {
+            GDALRasterBand* pBand = poDataset->GetRasterBand(1);
+            xSize = pBand->GetXSize();
+            ySize = pBand->GetYSize();
+            *pDataBuffer = new float[xSize*ySize];
+            int err = pBand->RasterIO(GF_Read, 0, 0, xSize, ySize, *pDataBuffer, xSize, ySize, GDT_Float32, 0, 0);
+            if (err == CE_None)
+            {
+                if (poDataset != NULL)
+                    GDALClose((GDALDatasetH)poDataset);
+                return true;
+            }
+            else
+            {
+                if (*pDataBuffer != NULL)
+                {
+                    delete *pDataBuffer; *pDataBuffer = NULL;
+                }
+            }
+        }
+    }
+    QgsMessageLog::logMessage(QString("特征匹配：\t影像%1无法读取，已忽略。").arg(rasterName));
+    if (poDataset!=NULL)
+        GDALClose((GDALDatasetH)poDataset);
+    return false;
+}
+
+int eqiGdalProgressTools::QStringToChar(const QString& str, char ***argv)
+{
+    int doneSize = 0;
     QStringList list = str.split(' ', QString::SkipEmptyParts);
     doneSize = list.size();
-    if (doneSize==0)
-        return NULL;
+    if ( doneSize==0 )
+        return doneSize;
 
-//    char **argv=(char **)malloc(sizeof(char*)*doneSize);
-    char **argv=new char*[doneSize];
+    char **mArgv= *argv;
     for (int var = 0; var < doneSize; ++var)
     {
         std::string str = list.at(var).toStdString();
@@ -301,8 +333,38 @@ char** eqiGdalProgressTools::QStringToChar(const QString &str, int &doneSize)
         char *c = new char[cSize];
         strncpy(c, p, cSize);
         c[cSize] = '\0';
-        argv[var] = c;
+        mArgv[var] = c;
     }
 
-    return argv;
+    return doneSize;
+}
+
+QString eqiGdalProgressTools::enumToString(const int value)
+{
+    switch (value) {
+    case 1:
+        return "Byte";
+    case 2:
+        return "UInt16";
+    case 3:
+        return "Int16";
+    case 4:
+        return "UInt32";
+    case 5:
+        return "Int32";
+    case 6:
+        return "Float32";
+    case 7:
+        return "Float64";
+    case 8:
+        return "CInt16";
+    case 9:
+        return "CInt32";
+    case 10:
+        return "CFloat32";
+    case 11:
+        return "CFloat64";
+    default:
+        return "Byte";
+    }
 }

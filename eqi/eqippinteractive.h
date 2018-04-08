@@ -112,6 +112,8 @@ public:
 
     QStringList modifyPos();
     QStringList modifyPhoto();
+
+    QString getPhotoPath(const QString& name);
 signals:
     /**
     * @brief            向主窗口发送信号更新繁忙进度条状态

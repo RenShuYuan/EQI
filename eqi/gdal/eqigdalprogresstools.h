@@ -4,6 +4,18 @@
 #include <QString>
 #include <QProgressDialog>
 
+#define GL_RED                            0x1903
+#define GL_RGB                            0x1907
+#define GL_LUMINANCE                      0x1909
+#define GL_STENCIL_INDEX                  0x1901
+#define GL_DEPTH_COMPONENT                0x1902
+#define GL_INTENSITY8                     0x804B
+#define GL_UNSIGNED_BYTE                  0x1401
+#define GL_FLOAT                          0x1406
+
+/*! 8U */
+typedef unsigned char                     DT_8U;
+
 class eqiGdalProgressTools
 {
 public:
@@ -21,6 +33,8 @@ public:
     */
     void eqiGDALTranslate(const QString &str);
 
+    bool readRasterIO(const QString& rasterName, float **pDataBuffer, int &xSize, int &ySize);
+
     /**
     * \brief 分割QString字符串
     *
@@ -31,8 +45,9 @@ public:
     *
     * @return 返回char**，类似于main()参数。
     */
-    static char **QStringToChar(const QString& str, int &doneSize);
+    int QStringToChar(const QString& str, char ***argv);
 
+    static QString enumToString(const int value);
 private:
     QProgressDialog *proDialog;
 };

@@ -56,7 +56,8 @@ INCLUDEPATH +=	C:/qgis-2.18.18/dev/include \
                 C:/Qt/4.8.6/include/QtXml \
                 C:/Qt/4.8.6/include/QtSql \
                 C:/Qt/4.8.6/include/QtNetwork \
-                C:/Qt/4.8.6/include/QtCore
+                C:/Qt/4.8.6/include/QtCore \
+                C:/siftgpu32
 
 # 加载lib文件
 LIBS += -LC:/qgis-2.18.18/dev/lib   -lqgis_core \
@@ -79,6 +80,8 @@ LIBS += -LC:/OSGeo4W/lib    -llibexpat \
                             -lsqlite3_i \
                             -lszip \
                             -lspatialindex_i \
+
+LIBS += -LC:/siftgpu32   -lSIFTGPU
 
 #DEFINES += NOMINMAX
 #DEFINES += WITH_QTWEBKIT
@@ -199,7 +202,8 @@ SOURCES += \
     eqi/maptool/eqipcmfastpicksystem.cpp \
     qgis/app/qgsattributeactiondialog.cpp \
     qgis/app/qgsattributeactionpropertiesdialog.cpp \
-    eqi/gdal/eqigdalprogresstools.cpp
+    eqi/gdal/eqigdalprogresstools.cpp \
+    ui/dialog/dialog_pcmsetting.cpp
 
 HEADERS += \
     mainwindow.h \
@@ -277,7 +281,8 @@ HEADERS += \
     qgis/app/qgsattributeactionpropertiesdialog.h \
     gdal/commonutils.h \
     gdal/gdal_utils_priv.h \
-    eqi/gdal/eqigdalprogresstools.h
+    eqi/gdal/eqigdalprogresstools.h \
+    ui/dialog/dialog_pcmsetting.h
 
 FORMS += \
     mainwindow.ui \
@@ -366,7 +371,8 @@ FORMS += \
     ui/qgis/qgssnappingdialogbase.ui \
     ui/qgis/qgspluginmanagerbase.ui \
     ui/qgis/qgsbookmarksbase.ui \
-    ui/qgis/qgsattributeactionpropertiesdialogbase.ui
+    ui/qgis/qgsattributeactionpropertiesdialogbase.ui \
+    ui/dialog/dialog_pcmsetting.ui
 
 RESOURCES += \
     Resources/images/images.qrc

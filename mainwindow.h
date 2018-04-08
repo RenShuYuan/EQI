@@ -297,7 +297,7 @@ private slots:
     void checkKappa();
 
     //! 删除重叠度超限相片
-    void delOverlapping();
+    void delOverlapIn();
 
     //! 删除倾角超限相片
     void delOmega();
@@ -339,6 +339,8 @@ private slots:
     void pcmPicking();
 
     void printPcmToTxt();
+
+    void pcmSetting();
 signals:
     void layerSavedAs( QgsMapLayer* l, const QString& path );
 
@@ -428,7 +430,8 @@ private:
     QAction *mActionPPLinkPhoto;
 
     //! 航摄数据预处理
-    QAction *mActionCheckOverlapping;
+    QAction *mActionCheckOverlapIn;
+    QAction *mActionCheckOverlapBetween;
     QAction *mActionCheckOmega;
     QAction *mActionCheckKappa;
     QAction *mActionDelSelect;
@@ -436,7 +439,8 @@ private:
     QAction *mActionSelectSetting;
     QAction *mActionDelOmega;
     QAction *mActionDelKappa;
-    QAction *mActionDelOverlapping;
+    QAction *mActionDelOverlapIn;
+    QAction *mActionDelOverlapBetween;
     QAction *mActionModifyPos;
     QAction *mActionModifyPhoto;
 

@@ -37,8 +37,8 @@ dialog_selectSetting::dialog_selectSetting(QWidget *parent) :
     ui->doubleSpinBox_6->setValue(value_f);
 
     // 航摄数据删除与保存
-    int iDelete = mSettings.value("/eqi/options/selectEdit/delete", DELETE_DIR).toInt();
-    int iSave = mSettings.value("/eqi/options/selectEdit/save", SAVE_TEMPDIR).toInt();
+    int iDelete = mSettings.value("/eqi/options/imagePreprocessing/delete", DELETE_DIR).toInt();
+    int iSave = mSettings.value("/eqi/options/imagePreprocessing/save", SAVE_TEMPDIR).toInt();
 
     if (iDelete == DELETE_PHYSICAL)
         ui->radioButton->setChecked(true);
@@ -49,6 +49,10 @@ dialog_selectSetting::dialog_selectSetting(QWidget *parent) :
         ui->radioButton_3->setChecked(true);
     else
         ui->radioButton_4->setChecked(true);
+
+    // 特征点匹配
+    bool isEnable = mSettings.value("/eqi/options/imagePreprocessing/match", true).toBool();
+    ui->checkBox->setChecked(isEnable);
 }
 
 dialog_selectSetting::~dialog_selectSetting()
@@ -81,4 +85,6 @@ void dialog_selectSetting::on_buttonBox_accepted()
         mSettings.setValue( "/eqi/options/selectEdit/save", SAVE_CUSTOMIZE );
     else
         mSettings.setValue( "/eqi/options/selectEdit/save", SAVE_TEMPDIR );
+
+    mSettings.setValue("/eqi/options/imagePreprocessing/match", ui->checkBox->isChecked());
 }
