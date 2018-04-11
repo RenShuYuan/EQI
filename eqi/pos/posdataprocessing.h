@@ -76,7 +76,7 @@ public:
     bool autoPosTransform();
 
     // 创建略图
-    QgsVectorLayer* autoSketchMap();
+    QgsVectorLayer *autoSketchMap();
 
     // 导出Pos文件
     bool posExport();

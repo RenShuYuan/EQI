@@ -60,7 +60,6 @@
 #include "qgsscalecombobox.h"
 #include "qgsdoublespinbox.h"
 #include "qgslayertreeview.h"
-#include "qgsmessagebar.h"
 #include "qgslayertreemodel.h"
 #include "qgsproject.h"
 #include "qgslayertreenode.h"
@@ -88,6 +87,7 @@
 #include "qgsrasterfilewriter.h"
 #include "qgseditorwidgetregistry.h"
 #include "qgsdataitem.h"
+#include "qgsmapcanvas.h"
 
 MainWindow *MainWindow::smInstance = nullptr;
 
@@ -177,6 +177,19 @@ MainWindow::MainWindow(QWidget *parent) :
     connect( QgsMessageLog::instance(), SIGNAL( messageReceived( bool ) ), this, SLOT( toggleLogMessageIcon( bool ) ) );
     connect( mMessageButton, SIGNAL( toggled( bool ) ), this, SLOT( toggleLogMessageIcon( bool ) ) );
     // end
+
+    // 连接图层加载与移除信号
+    connect( QgsMapLayerRegistry::instance()
+             , SIGNAL(layersAdded (const QList< QgsMapLayer * > &)), this
+             , SLOT(layersAdded (const QList< QgsMapLayer * > &)));
+
+    connect( QgsMapLayerRegistry::instance()
+             , SIGNAL(layersWillBeRemoved (const QList< QgsMapLayer * > &)), this
+             , SLOT(layersWillBeRemoved (const QList< QgsMapLayer * > &)));
+
+    connect( QgsMapLayerRegistry::instance()
+             , SIGNAL(layersRemoved (const QStringList &)), this
+             , SLOT(layersRemoved (const QStringList &)));
 
     // 连接POS处理进度
     pPosdp = new posDataProcessing(this);
@@ -434,7 +447,7 @@ void MainWindow::deleteAerialPhotographyData(const QStringList &delList)
         QgsMessageLog::logMessage("删除POS记录：没有载入POS文件，已忽略。");
 
     // 删除航飞略图
-    if (sketchMapLayer && sketchMapLayer->isValid())
+    if (sketchMapLayer)
         deleteSketchMap(delList);
     else
         QgsMessageLog::logMessage("删除航摄略图：无效的航摄略图，已忽略。");
@@ -1194,12 +1207,12 @@ void MainWindow::initActions()
     mActionCheckOverlapIn = new QAction("航带内\n重叠度检查", this);
     mActionCheckOverlapIn->setStatusTip("航带内重叠度检查");
     mActionCheckOverlapIn->setIcon(eqiApplication::getThemeIcon("eqi/other/checkoverlappingIn.png"));
-    connect( mActionCheckOverlapIn, SIGNAL( triggered() ), this, SLOT( checkOverlapping() ) );
+    connect( mActionCheckOverlapIn, SIGNAL( triggered() ), this, SLOT( checkOverlapIn() ) );
 
     mActionCheckOverlapBetween = new QAction("航带间\n重叠度检查", this);
     mActionCheckOverlapBetween->setStatusTip("航带间重叠度检查");
     mActionCheckOverlapBetween->setIcon(eqiApplication::getThemeIcon("eqi/other/checkoverlappingBetween.png"));
-    connect( mActionCheckOverlapBetween, SIGNAL( triggered() ), this, SLOT(  ) );
+    connect( mActionCheckOverlapBetween, SIGNAL( triggered() ), this, SLOT( checkOverlapBetween() ) );
 
     mActionCheckOmega = new QAction("倾斜角检查", this);
     mActionCheckOmega = new QAction("倾斜角检查", this);
@@ -2273,6 +2286,8 @@ void MainWindow::upDataPosActions()
         mActionPosOneButton->setEnabled(true);
         mActionPPLinkPhoto->setEnabled(true);
         mActionPosExport->setEnabled(true);
+        mActionDelSelect->setEnabled(true);
+        mActionSaveSelect->setEnabled(true);
     }
     else
     {
@@ -2281,15 +2296,46 @@ void MainWindow::upDataPosActions()
         mActionPosOneButton->setEnabled(false);
         mActionPPLinkPhoto->setEnabled(false);
         mActionPosExport->setEnabled(false);
+        mActionDelSelect->setEnabled(false);
+        mActionSaveSelect->setEnabled(false);
+    }
+
+    if (pPPInter->isValid())
+    {
+        mActionModifyPos->setEnabled(true);
+        mActionModifyPhoto->setEnabled(true);
+    }
+    else
+    {
+        mActionModifyPos->setEnabled(false);
+        mActionModifyPhoto->setEnabled(false);
+    }
+
+    if (sketchMapLayer)
+    {
+        mActionSketchMapSwitch->setEnabled(true);
+        mActionPosLabelSwitch->setEnabled(true);
+        mActionCheckOverlapIn->setEnabled(true);
+        mActionCheckOverlapBetween->setEnabled(true);
+        mActionCheckOmega->setEnabled(true);
+        mActionCheckKappa->setEnabled(true);
+    }
+    else
+    {
+        mActionSketchMapSwitch->setEnabled(false);
+        mActionPosLabelSwitch->setEnabled(false);
+        mActionCheckOverlapBetween->setEnabled(false);
+        mActionCheckOmega->setEnabled(false);
+        mActionCheckKappa->setEnabled(false);
+
+        if (pPPInter) delete pPPInter; pPPInter = nullptr;
+        if (pAnalysis) delete pAnalysis; pAnalysis = nullptr;
     }
 }
 
 int MainWindow::deleteSketchMap(const QStringList &delList)
 {
-    if (!sketchMapLayer && !sketchMapLayer->isValid())
-    {
-        return 0;
-    }
+    if (!sketchMapLayer) return 0;
 
     QgsFeature f;
     QString strExpression;
@@ -2321,6 +2367,8 @@ int MainWindow::deleteSketchMap(const QStringList &delList)
 
 void MainWindow::pSwitchSketchMap()
 {
+    if (!sketchMapLayer) return;
+
     QgsFeature f;
     QgsFeatureIterator it = sketchMapLayer->getFeatures();
 
@@ -2353,7 +2401,7 @@ void MainWindow::pSwitchSketchMap()
 
 void MainWindow::switchPosLabel()
 {
-    if (!sketchMapLayer && !sketchMapLayer->isValid()) return;
+    if (!sketchMapLayer) return;
 
     if (isPosLabel)
     {
@@ -2655,6 +2703,8 @@ void MainWindow::invertSelection()
 
 void MainWindow::delSelect()
 {
+    if (!sketchMapLayer) return;
+
     // 获得选择的相片编号
     QStringList delList;
     QgsFeatureList fList =	sketchMapLayer->selectedFeatures();
@@ -2753,7 +2803,7 @@ void MainWindow::modifyPos()
         QgsMessageLog::logMessage("删除POS记录：没有载入POS文件，已忽略。");
 
     // 删除航飞略图
-    if (sketchMapLayer && sketchMapLayer->isValid())
+    if (sketchMapLayer)
     {
         deleteSketchMap(willdel);
         QgsMessageLog::logMessage(QString("共删除%1项POS记录。").arg(willdel.size()));
@@ -3704,6 +3754,52 @@ QgsMapLayer *MainWindow::activeLayer()
     return mLayerTreeView ? mLayerTreeView->currentLayer() : nullptr;
 }
 
+void MainWindow::layersAdded(const QList<QgsMapLayer *> &theMapLayers)
+{
+//    if (theMapLayers.isEmpty()) return;
+//    for (int i = 0; i != theMapLayers.size(); ++i)
+//    {
+//        QgsVectorLayer* vectorLayer = dynamic_cast<QgsVectorLayer*>(theMapLayers.at(i));
+//        qDebug("layersAdded---------------------------------------->>>>>>>%d",*vectorLayer);
+//        if (vectorLayer)
+//        {
+//            mapLoadLayer[vectorLayer->id()] = vectorLayer;
+//        }
+//    }
+}
+
+void MainWindow::layersWillBeRemoved(const QList<QgsMapLayer *> &theMapLayers)
+{
+//    if (theMapLayers.isEmpty()) return;
+//    for (int i = 0; i != theMapLayers.size(); ++i)
+//    {
+//        QgsVectorLayer* vectorLayer = dynamic_cast<QgsVectorLayer*>(theMapLayers.at(i));
+//        if (vectorLayer)
+//        {
+//            mapLoadLayer[vectorLayer->id()] = &vectorLayer;
+//        }
+//    }
+}
+
+void MainWindow::layersRemoved(const QStringList &theLayerIds)
+{
+    if (theLayerIds.isEmpty()) return;
+    for (int i = 0; i != theLayerIds.size(); ++i)
+    {
+        QString id = theLayerIds.at(i);
+        if (mapLoadLayer.contains(id))
+        {
+            QgsVectorLayer** vectorLayer = mapLoadLayer.value(id);
+            if (vectorLayer && *vectorLayer)
+            {
+                *vectorLayer = nullptr;
+            }
+            mapLoadLayer.remove(id);
+        }
+    }
+    upDataPosActions();
+}
+
 void MainWindow::openPosFile()
 {
     dialog_posloaddialog *posDialog = new dialog_posloaddialog(this);
@@ -3768,9 +3864,11 @@ void MainWindow::posSketchMap()
     QgsMessageLog::logMessage("\n");
 
     //! 用于保存航飞略图
-    sketchMapLayer = pPosdp->autoSketchMap();;
+    sketchMapLayer = pPosdp->autoSketchMap();
     if (!sketchMapLayer)
         return;
+    mapLoadLayer[sketchMapLayer->id()] = &sketchMapLayer;
+
     pPPInter = new eqiPPInteractive(this, sketchMapLayer, pPosdp);
     pAnalysis = new eqiAnalysisAerialphoto(this, sketchMapLayer, pPosdp, pPPInter);
 }
@@ -3866,9 +3964,14 @@ void MainWindow::posSetting()
     posDialog->exec();
 }
 
-void MainWindow::checkOverlapping()
+void MainWindow::checkOverlapIn()
 {
     pAnalysis->checkoverlappingIn();
+}
+
+void MainWindow::checkOverlapBetween()
+{
+    pAnalysis->checkoverlappingBetween();
 }
 
 void MainWindow::checkOmega()
@@ -3883,7 +3986,7 @@ void MainWindow::checkKappa()
 
 void MainWindow::delOverlapIn()
 {
-    QStringList delList = pAnalysis->delOverlapping();
+    QStringList delList = pAnalysis->delOverlapIn();
     if (delList.isEmpty())
         return;
 

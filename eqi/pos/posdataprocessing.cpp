@@ -469,7 +469,7 @@ QgsVectorLayer* posDataProcessing::autoSketchMap()
         if (resolution == 0.0)
         {
             QgsMessageLog::logMessage(QString("\t\t||-->相片:%1 高程异常，地面分辨率计算为0，已跳过该张相片.").arg(nList->at(i)));
-            deletePosRecord(nList->at(i));
+            deletePosRecord(nList->at(i--));
             continue;
         }
 
@@ -491,16 +491,8 @@ QgsVectorLayer* posDataProcessing::autoSketchMap()
         featureList.append(MyFeature);
     }
 
-    MainWindow::instance()->mapCanvas()->freeze();
-
-    // 开始编辑
-    newLayer->startEditing();
-
     // 添加要素集到图层中
     newLayer->dataProvider()->addFeatures(featureList);
-
-    // 保存
-    newLayer->commitChanges();
 
     // 更新范围
     newLayer->updateExtents();
@@ -518,7 +510,6 @@ QgsVectorLayer* posDataProcessing::autoSketchMap()
     emit stopProcess();
 
     // 添加到地图
-    MainWindow::instance()->mapCanvas()->freeze( false );
     MainWindow::instance()->refreshMapCanvas();
 
     QgsMessageLog::logMessage(QString("创建航飞略图 : \t成功创建%1张相片略图。").arg(newLayer->featureCount()));

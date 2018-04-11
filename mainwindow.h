@@ -5,8 +5,7 @@
 #include <QMainWindow>
 #include <QSettings>
 
-// QGis
-#include "qgsmapcanvas.h"
+#include "qgspoint.h"
 #include "qgsmessagebar.h"
 
 class QAction;
@@ -30,6 +29,10 @@ class QgsMessageLogViewer;
 class QgsMapTool;
 class QgsMapOverviewCanvas;
 class QgsRasterLayer;
+class QgsVectorLayer;
+class QgsLayerTreeNode;
+class QgsMapCanvas;
+class QgsMapLayer;
 
 class posDataProcessing;
 class eqiPPInteractive;
@@ -232,6 +235,10 @@ private slots:
     //! 返回活动图层的指针
     QgsMapLayer *activeLayer();
 
+    void layersAdded (const QList< QgsMapLayer * > &theMapLayers);
+    void layersWillBeRemoved (const QList<QgsMapLayer *> &theMapLayers);
+    void layersRemoved (const QStringList &theLayerIds);
+
     /************************* 面板 *************************/
 
     /************ 要素选择 ************/
@@ -287,8 +294,11 @@ private slots:
     void posSetting();
 
     /************ 航摄数据预处理 ************/
-    //! 重叠度检查
-    void checkOverlapping();
+    //! 航带内重叠度检查
+    void checkOverlapIn();
+
+    //! 航带间重叠度检查
+    void checkOverlapBetween();
 
     //! 倾角检查
     void checkOmega();
@@ -341,6 +351,7 @@ private slots:
     void printPcmToTxt();
 
     void pcmSetting();
+
 signals:
     void layerSavedAs( QgsMapLayer* l, const QString& path );
 
@@ -381,6 +392,9 @@ private:
 
     // 标志，表示该项目属性对话框是怎么出现
     bool mShowProjectionTab;
+
+    // 管理已加载的矢量图层
+    QMap< QString, QgsVectorLayer** > mapLoadLayer;
 
     //! 地图浏览动作
     QAction *mActionPan;
@@ -434,15 +448,15 @@ private:
     QAction *mActionCheckOverlapBetween;
     QAction *mActionCheckOmega;
     QAction *mActionCheckKappa;
-    QAction *mActionDelSelect;
-    QAction *mActionSaveSelect;
-    QAction *mActionSelectSetting;
     QAction *mActionDelOmega;
     QAction *mActionDelKappa;
     QAction *mActionDelOverlapIn;
     QAction *mActionDelOverlapBetween;
     QAction *mActionModifyPos;
     QAction *mActionModifyPhoto;
+    QAction *mActionDelSelect;
+    QAction *mActionSaveSelect;
+    QAction *mActionSelectSetting;
 
     //! 像控点快速拾取
     QAction *pcm_mActionAddDOMLayer;

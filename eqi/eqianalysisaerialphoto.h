@@ -128,8 +128,11 @@ public:
     void checkoverlappingIn();
     void checkoverlappingBetween();
 
-    //! 删除重叠度过大的相片
-    QStringList delOverlapping();
+    //! 删除航带内重叠度过大的相片
+    QStringList delOverlapIn();
+
+    //! 删除航带间重叠度过大的相片
+    QStringList delOverlapBetween();
 
     //! 倾角检查、删除
     void checkOmega();
