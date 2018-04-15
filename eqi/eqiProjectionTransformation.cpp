@@ -1,4 +1,7 @@
-﻿#include "mainwindow.h"
+﻿#include <QDir>
+#include <QFileInfo>
+
+#include "mainwindow.h"
 #include "eqiProjectionTransformation.h"
 #include "qgscoordinatetransform.h"
 #include "qgsmessagebar.h"

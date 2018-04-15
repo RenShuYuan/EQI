@@ -235,8 +235,6 @@ private slots:
     //! 返回活动图层的指针
     QgsMapLayer *activeLayer();
 
-    void layersAdded (const QList< QgsMapLayer * > &theMapLayers);
-    void layersWillBeRemoved (const QList<QgsMapLayer *> &theMapLayers);
     void layersRemoved (const QStringList &theLayerIds);
 
     /************************* 面板 *************************/

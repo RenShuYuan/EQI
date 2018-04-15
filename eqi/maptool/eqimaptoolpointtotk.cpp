@@ -138,13 +138,13 @@ void eqiMapToolPointToTk::canvasReleaseEvent(QgsMapMouseEvent *e)
             MainWindow::instance()->mapCanvas()->freeze();
 
             // 开始编辑
-            newLayer->startEditing();
+//            newLayer->startEditing();
 
             // 添加要素集到图层中
             newLayer->dataProvider()->addFeatures(featureList);
 
             // 保存
-            newLayer->commitChanges();
+//            newLayer->commitChanges();
 
             // 更新范围
             newLayer->updateExtents();

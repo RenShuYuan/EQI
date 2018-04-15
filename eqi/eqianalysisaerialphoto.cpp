@@ -4,13 +4,18 @@
 #include "mainwindow.h"
 #include "siftGPU.h"
 
+#include "qgsmapcanvas.h"
 #include "qgsmessagelog.h"
 #include "qgsvectordataprovider.h"
 
 #include <QSet>
-#include <QStringList>
 #include <QDebug>
 #include <QProgressDialog>
+
+eqiAnalysisAerialphoto::eqiAnalysisAerialphoto()
+{
+
+}
 
 eqiAnalysisAerialphoto::eqiAnalysisAerialphoto(QObject *parent)
     : QObject(parent)
@@ -1429,7 +1434,6 @@ OverlappingProcessing::~OverlappingProcessing()
     while (it.hasNext())
     {
         Ol* ol = it.next().value();
-//        qDebug() << "delete:" << it.key();
         delete ol;
         ol = nullptr;
     }

@@ -491,6 +491,8 @@ QgsVectorLayer* posDataProcessing::autoSketchMap()
         featureList.append(MyFeature);
     }
 
+    MainWindow::instance()->mapCanvas()->freeze();
+
     // 添加要素集到图层中
     newLayer->dataProvider()->addFeatures(featureList);
 
@@ -510,6 +512,7 @@ QgsVectorLayer* posDataProcessing::autoSketchMap()
     emit stopProcess();
 
     // 添加到地图
+    MainWindow::instance()->mapCanvas()->freeze( false );
     MainWindow::instance()->refreshMapCanvas();
 
     QgsMessageLog::logMessage(QString("创建航飞略图 : \t成功创建%1张相片略图。").arg(newLayer->featureCount()));

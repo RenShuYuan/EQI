@@ -100,6 +100,7 @@ MainWindow::MainWindow(QWidget *parent) :
     , mRotationLabel( nullptr )
     , mRotationEdit( nullptr )
     , mProgressBar( nullptr )
+    , mInfoBar(nullptr)
     , mRenderSuppressionCBox( nullptr )
     , mOnTheFlyProjectionStatusButton( nullptr )
     , mLayerTreeCanvasBridge( nullptr )
@@ -154,7 +155,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     // create clipboard
     mInternalClipboard = new QgsClipboard;
-    connect( mInternalClipboard, SIGNAL( changed() ), this, SLOT( clipboardChanged() ) );
+//    connect( mInternalClipboard, SIGNAL( changed() ), this, SLOT( clipboardChanged() ) );
 
     initActions();
     initTabTools();
@@ -180,20 +181,12 @@ MainWindow::MainWindow(QWidget *parent) :
 
     // 连接图层加载与移除信号
     connect( QgsMapLayerRegistry::instance()
-             , SIGNAL(layersAdded (const QList< QgsMapLayer * > &)), this
-             , SLOT(layersAdded (const QList< QgsMapLayer * > &)));
-
-    connect( QgsMapLayerRegistry::instance()
-             , SIGNAL(layersWillBeRemoved (const QList< QgsMapLayer * > &)), this
-             , SLOT(layersWillBeRemoved (const QList< QgsMapLayer * > &)));
-
-    connect( QgsMapLayerRegistry::instance()
              , SIGNAL(layersRemoved (const QStringList &)), this
              , SLOT(layersRemoved (const QStringList &)));
 
     // 连接POS处理进度
     pPosdp = new posDataProcessing(this);
-    connect( pPosdp, SIGNAL( startProcess() ), this, SLOT( canvasRefreshStarted ) );
+    connect( pPosdp, SIGNAL( startProcess() ), this, SLOT( canvasRefreshStarted() ) );
     connect( pPosdp, SIGNAL( stopProcess() ), this, SLOT( canvasRefreshFinished() ) );
     upDataPosActions();
 
@@ -1773,9 +1766,9 @@ void MainWindow::initLayerTreeView()
     // 添加右键菜单
     mLayerTreeView->setMenuProvider( new QgsAppLayerTreeViewMenuProvider( mLayerTreeView, mMapCanvas ) );
 
-    connect( mLayerTreeView, SIGNAL( doubleClicked( QModelIndex ) ), this, SLOT( layerTreeViewDoubleClicked( QModelIndex ) ) );
+//    connect( mLayerTreeView, SIGNAL( doubleClicked( QModelIndex ) ), this, SLOT( layerTreeViewDoubleClicked( QModelIndex ) ) );
     connect( mLayerTreeView, SIGNAL( currentLayerChanged( QgsMapLayer* ) ), this, SLOT( activeLayerChanged( QgsMapLayer* ) ) );
-    connect( mLayerTreeView->selectionModel(), SIGNAL( currentChanged( QModelIndex, QModelIndex ) ), this, SLOT( updateNewLayerInsertionPoint() ) );
+//    connect( mLayerTreeView->selectionModel(), SIGNAL( currentChanged( QModelIndex, QModelIndex ) ), this, SLOT( updateNewLayerInsertionPoint() ) );
     connect( QgsProject::instance()->layerTreeRegistryBridge(), SIGNAL( addedLayersToLayerTree( QList<QgsMapLayer*> ) ),
         this, SLOT( autoSelectAddedLayer( QList<QgsMapLayer*> ) ) );
 
@@ -1798,7 +1791,7 @@ void MainWindow::initLayerTreeView()
     mActionFilterLegend->setCheckable( true );
     mActionFilterLegend->setToolTip( tr( "通过地图内容过滤图层" ) );
     mActionFilterLegend->setIcon( eqiApplication::getThemeIcon( "mActionFilter2.svg" ) );
-    connect( mActionFilterLegend, SIGNAL( toggled( bool ) ), this, SLOT( updateFilterLegend() ) );
+//    connect( mActionFilterLegend, SIGNAL( toggled( bool ) ), this, SLOT( updateFilterLegend() ) );
 
     //mLegendExpressionFilterButton = new QgsLegendFilterButton( this );
     //mLegendExpressionFilterButton->setToolTip( tr( "Filter legend by expression" ) );
@@ -1853,7 +1846,7 @@ void MainWindow::initLayerTreeView()
     addDockWidget( Qt::LeftDockWidgetArea, mLayerOrderDock );
     mLayerOrderDock->hide();
 
-    connect( mMapCanvas, SIGNAL( mapCanvasRefreshed() ), this, SLOT( updateFilterLegend() ) );
+//    connect( mMapCanvas, SIGNAL( mapCanvasRefreshed() ), this, SLOT( updateFilterLegend() ) );
 }
 
 void MainWindow::createCanvasTools()
@@ -1958,10 +1951,10 @@ void MainWindow::setupConnections()
     //connect( qApp, SIGNAL( aboutToQuit() ), this, SLOT( saveWindowState() ) );
 
     // 当鼠标移到窗口（在状态栏中显示参照坐标系）
-    connect( mMapCanvas, SIGNAL( xyCoordinates( const QgsPoint & ) ),
-        this, SLOT( saveLastMousePosition( const QgsPoint & ) ) );
-    connect( mMapCanvas, SIGNAL( extentsChanged() ),
-        this, SLOT( extentChanged() ) );
+//    connect( mMapCanvas, SIGNAL( xyCoordinates( const QgsPoint & ) ),
+//        this, SLOT( saveLastMousePosition( const QgsPoint & ) ) );
+//    connect( mMapCanvas, SIGNAL( extentsChanged() ),
+//        this, SLOT( extentChanged() ) );
     connect( mMapCanvas, SIGNAL( scaleChanged( double ) ),
         this, SLOT( showScale( double ) ) );
     connect( mMapCanvas, SIGNAL( rotationChanged( double ) ),
@@ -1970,8 +1963,8 @@ void MainWindow::setupConnections()
         this, SLOT( updateMouseCoordinatePrecision() ) );
     //connect( mMapCanvas, SIGNAL( mapToolSet( QgsMapTool *, QgsMapTool * ) ),
     //	this, SLOT( mapToolChanged( QgsMapTool *, QgsMapTool * ) ) );
-    connect( mMapCanvas, SIGNAL( selectionChanged( QgsMapLayer * ) ),
-        this, SLOT( selectionChanged( QgsMapLayer * ) ) );
+//    connect( mMapCanvas, SIGNAL( selectionChanged( QgsMapLayer * ) ),
+//        this, SLOT( selectionChanged( QgsMapLayer * ) ) );
     connect( mMapCanvas, SIGNAL( extentsChanged() ),
         this, SLOT( markDirty() ) );
     connect( mMapCanvas, SIGNAL( layersChanged() ),
@@ -1988,39 +1981,39 @@ void MainWindow::setupConnections()
     //	this, SLOT( reprojectAnnotations() ) );
 
     // connect 地图画布按键事件，所以我们可以检查，如果选择的要素集合必须被删除
-    connect( mMapCanvas, SIGNAL( keyPressed( QKeyEvent * ) ),
-        this, SLOT( mapCanvas_keyPressed( QKeyEvent * ) ) );
+//    connect( mMapCanvas, SIGNAL( keyPressed( QKeyEvent * ) ),
+//        this, SLOT( mapCanvas_keyPressed( QKeyEvent * ) ) );
 
     //// connect 渲染器
-    connect( mMapCanvas, SIGNAL( hasCrsTransformEnabledChanged( bool ) ),
-        this, SLOT( hasCrsTransformEnabled( bool ) ) );
-    connect( mMapCanvas, SIGNAL( destinationCrsChanged() ),
-        this, SLOT( destinationCrsChanged() ) );
+//    connect( mMapCanvas, SIGNAL( hasCrsTransformEnabledChanged( bool ) ),
+//        this, SLOT( hasCrsTransformEnabled( bool ) ) );
+//    connect( mMapCanvas, SIGNAL( destinationCrsChanged() ),
+//        this, SLOT( destinationCrsChanged() ) );
 
     // connect legend signals
     connect( mLayerTreeView, SIGNAL( currentLayerChanged( QgsMapLayer * ) ),
         this, SLOT( activateDeactivateLayerRelatedActions( QgsMapLayer * ) ) );
-    connect( mLayerTreeView->selectionModel(), SIGNAL( selectionChanged( QItemSelection, QItemSelection ) ),
-        this, SLOT( legendLayerSelectionChanged() ) );
+//    connect( mLayerTreeView->selectionModel(), SIGNAL( selectionChanged( QItemSelection, QItemSelection ) ),
+//        this, SLOT( legendLayerSelectionChanged() ) );
     connect( mLayerTreeView->layerTreeModel()->rootGroup(), SIGNAL( addedChildren( QgsLayerTreeNode*, int, int ) ),
         this, SLOT( markDirty() ) );
-    connect( mLayerTreeView->layerTreeModel()->rootGroup(), SIGNAL( addedChildren( QgsLayerTreeNode*, int, int ) ),
-        this, SLOT( updateNewLayerInsertionPoint() ) );
+//    connect( mLayerTreeView->layerTreeModel()->rootGroup(), SIGNAL( addedChildren( QgsLayerTreeNode*, int, int ) ),
+//        this, SLOT( updateNewLayerInsertionPoint() ) );
     connect( mLayerTreeView->layerTreeModel()->rootGroup(), SIGNAL( removedChildren( QgsLayerTreeNode*, int, int ) ),
         this, SLOT( markDirty() ) );
-    connect( mLayerTreeView->layerTreeModel()->rootGroup(), SIGNAL( removedChildren( QgsLayerTreeNode*, int, int ) ),
-        this, SLOT( updateNewLayerInsertionPoint() ) );
+//    connect( mLayerTreeView->layerTreeModel()->rootGroup(), SIGNAL( removedChildren( QgsLayerTreeNode*, int, int ) ),
+//        this, SLOT( updateNewLayerInsertionPoint() ) );
     connect( mLayerTreeView->layerTreeModel()->rootGroup(), SIGNAL( visibilityChanged( QgsLayerTreeNode*, Qt::CheckState ) ),
         this, SLOT( markDirty() ) );
     connect( mLayerTreeView->layerTreeModel()->rootGroup(), SIGNAL( customPropertyChanged( QgsLayerTreeNode*, QString ) ),
         this, SLOT( markDirty() ) );
 
     // connect 图层注册
-    connect( QgsMapLayerRegistry::instance(), SIGNAL( layersAdded( QList<QgsMapLayer *> ) ),
-        this, SLOT( layersWereAdded( QList<QgsMapLayer *> ) ) );
-    connect( QgsMapLayerRegistry::instance(),
-        SIGNAL( layersWillBeRemoved( QStringList ) ),
-        this, SLOT( removingLayers( QStringList ) ) );
+//    connect( QgsMapLayerRegistry::instance(), SIGNAL( layersAdded( QList<QgsMapLayer *> ) ),
+//        this, SLOT( layersWereAdded( QList<QgsMapLayer *> ) ) );
+//    connect( QgsMapLayerRegistry::instance(),
+//        SIGNAL( layersWillBeRemoved( QStringList ) ),
+//        this, SLOT( removingLayers( QStringList ) ) );
 
     //// connect initialization signal
     //connect( this, SIGNAL( initializationCompleted() ),
@@ -2279,28 +2272,44 @@ void MainWindow::saveAsVectorFileGeneral(QgsVectorLayer *vlayer, bool symbologyO
 
 void MainWindow::upDataPosActions()
 {
-    if ( pPosdp->isValid() )
+    if ( pPosdp && pPosdp->isValid() )
     {
         mActionPosTransform->setEnabled(true);
         mActionPosSketchMap->setEnabled(true);
         mActionPosOneButton->setEnabled(true);
-        mActionPPLinkPhoto->setEnabled(true);
         mActionPosExport->setEnabled(true);
-        mActionDelSelect->setEnabled(true);
-        mActionSaveSelect->setEnabled(true);
     }
     else
     {
         mActionPosTransform->setEnabled(false);
         mActionPosSketchMap->setEnabled(false);
         mActionPosOneButton->setEnabled(false);
-        mActionPPLinkPhoto->setEnabled(false);
         mActionPosExport->setEnabled(false);
-        mActionDelSelect->setEnabled(false);
-        mActionSaveSelect->setEnabled(false);
     }
 
-    if (pPPInter->isValid())
+    if (sketchMapLayer)
+    {
+    	mActionPPLinkPhoto->setEnabled(true);
+        mActionSketchMapSwitch->setEnabled(true);
+        mActionPosLabelSwitch->setEnabled(true);
+        mActionDelSelect->setEnabled(true);
+        mActionSaveSelect->setEnabled(true);
+    }
+    else
+    {
+    	mActionPPLinkPhoto->setEnabled(false);
+        mActionSketchMapSwitch->setEnabled(false);
+        mActionPosLabelSwitch->setEnabled(false);
+        mActionDelSelect->setEnabled(false);
+        mActionSaveSelect->setEnabled(false);
+        if (pPPInter) delete pPPInter; pPPInter = nullptr;
+        if (pAnalysis) delete pAnalysis; pAnalysis = nullptr;
+
+        mActionPPLinkPhoto->setText("PP动态联动");
+        mActionPPLinkPhoto->setIcon(eqiApplication::getThemeIcon("mActionLink.svg"));
+    }
+
+    if (pPPInter && pPPInter->isValid())
     {
         mActionModifyPos->setEnabled(true);
         mActionModifyPhoto->setEnabled(true);
@@ -2311,25 +2320,27 @@ void MainWindow::upDataPosActions()
         mActionModifyPhoto->setEnabled(false);
     }
 
-    if (sketchMapLayer)
+    if (pAnalysis)
     {
-        mActionSketchMapSwitch->setEnabled(true);
-        mActionPosLabelSwitch->setEnabled(true);
         mActionCheckOverlapIn->setEnabled(true);
         mActionCheckOverlapBetween->setEnabled(true);
         mActionCheckOmega->setEnabled(true);
         mActionCheckKappa->setEnabled(true);
+        mActionDelOmega->setEnabled(true);
+        mActionDelKappa->setEnabled(true);
+        mActionDelOverlapIn->setEnabled(true);
+        mActionDelOverlapBetween->setEnabled(true);
     }
     else
     {
-        mActionSketchMapSwitch->setEnabled(false);
-        mActionPosLabelSwitch->setEnabled(false);
+        mActionCheckOverlapIn->setEnabled(false);
         mActionCheckOverlapBetween->setEnabled(false);
         mActionCheckOmega->setEnabled(false);
         mActionCheckKappa->setEnabled(false);
-
-        if (pPPInter) delete pPPInter; pPPInter = nullptr;
-        if (pAnalysis) delete pAnalysis; pAnalysis = nullptr;
+        mActionDelOmega->setEnabled(false);
+        mActionDelKappa->setEnabled(false);
+        mActionDelOverlapIn->setEnabled(false);
+        mActionDelOverlapBetween->setEnabled(false);
     }
 }
 
@@ -2866,9 +2877,7 @@ void MainWindow::selectSetting()
     dialog_selectSetting *selectDialog = new dialog_selectSetting(this);
 
     if (pAnalysis)
-    {
         connect( selectDialog, SIGNAL( accepted() ), pAnalysis, SLOT( updataChackValue() ) );
-    }
 
     selectDialog->exec();
 }
@@ -3754,33 +3763,6 @@ QgsMapLayer *MainWindow::activeLayer()
     return mLayerTreeView ? mLayerTreeView->currentLayer() : nullptr;
 }
 
-void MainWindow::layersAdded(const QList<QgsMapLayer *> &theMapLayers)
-{
-//    if (theMapLayers.isEmpty()) return;
-//    for (int i = 0; i != theMapLayers.size(); ++i)
-//    {
-//        QgsVectorLayer* vectorLayer = dynamic_cast<QgsVectorLayer*>(theMapLayers.at(i));
-//        qDebug("layersAdded---------------------------------------->>>>>>>%d",*vectorLayer);
-//        if (vectorLayer)
-//        {
-//            mapLoadLayer[vectorLayer->id()] = vectorLayer;
-//        }
-//    }
-}
-
-void MainWindow::layersWillBeRemoved(const QList<QgsMapLayer *> &theMapLayers)
-{
-//    if (theMapLayers.isEmpty()) return;
-//    for (int i = 0; i != theMapLayers.size(); ++i)
-//    {
-//        QgsVectorLayer* vectorLayer = dynamic_cast<QgsVectorLayer*>(theMapLayers.at(i));
-//        if (vectorLayer)
-//        {
-//            mapLoadLayer[vectorLayer->id()] = &vectorLayer;
-//        }
-//    }
-}
-
 void MainWindow::layersRemoved(const QStringList &theLayerIds)
 {
     if (theLayerIds.isEmpty()) return;
@@ -3870,7 +3852,9 @@ void MainWindow::posSketchMap()
     mapLoadLayer[sketchMapLayer->id()] = &sketchMapLayer;
 
     pPPInter = new eqiPPInteractive(this, sketchMapLayer, pPosdp);
-    pAnalysis = new eqiAnalysisAerialphoto(this, sketchMapLayer, pPosdp, pPPInter);
+//    pAnalysis = new eqiAnalysisAerialphoto(this, sketchMapLayer, pPosdp, pPPInter);
+    pAnalysis = new eqiAnalysisAerialphoto();
+    upDataPosActions();
 }
 
 void MainWindow::posLinkPhoto()
@@ -3953,7 +3937,7 @@ void MainWindow::posOneButton()
 
 void MainWindow::posExport()
 {
-    if (!pPosdp->isValid()) return;
+    if (!pPosdp && !pPosdp->isValid()) return;
 
     pPosdp->posExport();
 }
@@ -3966,26 +3950,31 @@ void MainWindow::posSetting()
 
 void MainWindow::checkOverlapIn()
 {
+    if (!pAnalysis) return;
     pAnalysis->checkoverlappingIn();
 }
 
 void MainWindow::checkOverlapBetween()
 {
+    if (!pAnalysis) return;
     pAnalysis->checkoverlappingBetween();
 }
 
 void MainWindow::checkOmega()
 {
+    if (!pAnalysis) return;
     pAnalysis->checkOmega();
 }
 
 void MainWindow::checkKappa()
 {
+    if (!pAnalysis) return;
     pAnalysis->checkKappa();
 }
 
 void MainWindow::delOverlapIn()
 {
+    if (!pAnalysis) return;
     QStringList delList = pAnalysis->delOverlapIn();
     if (delList.isEmpty())
         return;
@@ -3995,6 +3984,7 @@ void MainWindow::delOverlapIn()
 
 void MainWindow::delOmega()
 {
+    if (!pAnalysis) return;
     QStringList delList = pAnalysis->delOmegaAndKappa("Omega");
     if (delList.isEmpty())
         return;
@@ -4004,6 +3994,7 @@ void MainWindow::delOmega()
 
 void MainWindow::delKappa()
 {
+    if (!pAnalysis) return;
     QStringList delList = pAnalysis->delOmegaAndKappa("Kappa");
     if (delList.isEmpty())
         return;

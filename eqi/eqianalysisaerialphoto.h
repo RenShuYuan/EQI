@@ -10,7 +10,7 @@
 #include "eqi/eqisymbol.h"
 #include "eqi/gdal/eqigdalprogresstools.h"
 #include "qgsvectorlayer.h"
-
+//=====================================
 #include <vector>
 using std::vector;
 
@@ -119,6 +119,7 @@ class eqiAnalysisAerialphoto : public QObject
 {
     Q_OBJECT
 public:
+    explicit eqiAnalysisAerialphoto();
     explicit eqiAnalysisAerialphoto(QObject *parent);
     explicit eqiAnalysisAerialphoto(QObject *parent, QgsVectorLayer* layer,
                                     posDataProcessing *posdp,
@@ -182,11 +183,11 @@ private:
     QSettings mSetting;
     QgsVectorLayer* mLayerMap;
     eqiPPInteractive* mPp;
+    posDataProcessing* mPosdp;
     QgsVectorLayer* mLayer_Omega;
     QgsVectorLayer* mLayer_Kappa;
     QgsVectorLayer* mLayer_OverlapIn;
     QgsVectorLayer* mLayer_OverlapBetween;
-    posDataProcessing* mPosdp;
 
     // 重叠度限差
     int heading_Max;
