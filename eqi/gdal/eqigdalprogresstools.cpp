@@ -1,9 +1,7 @@
 ﻿#include <QStringList>
-#include <QDebug>
 #include <QApplication>
 
 #include "eqigdalprogresstools.h"
-#include "qgsmessagelog.h"
 
 #include "cpl_string.h"
 #include "gdal_priv.h"
@@ -80,7 +78,7 @@ eqiGdalProgressTools::eqiGdalProgressTools()
 //    CPLSetConfigOption("GDAL_DATA", "C:\\gdal224-release-1600-dev\\release-1600\\data");
 
     //支持中文路径
-    CPLSetConfigOption("GDAL_FILENAME_IS_UTF8", "NO");
+//    CPLSetConfigOption("GDAL_FILENAME_IS_UTF8", "NO");
 
     proDialog = new QProgressDialog("影像处理中...", "取消", 0, 100, nullptr);
     proDialog->setWindowTitle("处理进度");

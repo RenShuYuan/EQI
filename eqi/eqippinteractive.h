@@ -1,14 +1,14 @@
 ﻿#ifndef EQIPPINTERACTIVE_H
 #define EQIPPINTERACTIVE_H
 
+#include "head.h"
 #include <QObject>
-#include <QSettings>
 #include <QColor>
 #include <QMap>
 
+#include "eqi/pos/posdataprocessing.h"
+
 class eqiSymbol;
-class QgsVectorLayer;
-class posDataProcessing;
 
 /*
  *负责曝光点与相片的所有互交细节

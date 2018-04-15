@@ -1,13 +1,11 @@
 ﻿#include "eqippinteractive.h"
 #include "mainwindow.h"
 #include "eqi/eqiapplication.h"
-#include "eqi/pos/posdataprocessing.h"
 #include "eqi/eqisymbol.h"
 
 #include "qgsmapcanvas.h"
-#include "qgsmessagelog.h"
 #include "qgsmessagebar.h"
-#include "qgsvectorlayer.h"
+
 #include "qgsvectorfilewriter.h"
 #include "qgslayertreeview.h"
 #include "qgssymbolv2.h"

@@ -68,8 +68,6 @@
 #include "qgslayertreemapcanvasbridge.h"
 #include "qgscustomlayerorderwidget.h"
 #include "qgsmessagelogviewer.h"
-#include "qgsmessagelog.h"
-#include "qgsvectorlayer.h"
 #include "qgslayertreegroup.h"
 #include "qgslayertreelayer.h"
 #include "qgslayertree.h"
@@ -250,9 +248,21 @@ MainWindow::~MainWindow()
     delete mMapTools.mCircularStringCurvePoint;
     delete mMapTools.mCircularStringRadius;
 
-    if(pPosdp) delete pPosdp; pPosdp=nullptr;
-    if(pPPInter) delete pPPInter; pPPInter=nullptr;
-    if(pAnalysis) delete pAnalysis; pAnalysis=nullptr;
+    if(pPosdp)
+    {
+        delete pPosdp;
+        pPosdp=nullptr;
+    }
+    if(pPPInter)
+    {
+        delete pPPInter;
+        pPPInter=nullptr;
+    }
+    if(pAnalysis)
+    {
+        delete pAnalysis;
+        pAnalysis=nullptr;
+    }
 
 //    delete mOverviewMapCursor;
 
@@ -2297,7 +2307,7 @@ void MainWindow::upDataPosActions()
     }
     else
     {
-    	mActionPPLinkPhoto->setEnabled(false);
+        mActionPPLinkPhoto->setEnabled(false);
         mActionSketchMapSwitch->setEnabled(false);
         mActionPosLabelSwitch->setEnabled(false);
         mActionDelSelect->setEnabled(false);
@@ -3852,8 +3862,7 @@ void MainWindow::posSketchMap()
     mapLoadLayer[sketchMapLayer->id()] = &sketchMapLayer;
 
     pPPInter = new eqiPPInteractive(this, sketchMapLayer, pPosdp);
-//    pAnalysis = new eqiAnalysisAerialphoto(this, sketchMapLayer, pPosdp, pPPInter);
-    pAnalysis = new eqiAnalysisAerialphoto();
+    pAnalysis = new eqiAnalysisAerialphoto(this, sketchMapLayer, pPosdp, pPPInter);
     upDataPosActions();
 }
 
@@ -3915,19 +3924,19 @@ void MainWindow::posOneButton()
         if (!posTransform())
             return;
     }
-
+    qDebug("posTransform");
     // 创建略图
     if (mSettings.value("/eqi/options/imagePreprocessing/chkSketchMap", true).toBool())
     {
         posSketchMap();
     }
-
+    qDebug("posSketchMap");
     // PP联动
     if (mSettings.value("/eqi/options/imagePreprocessing/chkLinkPhoto", true).toBool())
     {
         posLinkPhoto();
     }
-
+    qDebug("posLinkPhoto");
     // 导出POS数据
     if (mSettings.value("/eqi/options/imagePreprocessing/chkPosExport", true).toBool())
     {

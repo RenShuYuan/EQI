@@ -1,9 +1,10 @@
 ﻿#ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "head.h"
+
 // Qt
 #include <QMainWindow>
-#include <QSettings>
 
 #include "qgspoint.h"
 #include "qgsmessagebar.h"
@@ -29,7 +30,6 @@ class QgsMessageLogViewer;
 class QgsMapTool;
 class QgsMapOverviewCanvas;
 class QgsRasterLayer;
-class QgsVectorLayer;
 class QgsLayerTreeNode;
 class QgsMapCanvas;
 class QgsMapLayer;
@@ -37,9 +37,6 @@ class QgsMapLayer;
 class posDataProcessing;
 class eqiPPInteractive;
 class eqiAnalysisAerialphoto;
-
-// 分幅图框字段名称
-const static QString ThFieldName = "TH";
 
 namespace Ui {
 class MainWindow;

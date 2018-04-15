@@ -203,7 +203,8 @@ SOURCES += \
     qgis/app/qgsattributeactiondialog.cpp \
     qgis/app/qgsattributeactionpropertiesdialog.cpp \
     eqi/gdal/eqigdalprogresstools.cpp \
-    ui/dialog/dialog_pcmsetting.cpp
+    ui/dialog/dialog_pcmsetting.cpp \
+    eqi/overlappingprocessing.cpp
 
 HEADERS += \
     mainwindow.h \
@@ -282,7 +283,9 @@ HEADERS += \
     gdal/commonutils.h \
     gdal/gdal_utils_priv.h \
     eqi/gdal/eqigdalprogresstools.h \
-    ui/dialog/dialog_pcmsetting.h
+    ui/dialog/dialog_pcmsetting.h \
+    head.h \
+    eqi/overlappingprocessing.h
 
 FORMS += \
     mainwindow.ui \
