@@ -1,11 +1,11 @@
 ﻿#ifndef EQISYMBOL_H
 #define EQISYMBOL_H
 
+#include "head.h"
 #include <QObject>
 #include <QColor>
 #include <QMap>
 
-class QgsVectorLayer;
 class QgsSymbolV2;
 
 class eqiSymbol : public QObject

@@ -4,7 +4,6 @@
 #include <QDirIterator>
 #include <QProgressDialog>
 #include <QApplication>
-#include <QDebug>
 
 #include "eqiapplication.h"
 

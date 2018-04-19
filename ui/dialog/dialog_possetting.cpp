@@ -2,8 +2,6 @@
 #include "ui_dialog_possetting.h"
 #include "qgsprojectionselectionwidget.h"
 
-#include <QDebug>
-
 dialog_posSetting::dialog_posSetting(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::dialog_posSetting)
@@ -16,8 +14,7 @@ dialog_posSetting::dialog_posSetting(QWidget *parent) :
 
     // 添加参照坐标系选择小组件
     leUavLayerGlobalCrs = new QgsProjectionSelectionWidget(this);
-    QString mylayerDefaultCrs = mSettings.value( "/eqi/prjTransform/projectDefaultCrs",
-                                                  GEO_EPSG_CRS_AUTHID ).toString();
+    QString mylayerDefaultCrs = mSettings.value( globalCrs, GEO_EPSG_CRS_AUTHID ).toString();
     mLayerDefaultCrs.createFromOgcWmsCrs( mylayerDefaultCrs );
     leUavLayerGlobalCrs->setCrs( mLayerDefaultCrs );
     leUavLayerGlobalCrs->setOptionVisible( QgsProjectionSelectionWidget::DefaultCrs, false );
@@ -84,7 +81,7 @@ void dialog_posSetting::on_buttonBox_accepted()
     mSettings.setValue("/eqi/options/imagePreprocessing/chkPosExport", ui->checkBox_4->isChecked());
     mSettings.setValue("/eqi/options/imagePreprocessing/lePhotoFolder", ui->lineEdit_6->text());
 
-    mSettings.setValue( "/eqi/prjTransform/projectDefaultCrs", mLayerDefaultCrs.authid() );
+    mSettings.setValue( globalCrs, mLayerDefaultCrs.authid() );
 
     mSettings.setValue("/eqi/options/imagePreprocessing/dspScale", ui->doubleSpinBox->value());
 }

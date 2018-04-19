@@ -8,9 +8,7 @@
 #include "qgscategorizedsymbolrendererv2.h"
 #include "qgsvectordataprovider.h"
 #include "qgscoordinatetransform.h"
-#include "qgsmessagelog.h"
 #include "qgsmaplayerregistry.h"
-#include "qgsvectorlayer.h"
 #include "qgsmapcanvas.h"
 #include "qgsfeature.h"
 #include "qgscrscache.h"
@@ -19,11 +17,7 @@
 #include <QList>
 #include <QMap>
 #include <QVariant>
-#include <QString>
 #include <QColor>
-#include <QStringList>
-
-//#include "proj_api.h"
 
 QRegExp posDataProcessing::WktPrefixRegexp( "^\\s*(?:\\d+\\s+|SRID\\=\\d+\\;)", Qt::CaseInsensitive );
 QRegExp posDataProcessing::CrdDmsRegexp( "^\\s*(?:([-+nsew])\\s*)?(\\d{1,3})(?:[^0-9.]"
@@ -242,7 +236,7 @@ bool posDataProcessing::autoPosTransform()
      * 坐标系创建投影坐标系。
     */
     // 获得源坐标系
-    QString myDefaultCrs = mSettings.value( "/eqi/prjTransform/projectDefaultCrs", GEO_EPSG_CRS_AUTHID ).toString();
+    QString myDefaultCrs = mSettings.value( globalCrs, GEO_EPSG_CRS_AUTHID ).toString();
     mSourceCrs.createFromOgcWmsCrs( myDefaultCrs );
     eqiPrj.setSourceCrs(mSourceCrs);
 

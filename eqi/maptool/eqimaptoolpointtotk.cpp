@@ -3,12 +3,9 @@
 #include "eqi/eqifractalmanagement.h"
 #include "eqimaptoolpointtotk.h"
 
-#include "qgsmessagelog.h"
-#include "qgsvectorlayer.h"
 #include "qgsgeometry.h"
 #include "qgsrubberband.h"
 #include "qgsvectordataprovider.h"
-#include <QDebug>
 #include <QMessageBox>
 
 eqiMapToolPointToTk::eqiMapToolPointToTk(QgsMapCanvas *canvas)
@@ -115,6 +112,9 @@ void eqiMapToolPointToTk::canvasReleaseEvent(QgsMapMouseEvent *e)
             QStringList thList = fm.rectToTh(lastPoint, nextPoint);
             if (thList.isEmpty())
             {
+                mRubberBand->reset( QGis::Polygon );
+                delete mRubberBand;
+                mRubberBand = nullptr;
                 return;
             }
 
@@ -137,14 +137,8 @@ void eqiMapToolPointToTk::canvasReleaseEvent(QgsMapMouseEvent *e)
 
             MainWindow::instance()->mapCanvas()->freeze();
 
-            // 开始编辑
-//            newLayer->startEditing();
-
             // 添加要素集到图层中
             newLayer->dataProvider()->addFeatures(featureList);
-
-            // 保存
-//            newLayer->commitChanges();
 
             // 更新范围
             newLayer->updateExtents();

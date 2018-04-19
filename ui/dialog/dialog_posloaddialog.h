@@ -1,8 +1,8 @@
 ﻿#ifndef DIALOG_POSLOADDIALOG_H
 #define DIALOG_POSLOADDIALOG_H
 
+#include "head.h"
 #include <QDialog>
-#include <QSettings>
 #include "ui_dialog_posloaddialog.h"
 
 class QStringList;

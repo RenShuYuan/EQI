@@ -1,11 +1,8 @@
 ﻿#include "dialog_posloaddialog.h"
 
 #include <QFileDialog>
-#include <QString>
-#include <QStringList>
 #include <QMessageBox>
 #include <QFileInfo>
-#include "qgsmessagelog.h"
 #include "qgis/app/delimitedtext/qgsdelimitedtextfile.h"
 
 const int MAX_SAMPLE_LENGTH = 200;

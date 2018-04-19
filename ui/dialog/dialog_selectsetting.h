@@ -6,8 +6,8 @@
 #define SAVE_CUSTOMIZE 10003
 #define SAVE_TEMPDIR 10004
 
+#include "head.h"
 #include <QDialog>
-#include <QSettings>
 
 namespace Ui {
 class dialog_selectSetting;

@@ -3,7 +3,6 @@
 #include "eqi/eqifractalmanagement.h"
 #include "eqi/eqiProjectionTransformation.h"
 #include <QFileDialog>
-#include <QSettings>
 
 dialog_printTKtoXY_txt::dialog_printTKtoXY_txt(QWidget *parent) :
     QDialog(parent),

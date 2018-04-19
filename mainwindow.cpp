@@ -108,6 +108,8 @@ MainWindow::MainWindow(QWidget *parent) :
     , pPPInter( nullptr )
     , pAnalysis(nullptr)
     , sketchMapLayer(nullptr)
+    , mLayer_OverlapIn(nullptr)
+    , mLayer_OverlapBetween(nullptr)
     , pcm_rasterLayer(nullptr)
     , isSmSmall(false)
     , isPosLabel(false)
@@ -330,7 +332,7 @@ QgsVectorLayer *MainWindow::createrMemoryMap(const QString &layerName, const QSt
     QString layerProperties = geometric+"?";		// 几何类型
 
     // 参照坐标系
-    QString myCrsStr = mSettings.value( "/eqi/prjTransform/projectDefaultCrs", GEO_EPSG_CRS_AUTHID ).toString();
+    QString myCrsStr = mSettings.value( globalCrs, GEO_EPSG_CRS_AUTHID ).toString();
     QgsCoordinateReferenceSystem mCrs;
     mCrs.createFromOgcWmsCrs( myCrsStr );
     layerProperties.append("crs="+mCrs.authid()+"&");
@@ -1246,7 +1248,7 @@ void MainWindow::initActions()
     mActionDelOverlapBetween = new QAction("航带间剔片", this);
     mActionDelOverlapBetween->setStatusTip("在保证重叠度的情况下，自动删除已检查出航带间所有超过最大重叠度的相片。");
     mActionDelOverlapBetween->setIcon(eqiApplication::getThemeIcon("eqi/other/deloverlappingBetween.png"));
-    connect( mActionDelOverlapBetween, SIGNAL( triggered() ), this, SLOT(  ) );
+    connect( mActionDelOverlapBetween, SIGNAL( triggered() ), this, SLOT( delOverlapBetween() ) );
 
     mActionDelSelect = new QAction("删除航摄数据", this);
     mActionDelSelect->setStatusTip("将选择的略图、POS、相片数据删除，保持一套数据完整性。");
@@ -2384,6 +2386,15 @@ int MainWindow::deleteSketchMap(const QStringList &delList)
     mySymbol->delSymbolItem(delList);
 
     return fids.size();
+}
+
+void MainWindow::addLoadLayer(QgsVectorLayer **layer)
+{
+    if (!layer && !(*layer))
+    {
+        return;
+    }
+    mapLoadLayer[(*layer)->id()] = layer;
 }
 
 void MainWindow::pSwitchSketchMap()
@@ -3859,7 +3870,7 @@ void MainWindow::posSketchMap()
     sketchMapLayer = pPosdp->autoSketchMap();
     if (!sketchMapLayer)
         return;
-    mapLoadLayer[sketchMapLayer->id()] = &sketchMapLayer;
+    addLoadLayer(&sketchMapLayer);
 
     pPPInter = new eqiPPInteractive(this, sketchMapLayer, pPosdp);
     pAnalysis = new eqiAnalysisAerialphoto(this, sketchMapLayer, pPosdp, pPPInter);
@@ -3960,13 +3971,63 @@ void MainWindow::posSetting()
 void MainWindow::checkOverlapIn()
 {
     if (!pAnalysis) return;
-    pAnalysis->checkoverlappingIn();
+
+    // 创建错误图层
+    if ( !mLayer_OverlapIn )
+    {
+        mLayer_OverlapIn = MainWindow::instance()->createrMemoryMap("航带内重叠度检查",
+                                                            "Polygon",
+                                                            QStringList()
+                                                            << "field=id:integer"
+                                                            << "field=相片编号:string(50)"
+                                                            << "field=与相邻相片重叠度:string(10)"
+                                                            << "field=与相邻相片同名点:string(10)"
+                                                            << "field=错误类型:string(100)");
+
+        if (!mLayer_OverlapIn && !mLayer_OverlapIn->isValid())
+        {
+            MainWindow::instance()->messageBar()->pushMessage( "创建检查图层",
+                "创建图层失败, 运行已终止, 注意检查plugins文件夹!",
+                QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
+            QgsMessageLog::logMessage(QString("创建检查图层 : \t创建图层失败, 程序已终止, 注意检查plugins文件夹。"));
+            return;
+        }
+        mLayer_OverlapIn->setCrs(sketchMapLayer->crs());
+        addLoadLayer(&mLayer_OverlapIn);
+    }
+
+    pAnalysis->checkoverlappingIn(mLayer_OverlapIn);
 }
 
 void MainWindow::checkOverlapBetween()
 {
     if (!pAnalysis) return;
-    pAnalysis->checkoverlappingBetween();
+
+    // 创建错误图层
+    if ( !mLayer_OverlapBetween )
+    {
+        mLayer_OverlapBetween = MainWindow::instance()->createrMemoryMap("航带间重叠度检查",
+                                                            "Polygon",
+                                                            QStringList()
+                                                            << "field=id:integer"
+                                                            << "field=相片编号:string(50)"
+                                                            << "field=与相邻相片重叠度:string(10)"
+                                                            << "field=航带间相片同名点:string(10)"
+                                                            << "field=错误类型:string(100)");
+
+        if (!mLayer_OverlapBetween && !mLayer_OverlapBetween->isValid())
+        {
+            MainWindow::instance()->messageBar()->pushMessage( "创建检查图层",
+                "创建图层失败, 运行已终止, 注意检查plugins文件夹!",
+                QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
+            QgsMessageLog::logMessage(QString("创建检查图层 : \t创建图层失败, 程序已终止, 注意检查plugins文件夹。"));
+            return;
+        }
+        mLayer_OverlapBetween->setCrs(sketchMapLayer->crs());
+        addLoadLayer(&mLayer_OverlapBetween);
+    }
+
+    pAnalysis->checkoverlappingBetween(mLayer_OverlapBetween);
 }
 
 void MainWindow::checkOmega()
@@ -3983,8 +4044,18 @@ void MainWindow::checkKappa()
 
 void MainWindow::delOverlapIn()
 {
-    if (!pAnalysis) return;
-    QStringList delList = pAnalysis->delOverlapIn();
+    if (!pAnalysis && !mLayer_OverlapIn) return;
+    QStringList delList = pAnalysis->delOverlapIn(mLayer_OverlapIn);
+    if (delList.isEmpty())
+        return;
+
+    deleteAerialPhotographyData(delList);
+}
+
+void MainWindow::delOverlapBetween()
+{
+    if (!pAnalysis && !mLayer_OverlapBetween) return;
+    QStringList delList = pAnalysis->delOverlapBetween(mLayer_OverlapBetween);
     if (delList.isEmpty())
         return;
 
@@ -4152,7 +4223,10 @@ void MainWindow::printPcmToTxt()
                                    .arg(dataType).arg(format).arg(src_dataset).arg(dst_dataset);
 
         QgsMessageLog::logMessage( strArgv );
+
+
         gdalTools.eqiGDALTranslate(strArgv);
+
     }
 }
 

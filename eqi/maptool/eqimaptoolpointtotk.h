@@ -1,7 +1,7 @@
 ﻿#ifndef EQIMAPTOOLPOINTTOTK_H
 #define EQIMAPTOOLPOINTTOTK_H
 
-#include <QSettings>
+#include "head.h"
 #include <QList>
 #include "qgsmaptool.h"
 #include "qgspoint.h"

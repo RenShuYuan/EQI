@@ -1,8 +1,8 @@
 ﻿#ifndef EQIINQUIREDEMVALUE_H
 #define EQIINQUIREDEMVALUE_H
 
+#include "head.h"
 #include <QObject>
-#include <QSettings>
 #include <QList>
 #include <QMap>
 #include "qgscoordinatereferencesystem.h"

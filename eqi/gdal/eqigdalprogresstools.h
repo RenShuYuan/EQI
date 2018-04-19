@@ -35,6 +35,8 @@ public:
     */
     int QStringToChar(const QString& str, char ***argv);
 
+    bool isCompression(const QString& str);
+
     static QString enumToString(const int value);
 private:
     QProgressDialog *proDialog;

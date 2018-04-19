@@ -1,13 +1,5 @@
-﻿#include <QStringList>
-#include <QApplication>
-
+﻿#include <QApplication>
 #include "eqigdalprogresstools.h"
-
-#include "cpl_string.h"
-#include "gdal_priv.h"
-#include "ogr_spatialref.h"
-#include "gdal/commonutils.h"
-#include "gdal/gdal_utils_priv.h"
 
 /************************************************************************/
 /*                       GDALTranslateOptionsForBinaryNew()             */
@@ -77,21 +69,18 @@ eqiGdalProgressTools::eqiGdalProgressTools()
     //添加环境变量
 //    CPLSetConfigOption("GDAL_DATA", "C:\\gdal224-release-1600-dev\\release-1600\\data");
 
-    //支持中文路径
-//    CPLSetConfigOption("GDAL_FILENAME_IS_UTF8", "NO");
-
     proDialog = new QProgressDialog("影像处理中...", "取消", 0, 100, nullptr);
     proDialog->setWindowTitle("处理进度");
     proDialog->setWindowModality(Qt::WindowModal);
 }
 
 eqiGdalProgressTools::~eqiGdalProgressTools()
-{
+{    
     delete proDialog;
 }
 
 void eqiGdalProgressTools::eqiGDALTranslate(const QString &str)
-{
+{   
     QStringList list = str.split(' ', QString::SkipEmptyParts);
     int argc = list.size();
     if ( argc==0 )
@@ -190,9 +179,13 @@ void eqiGdalProgressTools::eqiGDALTranslate(const QString &str)
     GDALDatasetH hDataset, hOutDS;
     int bUsageError;
 
+    CPLSetConfigOption("GDAL_FILENAME_IS_UTF8", "NO");
+
     // 尝试打开数据源
     hDataset = GDALOpenEx(psOptionsForBinary->pszSource, GDAL_OF_RASTER | GDAL_OF_VERBOSE_ERROR, NULL,
         (const char* const*)psOptionsForBinary->papszOpenOptions, NULL);
+
+    CPLSetConfigOption("GDAL_FILENAME_IS_UTF8", "YES");
 
     if (hDataset == NULL)
     {
@@ -245,11 +238,17 @@ void eqiGdalProgressTools::eqiGDALTranslate(const QString &str)
             osTemp = CPLSPrintf(pszFormat, osBasename.c_str(), i / 2 + 1);
             osTemp = CPLFormFilename(osPath, osTemp, osExtension);
             strcpy(pszSubDest, osTemp.c_str());
+
+            CPLSetConfigOption("GDAL_FILENAME_IS_UTF8", "NO");
+
             hDataset = GDALOpenEx(pszSource, GDAL_OF_RASTER, NULL,
                 (const char* const*)psOptionsForBinary->papszOpenOptions, NULL);
             CPLFree(pszSource);
 
             hOutDS = GDALTranslate(pszDest, hDataset, psOptions, &bUsageError);
+
+            CPLSetConfigOption("GDAL_FILENAME_IS_UTF8", "YES");
+
             if (bUsageError)
                 return;
             if (hOutDS == NULL)
@@ -265,8 +264,13 @@ void eqiGdalProgressTools::eqiGDALTranslate(const QString &str)
         return;
     }
 
+    CPLSetConfigOption("GDAL_FILENAME_IS_UTF8", "NO");
+
     // 开始正儿八经的处理了
     hOutDS = GDALTranslate(psOptionsForBinary->pszDest, hDataset, psOptions, &bUsageError);
+
+    CPLSetConfigOption("GDAL_FILENAME_IS_UTF8", "YES");
+
     if (bUsageError == TRUE)
     {
         QgsMessageLog::logMessage("影像裁切：出现未知错误，已终止。");
@@ -283,7 +287,13 @@ bool eqiGdalProgressTools::readRasterIO(const QString &rasterName, float **pData
 {
     // 尝试打开数据源
     GDALDataset* poDataset = NULL;
+
+    CPLSetConfigOption("GDAL_FILENAME_IS_UTF8", "NO");
+
     poDataset = (GDALDataset*)GDALOpenEx(rasterName.toStdString().c_str(), GDAL_OF_RASTER, NULL, NULL, NULL);
+
+    CPLSetConfigOption("GDAL_FILENAME_IS_UTF8", "YES");
+
     if (poDataset != NULL)
     {
         if (poDataset->GetRasterCount()>0)
@@ -335,6 +345,40 @@ int eqiGdalProgressTools::QStringToChar(const QString& str, char ***argv)
     }
 
     return doneSize;
+}
+
+bool eqiGdalProgressTools::isCompression(const QString &str)
+{
+    // 尝试打开数据源
+    GDALDataset* poDataset = NULL;
+
+    CPLSetConfigOption("GDAL_FILENAME_IS_UTF8", "NO");
+
+    poDataset = (GDALDataset*)GDALOpenEx(str.toStdString().c_str(), GDAL_OF_RASTER, NULL, NULL, NULL);
+
+    CPLSetConfigOption("GDAL_FILENAME_IS_UTF8", "YES");
+
+    if (poDataset != NULL)
+    {
+        char** info = poDataset->GetMetadata("Image_Structure");
+        if( info != NULL && *info != NULL )
+        {
+            for( int i = 0; info[i] != NULL; i++ )
+            {
+                QString str = info[i];
+                QStringList list = str.split('=');
+                if (!list.isEmpty() && list.at(0)=="COMPRESSION")
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    if (poDataset!=NULL)
+        GDALClose((GDALDatasetH)poDataset);
+    return false;
 }
 
 QString eqiGdalProgressTools::enumToString(const int value)

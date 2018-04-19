@@ -1,6 +1,7 @@
 ﻿#ifndef DIALOG_PRINTTKTOXY_TXT_H
 #define DIALOG_PRINTTKTOXY_TXT_H
 
+#include "head.h"
 #include <QDialog>
 
 namespace Ui {

@@ -1,8 +1,8 @@
 ﻿#ifndef DIALOG_PRJTRANSFORMSETTING_H
 #define DIALOG_PRJTRANSFORMSETTING_H
 
+#include "head.h"
 #include <QDialog>
-#include "QSettings"
 #include "qgsprojectionselectionwidget.h"
 #include "qgscoordinatereferencesystem.h"
 

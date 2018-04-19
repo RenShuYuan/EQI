@@ -1,15 +1,12 @@
 ﻿#include "eqisymbol.h"
 #include "mainwindow.h"
 
-#include "qgsvectorlayer.h"
 #include "qgssymbolv2.h"
 #include "qgslayertreeview.h"
 #include "qgslayertreenode.h"
 #include "qgssinglesymbolrendererv2.h"
 #include "qgscategorizedsymbolrendererv2.h"
 #include "qgsfillsymbollayerv2.h"
-
-#include "qgsmessagelog.h"  //
 
 eqiSymbol::eqiSymbol(QObject *parent) :
     QObject(parent),

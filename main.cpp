@@ -1,8 +1,8 @@
-﻿#include "mainwindow.h"
+﻿#include "head.h"
+#include "mainwindow.h"
 #include <QApplication>
 #include <QTextCodec>
 #include <QTranslator>
-#include <QSettings>
 #include <QDir>
 
 #include "qgsapplication.h"
@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
 
     MainWindow m;
     m.setWindowState(Qt::WindowMaximized);
-    m.setWindowTitle("EQI");
+    m.setWindowTitle("无人机航摄数据预处理系统 UAV DataPreprocessingSystem v1.0");
     m.show();
 
     return a.exec();

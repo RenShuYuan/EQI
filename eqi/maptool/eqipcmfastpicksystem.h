@@ -1,10 +1,9 @@
 ﻿#ifndef EQIPCMFASTPICKSYSTEM_H
 #define EQIPCMFASTPICKSYSTEM_H
 
+#include "head.h"
 #include <QObject>
-#include <QStringList>
 #include <QMap>
-#include <QSettings>
 #include "qgsmaptool.h"
 #include "qgsrasterlayer.h"
 #include "eqi/eqiinquiredemvalue.h"

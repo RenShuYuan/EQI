@@ -1,13 +1,10 @@
 ﻿#include "eqifractalmanagement.h"
-#include "qgsvectorlayer.h"
-#include "qgsmessagelog.h"
 #include "mainwindow.h"
-#include <QDebug>
 
 eqiFractalManagement::eqiFractalManagement(QObject *parent) : QObject(parent)
 {
     // 获得分幅管理设置的坐标系
-    QString myDefaultCrs = mSettings.value( "/eqi/prjTransform/projectDefaultCrs", GEO_EPSG_CRS_AUTHID ).toString();
+    QString myDefaultCrs = mSettings.value( globalCrs, GEO_EPSG_CRS_AUTHID ).toString();
     mSourceCrs.createFromOgcWmsCrs( myDefaultCrs );
 
     // 设置源坐标系
@@ -198,10 +195,21 @@ QStringList eqiFractalManagement::rectToTh(const QgsPoint lastPoint, const QgsPo
     QgsPoint nextPointD;
 
     // 如果是投影坐标系，则转换为经纬度
-    if (eqiPrj.sourceCrs().geographicFlag() || (checkLBisCnExtent(lastPoint) && checkLBisCnExtent(nextPoint)))
+    if (eqiPrj.sourceCrs().geographicFlag())
     {
-        lastPointD = lastPoint;
-        nextPointD = nextPoint;
+        if (checkLBisExtent(lastPoint) && checkLBisExtent(nextPoint))
+        {
+            lastPointD = lastPoint;
+            nextPointD = nextPoint;
+        }
+        else
+        {
+            MainWindow::instance()->messageBar()->pushMessage( "参照坐标系定义错误",
+                                                               "设置中定义为地理坐标系，但选取的貌似不是有效的经纬度!",
+                                                               QgsMessageBar::CRITICAL,
+                                                               MainWindow::instance()->messageTimeout() );
+            return thList;
+        }
     }
     else
     {
@@ -432,10 +440,10 @@ bool eqiFractalManagement::setGCS()
         return false;
 }
 
-bool eqiFractalManagement::checkLBisCnExtent(const QgsPoint &point)
+bool eqiFractalManagement::checkLBisExtent(const QgsPoint &point)
 {
-    if (point.x()>=73 && point.x()<=136 &&
-        point.y()>=3 && point.y()<=54)
+    if (point.x()>=0 && point.x()<=180 &&
+        point.y()>=0 && point.y()<=90)
     {
         return true;
     }

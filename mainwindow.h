@@ -159,7 +159,8 @@ private:
     //! 删除航摄略图中指定相片
     int deleteSketchMap(const QStringList &delList);
 
-    QgsPoint vectorScale();
+    //! 管理已加载的图层，以便对图层移除后保持指针为null
+    void addLoadLayer(QgsVectorLayer **layer);
 
 private slots:
     void showRotation();
@@ -301,8 +302,11 @@ private slots:
     //! 旋片角检查
     void checkKappa();
 
-    //! 删除重叠度超限相片
+    //! 删除航带内重叠度超限相片
     void delOverlapIn();
+
+    //! 删除航带间重叠度超限相片
+    void delOverlapBetween();
 
     //! 删除倾角超限相片
     void delOmega();
@@ -390,6 +394,8 @@ private:
 
     // 管理已加载的矢量图层
     QMap< QString, QgsVectorLayer** > mapLoadLayer;
+    QgsVectorLayer* mLayer_OverlapIn;
+    QgsVectorLayer* mLayer_OverlapBetween;
 
     //! 地图浏览动作
     QAction *mActionPan;

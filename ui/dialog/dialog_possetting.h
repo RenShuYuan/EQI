@@ -1,8 +1,8 @@
 ﻿#ifndef DIALOG_POSSETTING_H
 #define DIALOG_POSSETTING_H
 
+#include "head.h"
 #include <QDialog>
-#include <QSettings>
 #include "qgscoordinatereferencesystem.h"
 
 class QgsProjectionSelectionWidget;

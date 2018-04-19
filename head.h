@@ -5,6 +5,7 @@
 #include <QSettings>
 #include <QDebug>
 #include <QString>
+#include <QStringList>
 
 // QGis常用类
 #include "qgsvectorlayer.h"
@@ -21,14 +22,23 @@
 #define GL_FLOAT                          0x1406
 
 // GDAL
+#include "cpl_string.h"
+#include "gdal_priv.h"
+#include "ogr_spatialref.h"
+#include "gdal/commonutils.h"
+#include "gdal/gdal_utils_priv.h"
+
 typedef unsigned char                     DT_8U;
 
-//! 自定义常量
+//! EQI自定义常量
 
 // 相邻相片最小连接点阈值
 static const int keyThreshold = 50;
 
 // 分幅图框字段名称
-const static QString ThFieldName = "TH";
+static const QString ThFieldName = "TH";
+
+// 设置的参考坐标系
+static const QString globalCrs = "/eqi/prjTransform/projectDefaultCrs";
 
 #endif // HEAD_H

@@ -1,15 +1,14 @@
 ﻿#ifndef POSDATAPROCESSING_H
 #define POSDATAPROCESSING_H
 
+#include "head.h"
 #include <QObject>
 #include <QMap>
-#include <QSettings>
 #include <QRegExp>
 #include "qgscoordinatereferencesystem.h"
 #include "eqi/eqiProjectionTransformation.h"
 #include "qgsgeometry.h"
 
-class QgsVectorLayer;
 class QgsDelimitedTextFile;
 
 // 负责处理与曝光点数据相关的类

@@ -1,7 +1,6 @@
 ﻿#include <QFileDialog>
 
 #include "eqipcmfastpicksystem.h"
-#include "qgsmessagelog.h"
 #include "qgsmapcanvas.h"
 #include "mainwindow.h"
 

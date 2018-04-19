@@ -1,16 +1,13 @@
 ﻿#ifndef CORE_H
 #define CORE_H
 
+#include "head.h"
 #include <QObject>
-#include <QString>
-#include <QSettings>
-
 #include "qgspoint.h"
 #include "qgsgeometry.h"
 
 class QIcon;
 class QWidget;
-class QStringList;
 
 class eqiApplication : public QObject
 {

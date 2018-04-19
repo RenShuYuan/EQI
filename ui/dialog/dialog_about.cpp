@@ -12,8 +12,3 @@ dialog_about::~dialog_about()
 {
     delete ui;
 }
-
-void dialog_about::on_pushButton_clicked()
-{
-    close();
-}

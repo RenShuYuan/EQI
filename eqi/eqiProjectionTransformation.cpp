@@ -5,7 +5,6 @@
 #include "eqiProjectionTransformation.h"
 #include "qgscoordinatetransform.h"
 #include "qgsmessagebar.h"
-#include "qgsmessagelog.h"
 #include "sqlite3.h"
 
 eqiProjectionTransformation::eqiProjectionTransformation()

@@ -12,7 +12,7 @@ dialog_PrjTransformSetting::dialog_PrjTransformSetting(QWidget *parent) :
 
     // 添加参照坐标系选择小组件
     leUavLayerGlobalCrs = new QgsProjectionSelectionWidget(this);
-    QString mylayerDefaultCrs = mSettings.value( "/eqi/prjTransform/projectDefaultCrs", GEO_EPSG_CRS_AUTHID ).toString();
+    QString mylayerDefaultCrs = mSettings.value( globalCrs, GEO_EPSG_CRS_AUTHID ).toString();
     mLayerDefaultCrs.createFromOgcWmsCrs( mylayerDefaultCrs );
     leUavLayerGlobalCrs->setCrs( mLayerDefaultCrs );
     leUavLayerGlobalCrs->setOptionVisible( QgsProjectionSelectionWidget::DefaultCrs, false );
@@ -35,6 +35,6 @@ void dialog_PrjTransformSetting::crsChanged(const QgsCoordinateReferenceSystem &
 
 void dialog_PrjTransformSetting::saveOptions()
 {
-    mSettings.setValue( "/eqi/prjTransform/projectDefaultCrs", mLayerDefaultCrs.authid() );
+    mSettings.setValue( globalCrs, mLayerDefaultCrs.authid() );
     mSettings.setValue( "/FractalManagement/scale", ui->comboBox->currentIndex() );
 }

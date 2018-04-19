@@ -1,8 +1,8 @@
 ﻿#ifndef DIALOG_PCMSETTING_H
 #define DIALOG_PCMSETTING_H
 
+#include "head.h"
 #include <QDialog>
-#include <QSettings>
 
 namespace Ui {
 class dialog_pcmSetting;

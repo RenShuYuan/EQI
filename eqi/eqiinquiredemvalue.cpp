@@ -1,12 +1,10 @@
 ﻿#include "eqiinquiredemvalue.h"
 #include "eqiProjectionTransformation.h"
-#include "qgsmessagelog.h"
 #include "qgsrasterlayer.h"
 #include "qgsrasterdataprovider.h"
 #include "qgsrasteridentifyresult.h"
 
 #include <QDir>
-#include <QDebug>
 
 eqiInquireDemValue::eqiInquireDemValue(QObject *parent) : QObject(parent)
 {
@@ -155,8 +153,7 @@ eqiInquireDemValue::ErrorType eqiInquireDemValue::pointTransform(const QList< Qg
     else // 然后调用“设置”中的参数
     {
         QgsCoordinateReferenceSystem mSourceCrs;
-        QString myDefaultCrs = mSettings.value( "/eqi/prjTransform/projectDefaultCrs",
-                                                GEO_EPSG_CRS_AUTHID ).toString();
+        QString myDefaultCrs = mSettings.value( globalCrs, GEO_EPSG_CRS_AUTHID ).toString();
         mSourceCrs.createFromOgcWmsCrs( myDefaultCrs );
 
         // debug

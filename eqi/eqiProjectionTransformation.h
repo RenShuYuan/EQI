@@ -1,9 +1,8 @@
 ﻿#ifndef EQICORE_H
 #define EQICORE_H
 
+#include "head.h"
 #include <QObject>
-#include <QSettings>
-#include <QStringList>
 
 #include "qgspoint.h"
 #include "qgscoordinatetransform.h"

@@ -5,7 +5,6 @@
 #include <QObject>
 #include <QMap>
 #include <QList>
-#include <QStringList>
 
 #include "eqi/eqisymbol.h"
 #include "eqi/overlappingprocessing.h"
@@ -22,14 +21,14 @@ public:
                                     eqiPPInteractive *pp);
 
     //! 重叠度检查
-    void checkoverlappingIn();
-    void checkoverlappingBetween();
+    void checkoverlappingIn(QgsVectorLayer* mLayer_OverlapIn);
+    void checkoverlappingBetween(QgsVectorLayer* mLayer_OverlapBetween);
 
     //! 删除航带内重叠度过大的相片
-    QStringList delOverlapIn();
+    QStringList delOverlapIn(QgsVectorLayer* mLayer_OverlapIn);
 
     //! 删除航带间重叠度过大的相片
-    QStringList delOverlapBetween();
+    QStringList delOverlapBetween(QgsVectorLayer* mLayer_OverlapBetween);
 
     //! 倾角检查、删除
     void checkOmega();
@@ -82,8 +81,6 @@ private:
     posDataProcessing* mPosdp;
     QgsVectorLayer* mLayer_Omega;
     QgsVectorLayer* mLayer_Kappa;
-    QgsVectorLayer* mLayer_OverlapIn;
-    QgsVectorLayer* mLayer_OverlapBetween;
 
     // 重叠度限差
     int heading_Max;

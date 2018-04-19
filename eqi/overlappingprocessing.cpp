@@ -1,8 +1,5 @@
 ﻿#include "overlappingprocessing.h"
-
 #include "qgsgeometry.h"
-
-#include "qgsmessagelog.h"
 #include "siftGPU.h"
 
 OverlappingProcessing::OverlappingProcessing()
@@ -260,8 +257,8 @@ int OverlappingProcessing::calculateOverlapSiftGPU(const QString &currentNo, con
     SiftMatchGPU *matcher = new SiftMatchGPU(4096);
     vector<float> descriptors1(1), descriptors2(1);
 
-//    char * argv[] = {"-fo", "-1",  "-v", "1", "-tc", "2000"};
-    char * argv[] = {"-fo", "-1",  "-v", "1"};
+    char * argv[] = {"-fo", "-1",  "-v", "1", "-tc", "2000"};
+//    char * argv[] = {"-fo", "-1",  "-v", "1"};
     int argc = sizeof(argv)/sizeof(char*);
     sift->ParseParam(argc, argv);
 
@@ -273,6 +270,8 @@ int OverlappingProcessing::calculateOverlapSiftGPU(const QString &currentNo, con
         return 0;
     }
 
+    gdalTools.isCompression(nextNo);
+
     // 检查是否已匹配过
     if (mapKeyDescriptors.contains(currentNo))
     {
@@ -280,14 +279,32 @@ int OverlappingProcessing::calculateOverlapSiftGPU(const QString &currentNo, con
     }
     else
     {
-        // 使用GDAL读取影像
-        float *image1;
-        int xSize1 = 0;
-        int ySize1 = 0;
-        bool isReadImage1 = gdalTools.readRasterIO(currentNo, &image1, xSize1, ySize1);
-        if (!isReadImage1) return 0;
-
-        if(sift->RunSIFT(xSize1, ySize1, image1, GL_LUMINANCE, GL_FLOAT))
+        bool isDone = false;
+//        if ( !gdalTools.isCompression(currentNo) )
+        if ( true )
+        {
+            QgsMessageLog::logMessage("影像特征匹配 : 非压缩格式，sitf直接读取影像:" + currentNo);
+            if (sift->RunSIFT(currentNo.toStdString().c_str()))
+                isDone = true;
+        }
+        else
+        {
+            // 使用GDAL读取影像
+            float *image1;
+            int xSize1 = 0;
+            int ySize1 = 0;
+            bool isReadImage1 = gdalTools.readRasterIO(currentNo, &image1, xSize1, ySize1);
+            if (isReadImage1)
+            {
+                if(sift->RunSIFT(xSize1, ySize1, image1, GL_LUMINANCE, GL_FLOAT))
+                {
+                    isDone = true;
+                    QgsMessageLog::logMessage("影像特征匹配 : 压缩格式，使用GDAL读取影像:" + currentNo);
+                }
+                delete[] image1;
+            }
+        }
+        if (isDone)
         {
             int num1 = sift->GetFeatureNum();
             vector<SiftGPU::SiftKeypoint> keys1(num1);
@@ -295,8 +312,10 @@ int OverlappingProcessing::calculateOverlapSiftGPU(const QString &currentNo, con
             sift->GetFeatureVector(&keys1[0], &descriptors1[0]);
             mapKeyDescriptors[currentNo] = descriptors1;
         }
-
-        delete[] image1;
+        else
+        {
+            QgsMessageLog::logMessage("影像特征匹配 : 读取匹配失败：" + currentNo);
+        }
     }
 
     if (mapKeyDescriptors.contains(nextNo))
@@ -305,22 +324,43 @@ int OverlappingProcessing::calculateOverlapSiftGPU(const QString &currentNo, con
     }
     else
     {
-        // 使用GDAL读取影像
-        float *image2;
-        int xSize2 = 0;
-        int ySize2 = 0;
-        bool isReadImage2 = gdalTools.readRasterIO(nextNo, &image2, xSize2, ySize2);
-        if (!isReadImage2) return 0;
-
-        if(sift->RunSIFT(xSize2, ySize2, image2, GL_LUMINANCE, GL_FLOAT))
+        bool isDone = false;
+//        if (!gdalTools.isCompression(nextNo))
+        if (true)
+        {
+            QgsMessageLog::logMessage("影像特征匹配 : 非压缩格式，sitf直接读取影像:" + nextNo);
+            if (sift->RunSIFT(nextNo.toStdString().c_str()))
+                isDone = true;
+        }
+        else
+        {
+            // 使用GDAL读取影像
+            float *image2;
+            int xSize2 = 0;
+            int ySize2 = 0;
+            bool isReadImage2 = gdalTools.readRasterIO(nextNo, &image2, xSize2, ySize2);
+            if (isReadImage2)
+            {
+                if(sift->RunSIFT(xSize2, ySize2, image2, GL_LUMINANCE, GL_FLOAT))
+                {
+                    isDone = true;
+                    QgsMessageLog::logMessage("影像特征匹配 :压缩格式，使用GDAL读取影像：" + nextNo);
+                }
+                delete[] image2;
+            }
+        }
+        if (isDone)
         {
             int num2 = sift->GetFeatureNum();
             vector<SiftGPU::SiftKeypoint> keys2(num2);
             descriptors2.resize(128*num2);
             sift->GetFeatureVector(&keys2[0], &descriptors2[0]);
+            mapKeyDescriptors[nextNo] = descriptors2;
         }
-
-        delete[] image2;
+        else
+        {
+            QgsMessageLog::logMessage("影像特征匹配 : 读取失败：" + nextNo);
+        }
     }
 
     int num1 = descriptors1.size()/128;
