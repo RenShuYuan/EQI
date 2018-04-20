@@ -48,8 +48,6 @@ eqiInquireDemValue::ErrorType eqiInquireDemValue::inquireElevations( const QList
                                                                      QList< qreal >& elevations,
                                                                      const QgsCoordinateReferenceSystem* crs /*= nullptr*/ )
 {
-    QgsMessageLog::logMessage(QString("自动匹配高程 : \t从默认DEM中匹配可用曝光点高程."));
-
     // 将点坐标转换到与DEM一致
     QList< QgsPoint > pointAfter;
     eqiInquireDemValue::ErrorType et = pointTransform(points, pointAfter, crs);
@@ -59,7 +57,6 @@ eqiInquireDemValue::ErrorType eqiInquireDemValue::inquireElevations( const QList
     // 计算涉及的所有DEM
     if (!involved(pointAfter))
     {
-        QgsMessageLog::logMessage("\t\t没有找到相关的DEM数据，该问题极有可能是由于坐标系设置不正确造成.");
         return eqiInquireDemValue::eOther;
     }
 
@@ -68,8 +65,6 @@ eqiInquireDemValue::ErrorType eqiInquireDemValue::inquireElevations( const QList
 
     // 搜索高程值
     searchElevationValues(pointAfter, elevations);
-
-    QgsMessageLog::logMessage(QString("\t\t高程匹配完成.\n"));
 
     return eqiInquireDemValue::eOK;
 }
@@ -98,11 +93,6 @@ void eqiInquireDemValue::loadDem()
         if (rasterLayer->isValid())
         {
             mRasterLayersMap[it.key()] = rasterLayer;
-        }
-        else
-        {
-            QgsMessageLog::logMessage(QString("\t\t加载%1失败, 将使用预设的平均高程计算地面分辨率.")
-                                      .arg(QFileInfo(path).baseName()));
         }
         ++it;
     }
@@ -140,7 +130,6 @@ eqiInquireDemValue::ErrorType eqiInquireDemValue::pointTransform(const QList< Qg
 {
     if (pointFirst.isEmpty())
     {
-        QgsMessageLog::logMessage("\t\t传递的曝光点坐标为空, 将使用预设的平均高程计算地面分辨率.");
         return eqiInquireDemValue::eOther;
     }
 
@@ -168,7 +157,6 @@ eqiInquireDemValue::ErrorType eqiInquireDemValue::pointTransform(const QList< Qg
         }
         else
         {
-            QgsMessageLog::logMessage("\t\t未定义源参照坐标系, 将使用预设的平均高程计算地面分辨率.");
             return eqiInquireDemValue::eOther;
         }
     }
@@ -185,7 +173,6 @@ eqiInquireDemValue::ErrorType eqiInquireDemValue::pointTransform(const QList< Qg
         }
         else
         {
-            QgsMessageLog::logMessage("\t\t不受支持的坐标系（CGCS2000）, 将使用预设的平均高程计算地面分辨率.");
             return eqiInquireDemValue::eNotSupportCrs;
         }
     }
@@ -197,13 +184,11 @@ eqiInquireDemValue::ErrorType eqiInquireDemValue::pointTransform(const QList< Qg
         mTargetCrs = eqiProjectionTransformation::getGCS(sourceCrs);
         if (!mTargetCrs.isValid())
         {
-            QgsMessageLog::logMessage("\t\t不受支持的坐标系, 将使用预设的平均高程计算地面分辨率.");
             return eqiInquireDemValue::eNotSupportCrs;
         }
     }
     else
     {
-        QgsMessageLog::logMessage("\t\t不受支持的坐标系, 将使用预设的平均高程计算地面分辨率.");
         return eqiInquireDemValue::eNotSupportCrs;
     }
 

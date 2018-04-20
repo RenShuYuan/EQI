@@ -22,7 +22,7 @@ public:
     virtual void canvasReleaseEvent( QgsMapMouseEvent* e ) override;
 
 private:
-    // 获得当前矢量图层，并且必须包含“TH”字段
+    // 获得当前矢量图层，检查图层是否符合要求
     QgsVectorLayer* getCurrentVectorLayer( QgsMapCanvas* canvas );
 
     //! Overridden mouse move event

@@ -369,7 +369,8 @@ QStringList posDataProcessing::getPosElev()
     }
 
     // 计算曝光点坐标对应的DEM高程
-    if ( eqiInquireDemValue::eOK == dem.inquireElevations(pointFirst, elevations, &eqiPrj.sourceCrs()) )
+    eqiInquireDemValue::ErrorType e = dem.inquireElevations(pointFirst, elevations, &eqiPrj.sourceCrs());
+    if ( e == eqiInquireDemValue::eOK )
     {
         isbl = true;
         if (xList->size() == elevations.size())
@@ -377,6 +378,14 @@ QStringList posDataProcessing::getPosElev()
         else
             isbl = false;
     }
+    else
+    {
+        if (e == eqiInquireDemValue::eNotSupportCrs)
+            QgsMessageLog::logMessage("\t\t不受支持的坐标系, 将使用预设的平均高程计算地面分辨率。");
+        else
+            QgsMessageLog::logMessage("\t\t高程匹配失败, 可能是由于未找到DEM数据或坐标系设置不正确造成。");
+    }
+    QgsMessageLog::logMessage("\t\t高程匹配完成。");
 
     // 利用DEM高程计算地面分辨率
     for (int i = 0; i < zList->size(); ++i)
@@ -413,7 +422,7 @@ QgsVectorLayer* posDataProcessing::autoSketchMap()
                                                         << "field=Kappa:string(10)"
                                                         << "field=地面分辨率:string(10)");
 
-    if (!newLayer && !newLayer->isValid())
+    if (!(newLayer && newLayer->isValid()))
     {
         MainWindow::instance()->messageBar()->pushMessage( "创建航摄略图",
             "创建略图失败, 运行已终止, 注意检查plugins文件夹!",
@@ -836,7 +845,7 @@ void posDataProcessing::clearInvalidLines()
 
 void posDataProcessing::reportErrors( const QStringList& messages /*= QStringList()*/, bool showDialog /*= false */ )
 {
-    if ( !mInvalidLines.isEmpty() && !messages.isEmpty() )
+    if ( !(mInvalidLines.isEmpty() && messages.isEmpty()) )
     {
         QString tag( "曝光点处理" );
         QgsMessageLog::logMessage( QString("错误文件 %1").arg( mFile->fileName() ), tag );

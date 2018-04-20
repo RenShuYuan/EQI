@@ -344,7 +344,6 @@ private slots:
 
     void addPcmDemPath();
 
-    void readPickPcm(QStringList &list);
     void pcmPicking();
 
     void printPcmToTxt();
@@ -383,9 +382,6 @@ private:
     // 用于保存像控快速拾取系统的DEM路径
     QStringList pcm_demPaths;
 
-    // 用于保存拾取到的控制点
-    QStringList pcmList;
-
     // 含有辅助光栅文件格式适合于FileDialog的文件过滤字符串。内置构造函数.
     QString mRasterFileFilter;
 
@@ -396,6 +392,9 @@ private:
     QMap< QString, QgsVectorLayer** > mapLoadLayer;
     QgsVectorLayer* mLayer_OverlapIn;
     QgsVectorLayer* mLayer_OverlapBetween;
+    QgsVectorLayer* mLayer_Omega;
+    QgsVectorLayer* mLayer_Kappa;
+    QgsVectorLayer* mLayer_pcm;
 
     //! 地图浏览动作
     QAction *mActionPan;

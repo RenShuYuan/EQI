@@ -31,14 +31,14 @@ public:
     QStringList delOverlapBetween(QgsVectorLayer* mLayer_OverlapBetween);
 
     //! 倾角检查、删除
-    void checkOmega();
+    void checkOmega(QgsVectorLayer* mLayer_Omega);
 
     //! 旋片角检查
-    void checkKappa();
+    void checkKappa(QgsVectorLayer* mLayer_Kappa);
 
     //! 删除超限倾角、旋偏角，当isEdge为true时位于边缘处的
     //! type="Omega" OR "Kappa"
-    QStringList delOmegaAndKappa(const QString& type, const bool isEdge = true);
+    QStringList delOmegaAndKappa(QgsVectorLayer* layer, const QString& type, const bool isEdge = true);
 public slots:
     void updataChackValue();
 
@@ -79,8 +79,6 @@ private:
     QgsVectorLayer* mLayerMap;
     eqiPPInteractive* mPp;
     posDataProcessing* mPosdp;
-    QgsVectorLayer* mLayer_Omega;
-    QgsVectorLayer* mLayer_Kappa;
 
     // 重叠度限差
     int heading_Max;

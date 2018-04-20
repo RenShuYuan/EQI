@@ -110,6 +110,9 @@ MainWindow::MainWindow(QWidget *parent) :
     , sketchMapLayer(nullptr)
     , mLayer_OverlapIn(nullptr)
     , mLayer_OverlapBetween(nullptr)
+    , mLayer_Kappa(nullptr)
+    , mLayer_Omega(nullptr)
+    , mLayer_pcm(nullptr)
     , pcm_rasterLayer(nullptr)
     , isSmSmall(false)
     , isPosLabel(false)
@@ -2390,7 +2393,7 @@ int MainWindow::deleteSketchMap(const QStringList &delList)
 
 void MainWindow::addLoadLayer(QgsVectorLayer **layer)
 {
-    if (!layer && !(*layer))
+    if (!(layer && (*layer)))
     {
         return;
     }
@@ -3957,7 +3960,7 @@ void MainWindow::posOneButton()
 
 void MainWindow::posExport()
 {
-    if (!pPosdp && !pPosdp->isValid()) return;
+    if (!(pPosdp && pPosdp->isValid())) return;
 
     pPosdp->posExport();
 }
@@ -3984,7 +3987,7 @@ void MainWindow::checkOverlapIn()
                                                             << "field=与相邻相片同名点:string(10)"
                                                             << "field=错误类型:string(100)");
 
-        if (!mLayer_OverlapIn && !mLayer_OverlapIn->isValid())
+        if (!(mLayer_OverlapIn && mLayer_OverlapIn->isValid()))
         {
             MainWindow::instance()->messageBar()->pushMessage( "创建检查图层",
                 "创建图层失败, 运行已终止, 注意检查plugins文件夹!",
@@ -4015,7 +4018,7 @@ void MainWindow::checkOverlapBetween()
                                                             << "field=航带间相片同名点:string(10)"
                                                             << "field=错误类型:string(100)");
 
-        if (!mLayer_OverlapBetween && !mLayer_OverlapBetween->isValid())
+        if (!(mLayer_OverlapBetween && mLayer_OverlapBetween->isValid()))
         {
             MainWindow::instance()->messageBar()->pushMessage( "创建检查图层",
                 "创建图层失败, 运行已终止, 注意检查plugins文件夹!",
@@ -4033,18 +4036,66 @@ void MainWindow::checkOverlapBetween()
 void MainWindow::checkOmega()
 {
     if (!pAnalysis) return;
-    pAnalysis->checkOmega();
+
+    // 创建错误图层
+    if ( !mLayer_Omega )
+    {
+        mLayer_Omega = MainWindow::instance()->createrMemoryMap("倾角检查",
+                                                            "Polygon",
+                                                            QStringList()
+                                                            << "field=id:integer"
+                                                            << "field=相片编号:string(50)"
+                                                            << "field=Omega:string(10)"
+                                                            << "field=错误类型:string(100)");
+
+        if (!(mLayer_Omega && mLayer_Omega->isValid()))
+        {
+            MainWindow::instance()->messageBar()->pushMessage( "创建检查图层",
+                "创建图层失败, 运行已终止, 注意检查plugins文件夹!",
+                QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
+            QgsMessageLog::logMessage(QString("创建检查图层 : \t创建图层失败, 程序已终止, 注意检查plugins文件夹。"));
+            return;
+        }
+        mLayer_Omega->setCrs(sketchMapLayer->crs());
+        addLoadLayer(&mLayer_Omega);
+    }
+
+    pAnalysis->checkOmega(mLayer_Omega);
 }
 
 void MainWindow::checkKappa()
 {
     if (!pAnalysis) return;
-    pAnalysis->checkKappa();
+
+    // 创建错误图层
+    if ( !mLayer_Kappa )
+    {
+        mLayer_Kappa = MainWindow::instance()->createrMemoryMap("旋片角检查",
+                                                            "Polygon",
+                                                            QStringList()
+                                                            << "field=id:integer"
+                                                            << "field=相片编号:string(50)"
+                                                            << "field=Kappa:string(10)"
+                                                            << "field=错误类型:string(100)");
+
+        if (!(mLayer_Kappa && mLayer_Kappa->isValid()))
+        {
+            MainWindow::instance()->messageBar()->pushMessage( "创建检查图层",
+                "创建图层失败, 运行已终止, 注意检查plugins文件夹!",
+                QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
+            QgsMessageLog::logMessage(QString("创建检查图层 : \t创建图层失败, 程序已终止, 注意检查plugins文件夹。"));
+            return;
+        }
+        mLayer_Kappa->setCrs(sketchMapLayer->crs());
+        addLoadLayer(&mLayer_Kappa);
+    }
+
+    pAnalysis->checkKappa(mLayer_Kappa);
 }
 
 void MainWindow::delOverlapIn()
 {
-    if (!pAnalysis && !mLayer_OverlapIn) return;
+    if (!(pAnalysis && mLayer_OverlapIn)) return;
     QStringList delList = pAnalysis->delOverlapIn(mLayer_OverlapIn);
     if (delList.isEmpty())
         return;
@@ -4054,7 +4105,7 @@ void MainWindow::delOverlapIn()
 
 void MainWindow::delOverlapBetween()
 {
-    if (!pAnalysis && !mLayer_OverlapBetween) return;
+    if (!(pAnalysis && mLayer_OverlapBetween)) return;
     QStringList delList = pAnalysis->delOverlapBetween(mLayer_OverlapBetween);
     if (delList.isEmpty())
         return;
@@ -4064,8 +4115,8 @@ void MainWindow::delOverlapBetween()
 
 void MainWindow::delOmega()
 {
-    if (!pAnalysis) return;
-    QStringList delList = pAnalysis->delOmegaAndKappa("Omega");
+    if (!(pAnalysis && mLayer_Omega)) return;
+    QStringList delList = pAnalysis->delOmegaAndKappa(mLayer_Omega, "Omega");
     if (delList.isEmpty())
         return;
 
@@ -4074,8 +4125,8 @@ void MainWindow::delOmega()
 
 void MainWindow::delKappa()
 {
-    if (!pAnalysis) return;
-    QStringList delList = pAnalysis->delOmegaAndKappa("Kappa");
+    if (!(pAnalysis && mLayer_Kappa)) return;
+    QStringList delList = pAnalysis->delOmegaAndKappa(mLayer_Kappa, "Kappa");
     if (delList.isEmpty())
         return;
 
@@ -4123,23 +4174,48 @@ void MainWindow::addPcmDemPath()
     QgisGui::openFilesRememberingFilter( "lastRasterFileFilter", mRasterFileFilter, pcm_demPaths, e, title );
 }
 
-void MainWindow::readPickPcm(QStringList &list)
-{
-    pcmList = list;
-}
-
 void MainWindow::pcmPicking()
 {
     if (!pcm_rasterLayer) return;
 //    if (pcm_demPaths.isEmpty()) return;
 
-    eqiPcmFastPickSystem *pfps = new eqiPcmFastPickSystem(mMapCanvas, pcm_rasterLayer, pcm_demPaths);
-    connect( pfps, SIGNAL( readPickPcm(QStringList&) ), this, SLOT( readPickPcm(QStringList&) ) );
+    if (!(mLayer_pcm && mLayer_pcm->isValid()))
+    {
+        QMessageBox::StandardButton sb = QMessageBox::information(
+                    this, "创建图层",
+                    "当前图层无法用于保存像控点，\n是否需要自动创建一个临时图层？\n或者取消后自行选择。",
+                    QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+        if ( sb == QMessageBox::Yes )
+        {
+            mLayer_pcm = MainWindow::instance()->createrMemoryMap("像控点位图",
+                                                                "Point",
+                                                                QStringList() << "field=点号:string(10)"
+                                                                              << "field=X:double"
+                                                                              << "field=Y:double"
+                                                                              << "field=Z:double");
+            if (!(mLayer_pcm && mLayer_pcm->isValid()))
+            {
+                MainWindow::instance()->messageBar()->pushMessage(
+                            "创建图层",
+                            "未知原因，图层创建失败，该操作已取消。",
+                            QgsMessageBar::CRITICAL,
+                            MainWindow::instance()->messageTimeout() );
+                return;
+            }
+        }
+    }
+    addLoadLayer(&mLayer_pcm);
+    eqiPcmFastPickSystem *pfps = new eqiPcmFastPickSystem(mMapCanvas, mLayer_pcm, pcm_rasterLayer, pcm_demPaths);
     mMapCanvas->setMapTool(pfps);
 }
 
 void MainWindow::printPcmToTxt()
 {
+    if (!(mLayer_pcm && mLayer_pcm->isValid()))
+    {
+        return;
+    }
+
     // 读取保存的上一次路径
     QString strListPath = mSettings.value( "/eqi/pos/pathName", QDir::homePath()).toString();
 
@@ -4162,27 +4238,39 @@ void MainWindow::printPcmToTxt()
         return;
     }
 
+    // 从矢量图层中提取控制点信息
+    // 并写入文本中
+    QgsFeature f;
+    QMap< QString, QgsPoint > pcmList;
+    QgsFeatureIterator it = mLayer_pcm->getFeatures();
     QTextStream out(&file);
-    foreach (QString str, pcmList)
+    while (it.nextFeature(f))
     {
-        out << str;
+        if (f.isValid())
+        {
+            QString name = f.attribute("点号").toString();
+            double x = f.attribute("X").toDouble();
+            double y = f.attribute("Y").toDouble();
+            double z = f.attribute("Z").toDouble();
+            pcmList[name] = QgsPoint(x, y);
+
+            out << name
+                << '\t' << QString::number(x, 'f', 3)
+                << '\t' << QString::number(y, 'f', 3)
+                << '\t' << QString::number(z, 'f', 3)
+                << '\n';
+        }
     }
     file.close();
-
-//    MainWindow::instance()->messageBar()->pushMessage( "导出控制点成果表",
-//        "控制点坐标导出到control.txt",
-//        QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
-    QgsMessageLog::logMessage("导出控制点成果表 : \t控制点坐标导出到control.txt.");
 
     // 裁切小影像
     if (!(pcm_rasterLayer && pcm_rasterLayer->isValid()))
     {
-        QgsMessageLog::logMessage("导出控制点裁切影像 : \t没有指定参考DOM。");
+        QgsMessageLog::logMessage("控制点小影像裁切 : \t没有指定参考DOM。");
         return;
     }
 
-    // 各项参数获取
-
+    //! -->
     // 参考DOM影像路径
     QString DOMname = pcm_rasterLayer->name();
 
@@ -4201,16 +4289,18 @@ void MainWindow::printPcmToTxt()
     int widthSize = mSettings.value("/eqi/options/pcm/width", 500).toInt();
     double exDisHeight = pcm_rasterLayer->rasterUnitsPerPixelY() * heightSize;
     double exDisWidth = pcm_rasterLayer->rasterUnitsPerPixelX() * widthSize;
+    //! <--
 
     eqiGdalProgressTools gdalTools;
-    foreach (QString str, pcmList)
+    QMap<QString, QgsPoint>::const_iterator itMap = pcmList.constBegin();
+    while (itMap != pcmList.constEnd())
     {
-        // 分割点号、X、Y、Z
-        QStringList list = str.split('\t', QString::SkipEmptyParts);
-        QgsPoint point(list.at(1).toDouble(), list.at(2).toDouble());
+        QString name = itMap.key();
+        QgsPoint point = itMap.value();
+        ++itMap;
 
         // 目标数据路径
-        QString dst_dataset = dir + "\\" + DOMname + list.at(0) + ".tif";
+        QString dst_dataset = dir + "\\" + DOMname + name + ".tif";
 
         // 裁切范围
         QString leftCd = QString::number( point.x()-exDisWidth );
@@ -4222,12 +4312,11 @@ void MainWindow::printPcmToTxt()
                                    .arg(leftCd).arg(topCd).arg(rightCd).arg(downCd)
                                    .arg(dataType).arg(format).arg(src_dataset).arg(dst_dataset);
 
-        QgsMessageLog::logMessage( strArgv );
-
-
         gdalTools.eqiGDALTranslate(strArgv);
-
+        QgsMessageLog::logMessage( strArgv );
     }
+
+    QgsMessageLog::logMessage("\t已导出控制点成果。");
 }
 
 void MainWindow::pcmSetting()

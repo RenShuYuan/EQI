@@ -21,21 +21,21 @@ eqiMapToolPointToTk::eqiMapToolPointToTk(QgsMapCanvas *canvas)
     mBorderColour = QColor( 254, 58, 29, 100 );
 
     newLayer = getCurrentVectorLayer(canvas);
-    if (!newLayer || !newLayer->isValid())
+    if (!(newLayer && newLayer->isValid()))
     {
         QMessageBox::StandardButton sb = QMessageBox::information(
                     NULL, "创建图层",
-                    "当前图层无法用于保存分幅图框，\n是否需要自动创建一个临时图层？\n或者取消后自行修改。",
+                    "当前图层无法用于保存分幅图框，\n是否需要自动创建一个临时图层？\n或者取消后自行选择。",
                     QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
         if ( sb == QMessageBox::Yes )
         {
             newLayer = MainWindow::instance()->createrMemoryMap("标准分幅略图",
                                                                 "Polygon",
                                                                 QStringList() << "field=TH:string(10)");
-            if (!newLayer && !newLayer->isValid())
+            if (!(newLayer && newLayer->isValid()))
             {
                 MainWindow::instance()->messageBar()->pushMessage(
-                            "坐标生图框",
+                            "创建图层",
                             "未知原因，图层创建失败，该操作已取消。",
                             QgsMessageBar::CRITICAL,
                             MainWindow::instance()->messageTimeout() );
@@ -175,11 +175,10 @@ QgsVectorLayer *eqiMapToolPointToTk::getCurrentVectorLayer(QgsMapCanvas *canvas)
     if ( !vlayer )
     {
         MainWindow::instance()->messageBar()->pushMessage(
-                    "坐标生图框",
+                    "创建图层",
                     "需要选择一个有效的矢量图层保存图框。",
                     QgsMessageBar::CRITICAL,
                     MainWindow::instance()->messageTimeout() );
-
         return nullptr;
     }
 
@@ -187,11 +186,10 @@ QgsVectorLayer *eqiMapToolPointToTk::getCurrentVectorLayer(QgsMapCanvas *canvas)
    if (QGis::Polygon != vlayer->geometryType())
    {
        MainWindow::instance()->messageBar()->pushMessage(
-                   "坐标生图框",
+                   "创建图层",
                    QString("当前图层%1矢量类型必须为\"面\"。").arg(vlayer->name()),
                    QgsMessageBar::CRITICAL,
                    MainWindow::instance()->messageTimeout() );
-
        return nullptr;
    }
 
@@ -201,11 +199,10 @@ QgsVectorLayer *eqiMapToolPointToTk::getCurrentVectorLayer(QgsMapCanvas *canvas)
     if (filedIndex == -1)
     {
         MainWindow::instance()->messageBar()->pushMessage(
-                    "坐标生图框",
+                    "创建图层",
                     "当前图层中未找到\"TH\"字段。",
                     QgsMessageBar::CRITICAL,
                     MainWindow::instance()->messageTimeout() );
-
         return nullptr;
     }
 
@@ -215,11 +212,10 @@ QgsVectorLayer *eqiMapToolPointToTk::getCurrentVectorLayer(QgsMapCanvas *canvas)
         field.length() >= 10))
     {
         MainWindow::instance()->messageBar()->pushMessage(
-                    "坐标生图框",
+                    "创建图层",
                     "当前图层中\"TH\"字段必须为字符型，且长度不低于10。",
                     QgsMessageBar::CRITICAL,
                     MainWindow::instance()->messageTimeout() );
-
         return nullptr;
     }
 
@@ -231,7 +227,6 @@ QList<QgsPoint> eqiMapToolPointToTk::getRect(const QgsPoint &lastPoint, const Qg
     QList<QgsPoint> ptLs;
     QgsPoint pt;
 
-
     pt.set( lastPoint.x()<nextPoint.x() ? lastPoint.x():nextPoint.x(),
             lastPoint.y()<nextPoint.y() ? lastPoint.y():nextPoint.y());
     ptLs.append(pt);
@@ -247,7 +242,6 @@ QList<QgsPoint> eqiMapToolPointToTk::getRect(const QgsPoint &lastPoint, const Qg
     pt.set( lastPoint.x()>nextPoint.x() ? lastPoint.x():nextPoint.x(),
             lastPoint.y()<nextPoint.y() ? lastPoint.y():nextPoint.y());
     ptLs.append(pt);
-
 
     return ptLs;
 }

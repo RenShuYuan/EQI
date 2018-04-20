@@ -17,8 +17,6 @@ eqiAnalysisAerialphoto::eqiAnalysisAerialphoto(QObject *parent, QgsVectorLayer *
     , mLayerMap(layer)
     , mPosdp(posdp)
     , mPp(pp)
-    , mLayer_Omega(nullptr)
-    , mLayer_Kappa(nullptr)
     , isGroup(false)
 {
     airLineGroup();
@@ -792,7 +790,7 @@ QStringList eqiAnalysisAerialphoto::delOverlapBetween(QgsVectorLayer *mLayer_Ove
     return willDel;
 }
 
-void eqiAnalysisAerialphoto::checkOmega()
+void eqiAnalysisAerialphoto::checkOmega(QgsVectorLayer* mLayer_Omega)
 {
     // 保存超限的相片名称
     QStringList angle_General_List;
@@ -816,23 +814,8 @@ void eqiAnalysisAerialphoto::checkOmega()
 
     if ( !mLayer_Omega || !mLayer_Omega->isValid() )
     {
-        mLayer_Omega = MainWindow::instance()->createrMemoryMap("倾角检查",
-                                                            "Polygon",
-                                                            QStringList()
-                                                            << "field=id:integer"
-                                                            << "field=相片编号:string(50)"
-                                                            << "field=Omega:string(10)"
-                                                            << "field=错误类型:string(100)");
-
-        if (!mLayer_Omega && !mLayer_Omega->isValid())
-        {
-            MainWindow::instance()->messageBar()->pushMessage( "创建检查图层",
-                "创建图层失败, 运行已终止, 注意检查plugins文件夹!",
-                QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
-            QgsMessageLog::logMessage(QString("创建检查图层 : \t创建图层失败, 程序已终止, 注意检查plugins文件夹。"));
-            return;
-        }
-        mLayer_Omega->setCrs(mLayerMap->crs());
+        QgsMessageLog::logMessage(QString("创建检查图层 : \t创建图层失败, 程序已终止, 注意检查plugins文件夹。"));
+        return;
     }
     else
     {
@@ -906,7 +889,7 @@ void eqiAnalysisAerialphoto::checkOmega()
     QgsMessageLog::logMessage("倾斜角检查完成。");
 }
 
-void eqiAnalysisAerialphoto::checkKappa()
+void eqiAnalysisAerialphoto::checkKappa(QgsVectorLayer *mLayer_Kappa)
 {
     if (!isGroup)
     {
@@ -974,23 +957,8 @@ void eqiAnalysisAerialphoto::checkKappa()
 
     if ( !mLayer_Kappa || !mLayer_Kappa->isValid() )
     {
-        mLayer_Kappa = MainWindow::instance()->createrMemoryMap("旋片角检查",
-                                                            "Polygon",
-                                                            QStringList()
-                                                            << "field=id:integer"
-                                                            << "field=相片编号:string(50)"
-                                                            << "field=Kappa:string(10)"
-                                                            << "field=错误类型:string(100)");
-
-        if (!mLayer_Kappa && !mLayer_Kappa->isValid())
-        {
-            MainWindow::instance()->messageBar()->pushMessage( "创建检查图层",
-                "创建图层失败, 运行已终止, 注意检查plugins文件夹!",
-                QgsMessageBar::CRITICAL, MainWindow::instance()->messageTimeout() );
-            QgsMessageLog::logMessage(QString("创建检查图层 : \t创建图层失败, 程序已终止, 注意检查plugins文件夹。"));
-            return;
-        }
-        mLayer_Kappa->setCrs(mLayerMap->crs());
+        QgsMessageLog::logMessage(QString("创建检查图层 : \t创建图层失败, 程序已终止, 注意检查plugins文件夹。"));
+        return;
     }
     else
     {
@@ -1077,22 +1045,21 @@ void eqiAnalysisAerialphoto::checkKappa()
     QgsMessageLog::logMessage("旋偏角检查完成。");
 }
 
-QStringList eqiAnalysisAerialphoto::delOmegaAndKappa(const QString& type, const bool isEdge)
+QStringList eqiAnalysisAerialphoto::delOmegaAndKappa(QgsVectorLayer *layer, const QString& type, const bool isEdge)
 {
-    // 重新检查mLayer_Kappa与mLayer_Omega图层有效性
-//    if ( !mLayer_Kappa || !mLayer_Kappa->isValid() )
-//    {
-//        MainWindow::instance()->messageBar()->pushMessage( "删除错误相片"
-//            ,"请先检查后再进行自动删除。", QgsMessageBar::INFO
-//            , MainWindow::instance()->messageTimeout() );
-//        return QStringList();
-//    }
-
     QStringList overrun;
     QStringList willDel;
 
+    if (!(layer && layer->isValid()))
+    {
+        MainWindow::instance()->messageBar()->pushMessage( "删除角度超限相片"
+            ,"请先检查后再进行自动删除。", QgsMessageBar::INFO
+            , MainWindow::instance()->messageTimeout() );
+        return willDel;
+    }
+
     //进度条
-    QProgressDialog prDialog("统计错误相片...", "取消", 0, mLayer_Kappa->featureCount(), nullptr);
+    QProgressDialog prDialog("统计错误相片...", "取消", 0, layer->featureCount(), nullptr);
     prDialog.setWindowTitle("处理进度");              //设置窗口标题
     prDialog.setWindowModality(Qt::WindowModal);      //将对话框设置为模态
     prDialog.show();
@@ -1101,10 +1068,7 @@ QStringList eqiAnalysisAerialphoto::delOmegaAndKappa(const QString& type, const 
     // 从错误图层中提取所有超过最大限差的相片集合
     QgsFeature f;
     QgsFeatureIterator it;
-    if (type=="Omega")
-        it = mLayer_Omega->getFeatures();
-    else
-        it = mLayer_Kappa->getFeatures();
+    it = layer->getFeatures();
 
     while (it.nextFeature(f))
     {
